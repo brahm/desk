@@ -1028,8 +1028,8 @@ fn rev_01_an_object_put_back_where_it_was_or_deleted_is_in_no_change() {
             edit.move_objects(&[shape, copy], Length::from_pt(10.0), Length::ZERO)
         })
         .unwrap();
-    // Both moves are one change.
-    assert_eq!(editor.document().changes().len(), 1);
+    // Each object moved is a change of its own.
+    assert_eq!(editor.document().changes().len(), 2);
     editor
         .edit("Move", |edit| {
             edit.move_objects(&[shape], Length::from_pt(-10.0), Length::ZERO)
@@ -1037,7 +1037,7 @@ fn rev_01_an_object_put_back_where_it_was_or_deleted_is_in_no_change() {
         .unwrap();
     assert_eq!(editor.document().objects().get(shape).unwrap().moved, None);
     assert_eq!(editor.document().changes().len(), 1);
-    // The last object of the change deleted, the change goes too.
+    // The object of a change deleted, the change goes too.
     editor
         .edit("Delete", |edit| edit.delete_objects(&[copy]))
         .unwrap();
@@ -1102,7 +1102,7 @@ fn rev_01_an_object_moved_then_put_in_the_text_or_grouped_leaves_its_change() {
                 edit.move_objects(ids, Length::from_pt(10.0), Length::ZERO)
             })
             .unwrap();
-        assert_eq!(editor.document().changes().len(), 1);
+        assert_eq!(editor.document().changes().len(), ids.len());
     };
     step(&mut editor, &[shape]);
     editor

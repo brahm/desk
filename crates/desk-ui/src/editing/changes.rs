@@ -454,7 +454,11 @@ impl TextEditor {
     pub fn has_changes(&self) -> bool {
         let state = self.state.borrow();
         let document = Self::main_document(&state);
-        !document.change_places().is_empty() || document.objects().iter().any(|o| o.moved.is_some())
+        !document.change_places().is_empty()
+            || document.objects().iter().any(|o| {
+                o.moved
+                    .is_some_and(|m| document.changes().get(m.change).is_some())
+            })
     }
 
     /// The tracked changes that Accept and Reject of the selection take
@@ -955,11 +959,14 @@ mod tests {
             assert_eq!(editor.changes_at_selection(), [change.id]);
             // The bar goes to it from the text.
             editor.select_objects(Vec::new());
-            editor.select(Selection::cursor(Spot::new(0, 0)));
+            editor.select(Selection::cursor(Spot::new(0, 2)));
             assert_eq!(
                 editor.go_to_review_item(true),
                 Some(super::super::ReviewItem::Change(change.id))
             );
+            assert_eq!(editor.selected_objects(), [shape]);
+            // Before it there is nothing, wherever the cursor was left.
+            assert_eq!(editor.go_to_review_item(false), None);
             assert_eq!(editor.selected_objects(), [shape]);
             assert_eq!(
                 editor.review_position(),

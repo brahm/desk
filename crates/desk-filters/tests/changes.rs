@@ -1370,21 +1370,25 @@ fn rev_01_objects_moved_or_resized_are_kept_in_odt() {
     let document = editor.document();
     let bytes = write_odt(document).unwrap();
     keep("rev-01-objects-moved.odt", &bytes);
-    // One region, of a change of formatting, which the objects name.
+    // A region for each, of a change of formatting, which the object
+    // names.
     let content = desk_odf::read_odt(&bytes).unwrap();
-    assert_eq!(content.tracked_changes.len(), 1);
-    assert_eq!(
-        content.tracked_changes[0].kind,
-        desk_odf::ChangeKind::FormatChange
+    assert_eq!(content.tracked_changes.len(), 2);
+    assert!(
+        content
+            .tracked_changes
+            .iter()
+            .all(|r| r.kind == desk_odf::ChangeKind::FormatChange)
     );
     let read = read_odt(&bytes).unwrap();
-    assert_eq!(read.changes().len(), 1);
-    let change = read.changes().iter().next().unwrap();
-    assert_eq!(change.kind, ChangeKind::Placement);
-    assert_eq!(change.author.as_ref(), "Ana");
-    // Each object where it is, with where it was: the second moved from
-    // the second paragraph to the first.
+    assert_eq!(read.changes().len(), 2);
+    // Each object where it is, with where it was, in a change of its own
+    // by Ana: the second moved from the second paragraph to the first.
     let second = read.body().get(1).unwrap().id();
+    let by = |id| {
+        let change = read.changes().get(id).unwrap();
+        (change.kind, change.author.to_string())
+    };
     let placed: Vec<_> = read
         .objects()
         .iter()
@@ -1392,11 +1396,12 @@ fn rev_01_objects_moved_or_resized_are_kept_in_odt() {
             (
                 o.anchor,
                 o.frame,
-                o.moved.map(|m| (m.change, m.anchor, m.frame)),
+                o.moved.map(|m| (by(m.change), m.anchor, m.frame)),
             )
         })
         .collect();
     let read_first = read.body().get(0).unwrap().id();
+    let ana = (ChangeKind::Placement, "Ana".to_owned());
     assert_eq!(
         placed,
         [
@@ -1404,7 +1409,7 @@ fn rev_01_objects_moved_or_resized_are_kept_in_odt() {
                 Anchor::Page(0),
                 Frame::from_pt(120.0, 90.0, 50.0, 40.0),
                 Some((
-                    change.id,
+                    ana.clone(),
                     Anchor::Page(0),
                     Frame::from_pt(100.0, 100.0, 50.0, 40.0)
                 ))
@@ -1413,7 +1418,7 @@ fn rev_01_objects_moved_or_resized_are_kept_in_odt() {
                 Anchor::Paragraph(read_first),
                 Frame::from_pt(80.0, 5.0, 60.0, 45.0),
                 Some((
-                    change.id,
+                    ana,
                     Anchor::Paragraph(second),
                     Frame::from_pt(90.0, 10.0, 30.0, 30.0)
                 ))

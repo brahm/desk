@@ -777,6 +777,12 @@ impl TextEditor {
             .cells
             .filter(|c| Some(c.id) == object)
             .map(|c| c.focus);
+        // A selected object is the selection, wherever the cursor was
+        // left: its places have no text.
+        let (start, end) = match object {
+            Some(_) => (Spot::default(), Spot::default()),
+            None => (start, end),
+        };
         let mut cache = state.review_order.borrow_mut();
         if cache.as_ref().is_none_or(|c| c.document != *document) {
             let mut places = placed(document);
@@ -829,6 +835,12 @@ impl TextEditor {
         let document = Self::main_document(state);
         let (start, end) = state.selection.ordered();
         let story = state.story.as_ref().map(|m| m.story);
+        // Screen View selects no object (PXV-01): past those of comments
+        // and changes.
+        let mut places = places;
+        if state.screen.is_some() {
+            places.retain(|p| p.object.is_none());
+        }
         // With the text being edited, where the selection is.
         let stories = places.iter().filter_map(|p| p.story).chain(story);
         let texts = Texts::with(document, Self::main_layout(state), stories);
@@ -840,6 +852,12 @@ impl TextEditor {
             .cells
             .filter(|c| Some(c.id) == object)
             .map(|c| c.focus);
+        // A selected object is the selection, wherever the cursor was
+        // left: its places have no text.
+        let (start, end) = match object {
+            Some(_) => (Spot::default(), Spot::default()),
+            None => (start, end),
+        };
         let selected = Placed {
             id: NodeId::new(1).expect("not zero"),
             story,

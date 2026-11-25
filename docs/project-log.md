@@ -2566,6 +2566,14 @@ paragraph, and objects on a second page.
   Reject take the changes of the objects selected.
 - Whether the document has changes, which Accept All, Reject All and
   turning tracking off look at, counts the objects moved too.
+- The review found that objects moved at once shared one change, which
+  the bar went to once for each and which Reject of one of them took
+  back for all: each object moved is now a change of its own. Previous
+  from a selected object compared the cursor left in the text with
+  the place of the object, and went back to the same object; a
+  selected object is now the selection wherever the cursor was. Screen
+  View, which selects no object, goes past those of comments and
+  changes.
 
 ## Decisions, with their reasons and consequences
 
