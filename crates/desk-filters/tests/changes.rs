@@ -949,3 +949,31 @@ fn b_069_a_change_of_a_paragraph_joined_by_a_deletion_stays_on_it_in_odt() {
     assert_eq!(formats(&read), before);
     assert_eq!(described(&read), described(&document));
 }
+
+/// B-069 review: a change of a paragraph whose marks take in a deletion
+/// of breaks, as another program may write it, stays on the paragraph of
+/// its start and does not reach the paragraphs the deletion took.
+#[test]
+fn b_069_a_change_of_a_paragraph_around_a_deletion_stays_on_its_paragraph() {
+    let content = format!(
+        r#"{HEAD}<text:tracked-changes>
+<text:changed-region text:id="p"><text:format-change xmlns:desk="https://brahm.com.br/ns/desk/1.0" desk:paragraph-style-name=""><office:change-info><dc:creator>Bo</dc:creator><dc:date>2026-11-24T12:00:00</dc:date></office:change-info></text:format-change></text:changed-region>
+<text:changed-region text:id="d"><text:deletion><office:change-info><dc:creator>Ana</dc:creator><dc:date>2026-11-24T13:00:00</dc:date></office:change-info><text:p/><text:p>two</text:p><text:p/></text:deletion></text:changed-region>
+</text:tracked-changes>
+<text:p><text:change-start text:change-id="p"/>one<text:change text:change-id="d"/>three<text:change-end text:change-id="p"/></text:p>{TAIL}"#
+    );
+    let document = read_odt(&odt(&content)).unwrap();
+    let formatted: Vec<(String, bool)> = document
+        .body()
+        .iter()
+        .map(|p| (p.text(), p.attrs().format_change.flatten().is_some()))
+        .collect();
+    assert_eq!(
+        formatted,
+        [
+            ("one".into(), true),
+            ("two".into(), false),
+            ("three".into(), false)
+        ]
+    );
+}

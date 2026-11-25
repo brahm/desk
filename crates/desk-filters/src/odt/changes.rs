@@ -220,7 +220,12 @@ fn put(
                     .filter_map(|i| body.get(i).map(Paragraph::id))
                     .collect();
                 if let Some(before) = paragraphs.get(id.as_str()) {
-                    of_paragraphs.push((change, before.clone(), (start, from), (at, order)));
+                    // The paragraphs after the first that its marks take
+                    // in, as they are before the deletions are back.
+                    let rest: Vec<NodeId> = (first + 1..=last)
+                        .filter_map(|i| body.get(i).map(Paragraph::id))
+                        .collect();
+                    of_paragraphs.push((change, before.clone(), (start, from), rest));
                     continue;
                 }
                 if kind == ChangeKind::Format {
@@ -275,18 +280,12 @@ fn put(
         }
         place
     };
-    for (change, before, start, end) in of_paragraphs {
-        let (start, end) = (moved(start), moved(end));
-        let body = edit.document().body();
-        let (Some(first), Some(last)) =
-            (body.index_of(start.paragraph), body.index_of(end.paragraph))
-        else {
-            continue;
-        };
-        let marked: Vec<NodeId> = (first..=last)
-            .filter_map(|i| body.get(i).map(Paragraph::id))
-            .collect();
-        for paragraph in marked {
+    // The paragraph of its start, where the deletion before it put that,
+    // and those whose text its marks take in, but not the paragraphs
+    // that the deletions in it put back.
+    for (change, before, start, rest) in of_paragraphs {
+        let first = moved(start).paragraph;
+        for paragraph in std::iter::once(first).chain(rest) {
             edit.mark_paragraph_formatted(paragraph, change, before.clone())?;
         }
     }
