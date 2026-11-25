@@ -1189,12 +1189,15 @@ pub fn import(source: &odf::TextDocument) -> Result<Document, FilterError> {
             first.frames.clear();
         }
         let mut document = import_text(&source)?;
+        changes::prune(&mut document)?;
         let mut setup = *document.page_setup();
         setup.layout_pages = Some(pages);
         document.apply(Op::SetPageSetup { page: setup })?;
         return Ok(document);
     }
-    import_text(source)
+    let mut document = import_text(source)?;
+    changes::prune(&mut document)?;
+    Ok(document)
 }
 
 /// A word processing document from its ODF.
@@ -2178,8 +2181,14 @@ fn import_tracked(
         .iter()
         .filter(|r| met.contains(&r.id))
         .filter_map(|r| {
+            // Empty for text that had no formatting of its own; a name
+            // the file does not have leaves it unknown.
             let name = r.previous_style.as_deref()?;
-            let (style, attrs) = span_format(source, ids, name, odf_default_size(source));
+            let (style, attrs) = if name.is_empty() {
+                (None, CharAttrs::default())
+            } else {
+                span_format(source, ids, name, odf_default_size(source))?
+            };
             Some((
                 r.id.clone(),
                 Arc::new(desk_model::Formatting { style, attrs }),
@@ -2422,29 +2431,26 @@ type Marks = HashMap<String, NodeId>;
 
 /// The character style and the formatting that a text style of ODF names:
 /// a common style, or an automatic one over its parent, in text of the
-/// size `size` around it.
+/// size `size` around it; none for a name that the file does not have.
 fn span_format(
     source: &odf::TextDocument,
     ids: &HashMap<(odf::Family, &str), StyleId>,
     name: &str,
     size: f64,
-) -> (Option<StyleId>, CharAttrs) {
+) -> Option<(Option<StyleId>, CharAttrs)> {
     if let Some(&id) = ids.get(&(odf::Family::Text, name)) {
-        return (Some(id), CharAttrs::default());
+        return Some((Some(id), CharAttrs::default()));
     }
-    let Some(automatic) = source
+    let automatic = source
         .automatic_styles
         .iter()
-        .find(|s| s.family == odf::Family::Text && s.name == name)
-    else {
-        return (None, CharAttrs::default());
-    };
+        .find(|s| s.family == odf::Family::Text && s.name == name)?;
     let style = automatic
         .parent
         .as_deref()
         .and_then(|p| ids.get(&(odf::Family::Text, p)).copied());
     let size = odf_font_size(source, odf::Family::Text, Some(name)).unwrap_or(size);
-    (style, char_attrs(source, &automatic.properties.text, size))
+    Some((style, char_attrs(source, &automatic.properties.text, size)))
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -2508,8 +2514,11 @@ fn import_paragraph(
         }
         let mut run_style = None;
         let mut run_attrs = base.clone();
-        if let Some(name) = &span.style {
-            let (style, attrs) = span_format(source, ids, name, paragraph_size);
+        if let Some((style, attrs)) = span
+            .style
+            .as_deref()
+            .and_then(|name| span_format(source, ids, name, paragraph_size))
+        {
             run_style = style;
             run_attrs.merge(&attrs);
         }
@@ -2959,7 +2968,7 @@ fn export_margins(
             };
             let spans = export_spans(paragraph, None, comments, Some(&mut tracked), |run| {
                 let attrs = run.attrs.without_field();
-                let named = run.style.map(|id| names[&id].clone());
+                let named = run.style.and_then(|id| names.get(&id).cloned());
                 if attrs.is_empty() {
                     return named;
                 }
@@ -3400,7 +3409,7 @@ pub fn export(document: &Document) -> odf::TextDocument {
             &comment_marks,
             Some(&mut tracked),
             |run| {
-                let named = run.style.map(|id| names[&id].clone());
+                let named = run.style.and_then(|id| names.get(&id).cloned());
                 let attrs = run.attrs.without_field();
                 if attrs.is_empty() {
                     named
@@ -3511,7 +3520,7 @@ pub fn export(document: &Document) -> odf::TextDocument {
                 )
             };
             let spans = export_spans(paragraph, None, &comment_marks, Some(&mut tracked), |run| {
-                let named = run.style.map(|id| names[&id].clone());
+                let named = run.style.and_then(|id| names.get(&id).cloned());
                 let attrs = run.attrs.without_field();
                 if attrs.is_empty() {
                     return named;
@@ -3577,6 +3586,7 @@ pub fn export(document: &Document) -> odf::TextDocument {
             charts: Vec::new(),
             text_fills: &mut fills,
             comments: &comment_marks,
+            master: false,
         },
         &mut out,
     );

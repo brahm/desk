@@ -1707,6 +1707,11 @@ pub(super) struct Exporter<'a> {
     pub text_fills: &'a mut super::TextFills,
     /// The annotations of the comments on their text (W149).
     pub comments: &'a super::CommentMarks,
+    /// Whether the objects are those of master pages, whose automatic
+    /// styles are in styles.xml: their text styles take names of their
+    /// own, apart from those of content.xml, as the tracked changes of
+    /// both name them from content.xml (W148).
+    pub master: bool,
 }
 
 impl super::tables::TableStyles for Exporter<'_> {
@@ -1819,13 +1824,14 @@ impl Exporter<'_> {
                 ),
                 ..Default::default()
             };
-            self.style("OP", odf::Family::Paragraph, Some(style_name), properties)
+            let prefix = if self.master { "MOP" } else { "OP" };
+            self.style(prefix, odf::Family::Paragraph, Some(style_name), properties)
         };
         let names = self.names;
         let comments = self.comments;
         let spans = export_spans(paragraph, None, comments, Some(track), |run| {
             let attrs = run.attrs.without_field();
-            let named = run.style.map(|id| names[&id].clone());
+            let named = run.style.and_then(|id| names.get(&id).cloned());
             if attrs.is_empty() {
                 named
             } else {
@@ -1837,7 +1843,8 @@ impl Exporter<'_> {
                     ),
                     ..Default::default()
                 };
-                Some(self.style("OT", odf::Family::Text, named, properties))
+                let prefix = if self.master { "MOT" } else { "OT" };
+                Some(self.style(prefix, odf::Family::Text, named, properties))
             }
         });
         odf::Paragraph {
@@ -2486,6 +2493,7 @@ pub(super) fn export_master_objects(
         charts: Vec::new(),
         text_fills,
         comments,
+        master: true,
     };
     // The objects in the lines of the headers and footers (EST-12), with
     // the styles of the master pages.

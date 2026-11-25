@@ -599,7 +599,11 @@ impl Edit {
         end: Position,
         change: NodeId,
     ) -> Result<(), ModelError> {
-        self.map_runs(start, end, |run| run.attrs.change = Some(Some(change)))
+        self.map_runs(start, end, |run| {
+            run.attrs.change = Some(Some(change));
+            // Added or deleted, it has no change of formatting.
+            run.attrs.formatted = None;
+        })
     }
 
     /// Puts the text between two positions in a tracked change of its
@@ -629,7 +633,8 @@ impl Edit {
 
     /// Puts the text between two positions in a tracked change of its
     /// formatting whose formatting before is `before` for all of it, or
-    /// unknown, as a file gives it (W148).
+    /// unknown, as a file gives it (W148). Text already in a change keeps
+    /// it, as with [`Edit::mark_format_change`].
     pub fn mark_formatted(
         &mut self,
         start: Position,
@@ -638,6 +643,9 @@ impl Edit {
         before: Option<Arc<crate::Formatting>>,
     ) -> Result<(), ModelError> {
         self.map_runs(start, end, |run| {
+            if run.attrs.change.flatten().is_some() {
+                return;
+            }
             run.attrs.change = Some(Some(change));
             run.attrs.formatted = Some(before.clone());
         })

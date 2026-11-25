@@ -243,13 +243,13 @@ fn rev_01_changes_of_cells_or_out_of_order_do_not_stop_a_file() {
     );
     let (document, log) = read_odt_logged(&odt(&content)).unwrap();
     // The deletion in the cell of a table is listed as kept as accepted,
-    // as the comments of cells' text are, and the insertion whose end
-    // comes first marks nothing.
+    // as the comments of cells' text are, and so is the insertion whose
+    // end comes first, which marks nothing.
     let found: Vec<_> = log.entries().iter().map(|e| e.count).collect();
-    assert_eq!(found, [1], "{:?}", log.entries());
+    assert_eq!(found, [2], "{:?}", log.entries());
     let (lines, changes) = described(&document);
     assert_eq!(lines, ["\u{fffc}", "End first", "then start"]);
-    assert_eq!(changes, ["Insertion Ana Some(\"2026-11-24T13:00:00\")"]);
+    assert!(changes.is_empty(), "{changes:?}");
 }
 
 #[test]
@@ -561,5 +561,37 @@ fn rev_01_changes_of_formatting_of_libreoffice_are_read() {
     assert_eq!(
         described(&read_odt(&written).unwrap()),
         described(&document)
+    );
+}
+
+#[test]
+fn rev_01_changes_of_formatting_around_others_or_of_nothing() {
+    let region = |id: &str, kind: &str, style: &str| {
+        format!(
+            r#"<text:changed-region text:id="{id}"><text:{kind}{style}><office:change-info><dc:creator>Ana</dc:creator><dc:date>2026-11-25T10:00:00</dc:date></office:change-info></text:{kind}></text:changed-region>"#
+        )
+    };
+    let content = format!(
+        r#"{HEAD}<text:tracked-changes xmlns:desk="https://brahm.com.br/ns/desk/1.0">{}{}{}</text:tracked-changes>
+<text:p><text:change-start text:change-id="f"/>ab<text:change-start text:change-id="i"/>cd<text:change-end text:change-id="i"/>ef<text:change-end text:change-id="f"/></text:p>
+<text:p><text:change-start text:change-id="e"/><text:change-end text:change-id="e"/></text:p>{TAIL}"#,
+        region("f", "format-change", r#" desk:style-name="Missing""#),
+        region("i", "insertion", ""),
+        region("e", "format-change", ""),
+    );
+    let (document, log) = read_odt_logged(&odt(&content)).unwrap();
+    // The insertion keeps its text; the change of an empty paragraph is
+    // left out, and listed so.
+    let (lines, changes) = described(&document);
+    assert_eq!(lines, ["[~ab~][+cd+][~ef~]", ""]);
+    assert_eq!(changes.len(), 2);
+    assert_eq!(log.entries().len(), 1, "{:?}", log.entries());
+    // A style the file does not have leaves the formatting before unknown.
+    let first = document.body().iter().next().unwrap();
+    assert!(
+        first
+            .runs()
+            .filter(|r| r.text() != "cd")
+            .all(|r| r.attrs.formatted == Some(None))
     );
 }

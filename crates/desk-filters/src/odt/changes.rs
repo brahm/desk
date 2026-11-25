@@ -99,6 +99,42 @@ pub(super) fn import(
     Ok(())
 }
 
+/// Leaves out the changes that no text of a document read carries: those
+/// whose marks enclose no text, as a change of the formatting of an
+/// empty paragraph, or whose text is in another change. The log counts
+/// them, as the changes it does not find (W148).
+pub(super) fn prune(document: &mut Document) -> Result<(), FilterError> {
+    let mut carried: std::collections::HashSet<NodeId> = document
+        .change_places()
+        .into_iter()
+        .map(|(_, span)| span.id)
+        .collect();
+    // Notes too, wherever their marks are.
+    for note in document.notes().iter() {
+        let paragraphs = document.story_paragraphs(desk_model::Story::Note(note.id));
+        for paragraph in paragraphs.iter() {
+            carried.extend(paragraph.runs().filter_map(|r| r.attrs.change.flatten()));
+            carried.extend(paragraph.attrs().break_change.flatten());
+        }
+    }
+    let unused: Vec<NodeId> = document
+        .changes()
+        .iter()
+        .map(|c| c.id)
+        .filter(|id| !carried.contains(id))
+        .collect();
+    if unused.is_empty() {
+        return Ok(());
+    }
+    document.transact("Tracked Changes", |edit| {
+        for id in unused {
+            edit.set_change(id, None)?;
+        }
+        Ok(())
+    })?;
+    Ok(())
+}
+
 /// Puts the changes whose marks a text has on it: the body, or a story
 /// edited as a body.
 fn put(
@@ -193,6 +229,7 @@ fn restore(
             .cloned()
             .map(|mut run| {
                 run.attrs.change = Some(Some(change));
+                run.attrs.formatted = None;
                 run
             })
             .collect()
