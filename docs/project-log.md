@@ -2368,6 +2368,13 @@ paragraph, and objects on a second page.
 - A paragraph break of another author's insertion that a deletion took
   still loses that insertion, since a break keeps one change; it moves
   to step 13 (B-072).
+- The review found that text typed next to deleted text took the change
+  that text was in before, and that ODT split that change at each break
+  and lost the formatting before of all but its first run; the
+  formatting of text now leaves the change before out, and its marks go
+  on past a break the deletion took. A change that another change
+  interrupts still comes back from ODT as several, one for each piece,
+  as it did before; reading them as one moves to step 13 (B-073).
 
 ## Decisions, with their reasons and consequences
 

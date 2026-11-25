@@ -252,6 +252,10 @@ fn resolve_text(
     };
     let kind_of = |id: Option<NodeId>| id.and_then(|id| kinds.get(&id).copied());
     let ids: Vec<NodeId> = edit.document().body().iter().map(Paragraph::id).collect();
+    // The changes there are, which the text of a deletion rejected goes
+    // back to: one that is gone leaves it in none.
+    let changes: std::collections::HashSet<NodeId> =
+        edit.document().changes().iter().map(|c| c.id).collect();
     let mut gone: Vec<(Position, Position)> = Vec::new();
     for (i, &id) in ids.iter().enumerate() {
         let paragraph = edit.document().paragraph(id)?.clone();
@@ -309,6 +313,7 @@ fn resolve_text(
                 // A deletion rejected gives the text back to the change it
                 // was in before, unless that one is resolved too (B-070).
                 (Some(ChangeKind::Deletion), None) => {
+                    let former = former.filter(|id| changes.contains(id));
                     run.attrs.change = former.map(Some);
                     run.attrs.former = None;
                     if former.is_none() {

@@ -895,6 +895,7 @@ impl CharAttrs {
             comments: None,
             change: None,
             formatted: None,
+            former: None,
             ..self.clone()
         }
     }

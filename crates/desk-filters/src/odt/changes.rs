@@ -145,6 +145,7 @@ pub(super) fn prune(document: &mut Document) -> Result<(), FilterError> {
         let paragraphs = document.story_paragraphs(desk_model::Story::Note(note.id));
         for paragraph in paragraphs.iter() {
             carried.extend(paragraph.runs().filter_map(|r| r.attrs.change.flatten()));
+            carried.extend(paragraph.runs().filter_map(|r| r.attrs.former.flatten()));
             carried.extend(paragraph.attrs().break_change.flatten());
             carried.extend(paragraph.attrs().format_change.flatten());
         }

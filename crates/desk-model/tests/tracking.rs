@@ -717,3 +717,45 @@ fn b_070_deleted_text_keeps_the_change_it_was_in() {
         .unwrap();
     assert_eq!(runs(&editor, p), [plain("one three")]);
 }
+
+/// B-070 review: text typed next to deleted text that was in another
+/// author's change is in neither, so rejecting that change keeps it.
+#[test]
+fn b_070_text_typed_next_to_deleted_text_is_in_no_change_it_was_in() {
+    let (mut editor, p) = typed("one two three");
+    let ((bo, _), _) = editor
+        .edit("Changes", |edit| {
+            let bo = edit.add_change(ChangeKind::Insertion, "Bo", None)?;
+            edit.mark_change(Position::new(p, 4), Position::new(p, 8), bo)?;
+            Ok(((bo, ()), ()))
+        })
+        .unwrap();
+    track(&mut editor, Tracking::On);
+    editor
+        .edit("Delete", |edit| {
+            edit.delete(Position::new(p, 4), Position::new(p, 8))
+                .map(|_| ())
+        })
+        .unwrap();
+    track(&mut editor, Tracking::Off);
+    editor
+        .edit("Typing", |edit| {
+            edit.insert_text(Position::new(p, 8), "X").map(|_| ())
+        })
+        .unwrap();
+    let paragraph = editor.document().paragraph(p).unwrap();
+    assert!(
+        paragraph
+            .runs()
+            .filter(|r| r.text().contains('X'))
+            .all(|r| r.attrs.former.is_none() && r.attrs.change.is_none()),
+        "{:?}",
+        paragraph.runs().collect::<Vec<_>>()
+    );
+    editor
+        .edit("Resolve", |edit| {
+            edit.resolve_changes(false, |c| c == bo).map(|_| ())
+        })
+        .unwrap();
+    assert_eq!(editor.document().paragraph(p).unwrap().text(), "one Xthree");
+}

@@ -713,7 +713,10 @@ rejecting the deletion gives the text back to it (W148, B-070). Desk
 writes the `text:change-start` and `text:change-end` marks of that
 change inside the paragraphs of the `text:deletion` that hold the text,
 with a `text:changed-region` of its own, and reads them back from
-there. ODF lets a deletion keep any content of a paragraph; other
+there. A change that goes on past a break the deletion took goes on
+in the next of its paragraphs, and a change of formatting starts again
+where the formatting before it differs, as outside a deletion. ODF lets
+a deletion keep any content of a paragraph; other
 programs that do not look for marks there read the text as deleted
 alone, and the region as a change that holds no text.
 
