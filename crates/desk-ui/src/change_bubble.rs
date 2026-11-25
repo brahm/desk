@@ -5,8 +5,8 @@
 //! it at the change that Previous or Next of the bar of comments and
 //! changes selects: a dot in the colour of its author, the author and
 //! when, what it did to which text, and the arrows to the change before
-//! and after. It stays while the change is selected, and the keyboard
-//! stays with the document. Accept and Reject come with step 12 of W2.
+//! and after, and Accept and Reject. It stays while the change is
+//! selected, and the keyboard stays with the document.
 
 use std::cell::Cell;
 
@@ -95,6 +95,27 @@ impl ChangeBubbleView {
             date.as_deref(),
             &[&previous, &next],
         ));
+        // Accept and Reject of this change (REV-05).
+        let accept = gtk::Button::builder()
+            .label(tr("_Accept"))
+            .use_underline(true)
+            .action_name("win.accept-change")
+            .can_focus(false)
+            .build();
+        accept.add_css_class("suggested-action");
+        let reject = gtk::Button::builder()
+            .label(tr("_Reject"))
+            .use_underline(true)
+            .action_name("win.reject-change")
+            .can_focus(false)
+            .build();
+        let buttons = gtk::Box::builder()
+            .spacing(6)
+            .halign(gtk::Align::End)
+            .margin_top(4)
+            .build();
+        buttons.append(&reject);
+        buttons.append(&accept);
         let label = gtk::Label::builder()
             .use_markup(true)
             .label(what(bubble))
@@ -104,6 +125,7 @@ impl ChangeBubbleView {
             .max_width_chars(36)
             .build();
         self.content.append(&label);
+        self.content.append(&buttons);
         self.place(view);
     }
 

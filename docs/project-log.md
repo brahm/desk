@@ -2341,6 +2341,19 @@ paragraph, and objects on a second page.
   when it was an earlier one (B-066), when, in the words of the comment
   cards, and what it did to which text, its start when it is long.
 
+### 25 November: accepting and rejecting a change (step 12 of W2, first part)
+
+- Accept and Reject take the change selected, or the one the cursor is
+  in, or every change the selection touches, its text, the breaks it
+  goes over and the formatting of its paragraphs, as Pages 15.4 does
+  from the bubble and from Edit > Track Changes; the window has no Edit
+  menu, so they are in the command search too (D-008), and in the menu
+  of the bar.
+- A change that runs on past the selection is taken whole, as in Pages:
+  a change is one thing to accept or reject, and cutting it in two
+  would give the author two changes they did not make.
+- The tracking actions are named in Undo and Redo.
+
 ## Decisions, with their reasons and consequences
 
 Ids `D-nnn` and `R-nnn` are those of [decisions.md](decisions.md).

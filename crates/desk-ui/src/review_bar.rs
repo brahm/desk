@@ -8,11 +8,10 @@
 //! order of the pages, the place of the one selected among them, Comment,
 //! Highlight and Track Changes. While changes are tracked, Track Changes
 //! gives way to the switch between Paused and On and the menu of the
-//! actions: Accept All Changes, Reject All Changes, the views of markup
-//! (REV-04), Author Color and Turn Off Tracking. It shows while the
-//! document has comments or changes, or tracks them.
-//!
-//! Accept and Reject of the change selected come with step 12 of W2.
+//! actions: Accept and Reject of the change selected (REV-05), Accept All
+//! Changes, Reject All Changes, the views of markup (REV-04), Author Color
+//! and Turn Off Tracking. It shows while the document has comments or
+//! changes, or tracks them.
 
 use adw::prelude::*;
 use gtk::gio;
@@ -169,6 +168,10 @@ pub fn position_label(current: Option<(usize, ReviewItem)>, total: usize) -> Str
 /// The menu of the actions of tracking.
 fn actions_menu() -> gio::Menu {
     let menu = gio::Menu::new();
+    let one = gio::Menu::new();
+    one.append(Some(&tr("Accept _Change")), Some("win.accept-change"));
+    one.append(Some(&tr("Re_ject Change")), Some("win.reject-change"));
+    menu.append_section(None, &one);
     let all = gio::Menu::new();
     all.append(
         Some(&tr("_Accept All Changes")),

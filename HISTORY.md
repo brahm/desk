@@ -8,6 +8,9 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
 
 ## Changes since 0.7.0 (unreleased)
 
+* Added: Desk Writer accepts or rejects the tracked change selected,
+  or those of the selection, from its bubble, the tracking bar and the
+  command search (#PR).
 * Added: in Desk Writer, the tracked change that Previous or Next
   selects shows a bubble with its author, its date and what it did
   (#223).

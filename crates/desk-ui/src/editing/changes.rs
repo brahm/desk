@@ -370,6 +370,86 @@ impl TextEditor {
         !Self::main_document(&state).change_places().is_empty()
     }
 
+    /// The tracked changes that Accept and Reject of the selection take
+    /// (REV-05): those of the text selected, its breaks and the
+    /// formatting of its paragraphs, or the change that the cursor or the
+    /// bar is on.
+    pub fn changes_at_selection(&self) -> Vec<desk_model::NodeId> {
+        if self.selection().is_empty() {
+            return match self.review_position().0 {
+                Some((_, super::ReviewItem::Change(id))) => vec![id],
+                _ => Vec::new(),
+            };
+        }
+        let state = self.state.borrow();
+        let (start, end) = state.selection.ordered();
+        let document = state.editor.document();
+        let mut out = Vec::new();
+        let mut add = |id: Option<desk_model::NodeId>| {
+            if let Some(id) = id
+                && document.changes().get(id).is_some()
+                && !out.contains(&id)
+            {
+                out.push(id);
+            }
+        };
+        for index in start.paragraph..=end.paragraph {
+            let Some(paragraph) = document.body().get(index) else {
+                break;
+            };
+            let attrs = paragraph.attrs();
+            add(attrs.format_change.flatten());
+            // The break at its end, when the selection goes over it.
+            if index < end.paragraph {
+                add(attrs.break_change.flatten());
+            }
+            let from = if index == start.paragraph {
+                start.offset
+            } else {
+                0
+            };
+            let to = if index == end.paragraph {
+                end.offset
+            } else {
+                usize::MAX
+            };
+            let mut offset = 0;
+            for run in paragraph.runs() {
+                let run_end = offset + run.len();
+                if offset < to && run_end > from {
+                    add(run.attrs.change.flatten());
+                }
+                offset = run_end;
+            }
+        }
+        out
+    }
+
+    /// Accepts or rejects the tracked changes of the selection, as one
+    /// action of the history (REV-05), and gives how many there were.
+    pub fn resolve_selected_changes(&self, accept: bool) -> usize {
+        let ids = self.changes_at_selection();
+        if ids.is_empty() {
+            return 0;
+        }
+        // A change may be in more than one text: from the body.
+        if self.story().is_some() {
+            self.leave_story(None);
+        }
+        let name = if accept {
+            "Accept Change"
+        } else {
+            "Reject Change"
+        };
+        let mut count = 0;
+        let counted = &mut count;
+        self.format_edit(name, |edit| {
+            *counted = edit.resolve_changes(accept, |id| ids.contains(&id))?;
+            Ok(())
+        });
+        count
+    }
+
     /// Accepts or rejects every tracked change of the document, as one
     /// action of the history (REV-06), and gives how many there were.
     pub fn resolve_all_changes(&self, accept: bool) -> usize {
@@ -625,6 +705,53 @@ mod tests {
         assert!(short.chars().count() <= BUBBLE_TEXT + 1);
         assert!(short.ends_with("word\u{2026}"));
         assert_eq!(excerpt(" two "), "two");
+    }
+
+    #[test]
+    fn rev_05_the_change_selected_or_those_of_the_selection_are_accepted_or_rejected() {
+        crate::with_gtk(|| {
+            let mut document = Document::new_word_processing();
+            let p = document.start().paragraph;
+            let ((added, gone), _) = document
+                .transact("Changes", |edit| {
+                    let start = edit.document().start();
+                    edit.insert_text(start, "one two three")?;
+                    let added = edit.add_change(ChangeKind::Insertion, "Bo", None)?;
+                    let gone = edit.add_change(ChangeKind::Deletion, "Bo", None)?;
+                    edit.mark_change(Position::new(p, 0), Position::new(p, 3), added)?;
+                    edit.mark_change(Position::new(p, 4), Position::new(p, 8), gone)?;
+                    Ok((added, gone))
+                })
+                .unwrap();
+            let editor = TextEditor::new(&crate::view::DocumentView::new(), document);
+            let text = |editor: &TextEditor| editor.document().body().get(0).unwrap().text();
+            // The selection over both takes both.
+            editor.select(Selection {
+                anchor: Spot::new(0, 1),
+                focus: Spot::new(0, 6),
+            });
+            assert_eq!(editor.changes_at_selection(), [added, gone]);
+            // The cursor in a change takes it alone.
+            editor.select(Selection::cursor(Spot::new(0, 5)));
+            assert_eq!(editor.changes_at_selection(), [gone]);
+            // Rejected, the deleted text stays, and is no change.
+            assert_eq!(editor.resolve_selected_changes(false), 1);
+            assert_eq!(text(&editor), "one two three");
+            assert!(editor.document().changes().get(gone).is_none());
+            // Accepted, the added text stays as text.
+            assert_eq!(
+                editor.go_to_review_item(false),
+                Some(super::super::ReviewItem::Change(added))
+            );
+            assert_eq!(editor.resolve_selected_changes(true), 1);
+            assert_eq!(text(&editor), "one two three");
+            assert!(!editor.has_changes());
+            assert_eq!(editor.resolve_selected_changes(true), 0);
+            // One action of the history each.
+            editor.undo();
+            assert!(editor.document().changes().get(added).is_some());
+            assert!(editor.document().changes().get(gone).is_none());
+        });
     }
 
     #[test]
