@@ -1842,7 +1842,7 @@ fn import_text(source: &odf::TextDocument) -> Result<Document, FilterError> {
     // The objects, once the body and the pages they go on are there, and
     // the comments of their text (W149).
     let mut object_comments: Vec<(NodeId, usize, odf::Field)> = Vec::new();
-    objects::import_objects(source, &mut document, &mut |document, paragraph| {
+    let moved = objects::import_objects(source, &mut document, &mut |document, paragraph| {
         let mut found = Vec::new();
         let built = import_paragraph(
             source,
@@ -2004,6 +2004,9 @@ fn import_text(source: &odf::TextDocument) -> Result<Document, FilterError> {
         relative,
         tracked,
     )?;
+    // Then the objects that changes moved, with the paragraphs they were
+    // at all there.
+    changes::import_moves(source, &mut document, &moved)?;
 
     let meta = &source.meta;
     document.apply(Op::SetMetadata {
@@ -2304,6 +2307,25 @@ fn import_tracked(
             }
             paragraphs.push(built);
         }
+        // The objects in the lines it took (REV-01, OBJ-01).
+        objects::import_story_inline_objects(
+            source,
+            document,
+            &region.deleted,
+            &mut paragraphs,
+            &mut |document, paragraph| {
+                import_paragraph(
+                    source,
+                    document,
+                    ids,
+                    default,
+                    paragraph,
+                    relative,
+                    &Marks::new(),
+                    None,
+                )
+            },
+        )?;
         for (_, field) in inner.iter().flatten() {
             if let odf::Field::ChangeStart { id } = field {
                 met.insert(id.clone());

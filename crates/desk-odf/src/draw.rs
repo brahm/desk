@@ -389,6 +389,10 @@ pub struct DrawObject {
     /// `desk:origin`: what the copies of one object share, which Magic
     /// Move of Desk Slides matches (IOP-33).
     pub origin: Option<String>,
+    /// `desk:moved-from`: where a floating object was before a tracked
+    /// change moved or resized it, as Desk writes it (W148, REV-01,
+    /// odf-extensions.md).
+    pub moved_from: Option<String>,
     /// The `desk:annotation`s in it: the comments on the object itself,
     /// each with its replies after it (W149, odf-extensions.md).
     pub annotations: Vec<crate::Annotation>,
@@ -420,6 +424,7 @@ impl DrawObject {
             contour: None,
             contour_parts: Vec::new(),
             origin: None,
+            moved_from: None,
             annotations: Vec::new(),
         }
     }
@@ -1016,6 +1021,7 @@ fn draw_object_at(
         contour,
         contour_parts,
         origin: e.attr(DESK, "origin").map(str::to_owned),
+        moved_from: e.attr(DESK, "moved-from").map(str::to_owned),
         annotations: e
             .elements()
             .filter(|c| c.name.is(DESK, "annotation"))
@@ -1167,6 +1173,7 @@ pub(crate) fn write_draw_object(
         w.attr("draw:z-index", &z.to_string());
     }
     w.attr_opt("desk:origin", object.origin.as_deref());
+    w.attr_opt("desk:moved-from", object.moved_from.as_deref());
     if !matches!(
         object.kind,
         DrawKind::Line { .. } | DrawKind::Connector { .. } | DrawKind::Group(_)

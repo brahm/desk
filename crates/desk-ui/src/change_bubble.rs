@@ -176,6 +176,7 @@ pub fn what(bubble: &ChangeBubble) -> String {
         desk_model::ChangeKind::Insertion => tr("Added:"),
         desk_model::ChangeKind::Deletion => tr("Deleted:"),
         desk_model::ChangeKind::Format => tr("Formatted:"),
+        desk_model::ChangeKind::Placement => tr("Moved:"),
     };
     let text = if !bubble.text.is_empty() {
         tr("“{text}”").replace("{text}", &bubble.text)

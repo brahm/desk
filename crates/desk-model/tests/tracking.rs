@@ -865,3 +865,207 @@ fn b_072_the_last_break_accepted_is_in_no_change() {
     assert_eq!(attrs.break_former.flatten(), None);
     let _ = bo;
 }
+
+/// A shape in the line of the text of a paragraph, inserted at `offset`.
+fn inline_shape(editor: &mut Editor, p: NodeId, offset: usize) -> NodeId {
+    use desk_model::{Frame, Object, Shape};
+    editor
+        .edit("Insert Shape", |edit| {
+            let shape = Object::new(
+                edit.new_id(),
+                Shape::Ellipse.into(),
+                Frame::from_pt(0.0, 0.0, 20.0, 10.0),
+            );
+            let id = shape.id;
+            edit.insert_object_in_text(Position::new(p, offset), shape)?;
+            Ok(id)
+        })
+        .unwrap()
+}
+
+#[test]
+fn rev_01_an_object_put_in_the_text_is_an_insertion() {
+    let (mut editor, p) = typed("ab");
+    track(&mut editor, Tracking::On);
+    let shape = inline_shape(&mut editor, p, 1);
+    // The mark of the object is in one insertion, with no change of its
+    // formatting.
+    assert_eq!(editor.document().changes().len(), 1);
+    let mark = desk_model::FIELD_CHARACTER.to_string();
+    assert_eq!(runs(&editor, p), [plain("a"), ins(&mark), plain("b")]);
+    // Rejected, the object goes with its mark; accepted, it stays.
+    editor
+        .edit("Reject", |edit| edit.resolve_changes(false, |_| true))
+        .unwrap();
+    assert_eq!(texts(&editor), ["ab"]);
+    assert!(editor.document().objects().get(shape).is_none());
+    editor.undo().unwrap();
+    editor
+        .edit("Accept", |edit| edit.resolve_changes(true, |_| true))
+        .unwrap();
+    assert_eq!(runs(&editor, p), [plain("a"), plain(&mark), plain("b")]);
+    assert!(editor.document().objects().get(shape).is_some());
+}
+
+#[test]
+fn rev_01_an_object_deleted_from_the_text_stays_until_the_deletion_is_accepted() {
+    let (mut editor, p) = typed("ab");
+    let shape = inline_shape(&mut editor, p, 1);
+    track(&mut editor, Tracking::On);
+    editor
+        .edit("Delete", |edit| {
+            edit.delete(
+                Position::new(p, 1),
+                Position::new(p, 1 + desk_model::FIELD_CHARACTER.len_utf8()),
+            )
+        })
+        .unwrap();
+    assert!(editor.document().objects().get(shape).is_some());
+    editor
+        .edit("Reject", |edit| edit.resolve_changes(false, |_| true))
+        .unwrap();
+    assert!(editor.document().objects().get(shape).is_some());
+    assert!(editor.document().changes().is_empty());
+    editor.undo().unwrap();
+    editor
+        .edit("Accept", |edit| edit.resolve_changes(true, |_| true))
+        .unwrap();
+    assert_eq!(texts(&editor), ["ab"]);
+    assert!(editor.document().objects().get(shape).is_none());
+}
+
+/// A shape fixed on the first page.
+fn floating_shape(editor: &mut Editor) -> NodeId {
+    use desk_model::{Anchor, Frame, Object, Shape};
+    editor
+        .edit("Insert Shape", |edit| {
+            let mut shape = Object::new(
+                edit.new_id(),
+                Shape::Ellipse.into(),
+                Frame::from_pt(100.0, 100.0, 50.0, 40.0),
+            );
+            shape.anchor = Anchor::Page(0);
+            let id = shape.id;
+            edit.add_object(shape)?;
+            Ok(id)
+        })
+        .unwrap()
+}
+
+#[test]
+fn rev_01_a_floating_object_moved_or_resized_keeps_where_it_was() {
+    use desk_model::{Anchor, Frame, Length};
+    let (mut editor, p) = typed("ab");
+    let shape = floating_shape(&mut editor);
+    let before = Frame::from_pt(100.0, 100.0, 50.0, 40.0);
+    track(&mut editor, Tracking::On);
+    let moved = |editor: &Editor| editor.document().objects().get(shape).unwrap().moved;
+    editor
+        .edit("Move", |edit| {
+            edit.move_objects(&[shape], Length::from_pt(10.0), Length::from_pt(5.0))
+        })
+        .unwrap();
+    // One change, by the author, which keeps where it was.
+    let change = editor.document().changes().iter().next().unwrap().clone();
+    assert_eq!(change.kind, ChangeKind::Placement);
+    assert_eq!(change.author.as_ref(), "Ana");
+    assert_eq!(
+        moved(&editor),
+        Some(desk_model::Moved {
+            change: change.id,
+            anchor: Anchor::Page(0),
+            frame: before,
+        })
+    );
+    // Resized and moved to the paragraph after, it stays in that change,
+    // with where it was first.
+    editor
+        .edit("Resize", |edit| {
+            edit.place_object(
+                shape,
+                Anchor::Paragraph(p),
+                Frame::from_pt(20.0, 0.0, 80.0, 60.0),
+            )
+        })
+        .unwrap();
+    assert_eq!(editor.document().changes().len(), 1);
+    assert_eq!(moved(&editor).unwrap().frame, before);
+    // Rejected, it is back where it was, in no change.
+    editor
+        .edit("Reject", |edit| edit.resolve_changes(false, |_| true))
+        .unwrap();
+    let object = editor.document().objects().get(shape).unwrap();
+    assert_eq!(
+        (object.anchor, object.frame, object.moved),
+        (Anchor::Page(0), before, None)
+    );
+    assert!(editor.document().changes().is_empty());
+    // Accepted, it stays where it went.
+    editor.undo().unwrap();
+    editor
+        .edit("Accept", |edit| edit.resolve_changes(true, |_| true))
+        .unwrap();
+    let object = editor.document().objects().get(shape).unwrap();
+    assert_eq!(
+        (object.anchor, object.frame, object.moved),
+        (
+            Anchor::Paragraph(p),
+            Frame::from_pt(20.0, 0.0, 80.0, 60.0),
+            None
+        )
+    );
+}
+
+#[test]
+fn rev_01_an_object_put_back_where_it_was_or_deleted_is_in_no_change() {
+    use desk_model::Length;
+    let (mut editor, _) = typed("ab");
+    let shape = floating_shape(&mut editor);
+    let copy = floating_shape(&mut editor);
+    track(&mut editor, Tracking::On);
+    editor
+        .edit("Move", |edit| {
+            edit.move_objects(&[shape, copy], Length::from_pt(10.0), Length::ZERO)
+        })
+        .unwrap();
+    // Both moves are one change.
+    assert_eq!(editor.document().changes().len(), 1);
+    editor
+        .edit("Move", |edit| {
+            edit.move_objects(&[shape], Length::from_pt(-10.0), Length::ZERO)
+        })
+        .unwrap();
+    assert_eq!(editor.document().objects().get(shape).unwrap().moved, None);
+    assert_eq!(editor.document().changes().len(), 1);
+    // The last object of the change deleted, the change goes too.
+    editor
+        .edit("Delete", |edit| edit.delete_objects(&[copy]))
+        .unwrap();
+    assert!(editor.document().changes().is_empty());
+    // Paused, moving is no change.
+    track(&mut editor, Tracking::Paused);
+    editor
+        .edit("Move", |edit| {
+            edit.move_objects(&[shape], Length::from_pt(10.0), Length::ZERO)
+        })
+        .unwrap();
+    assert!(editor.document().changes().is_empty());
+}
+
+#[test]
+fn rev_01_an_object_moved_into_the_text_is_no_insertion() {
+    let (mut editor, p) = typed("ab");
+    let shape = floating_shape(&mut editor);
+    track(&mut editor, Tracking::On);
+    editor
+        .edit("Inline", |edit| {
+            edit.put_object_in_text(shape, Position::new(p, 1))
+        })
+        .unwrap();
+    assert!(editor.document().changes().is_empty());
+    // Rejecting all leaves it in the text.
+    editor
+        .edit("Reject", |edit| edit.resolve_changes(false, |_| true))
+        .unwrap();
+    assert!(editor.document().objects().get(shape).is_some());
+}

@@ -180,9 +180,12 @@ impl Edit {
             let mut placed = object;
             placed.anchor = Anchor::InText;
             placed.rotation = 0;
+            placed.moved = None;
             self.replace_object(placed)?;
         }
-        self.insert_mark(at, id)?;
+        // Moving an object that is there already, its mark is no text
+        // added, which rejecting would take away with the object (W148).
+        self.untracked(|edit| edit.insert_mark(at, id))?;
         Ok(())
     }
 
@@ -219,6 +222,8 @@ impl Edit {
         // A copy is a new object, without the comments of the first, on
         // it or on its cells.
         copy.comments = crate::CommentIds::none();
+        // Nor its tracked change of place (W148).
+        copy.moved = None;
         if let crate::ObjectKind::Table(table) = &mut copy.kind
             && !table.comments().is_empty()
         {

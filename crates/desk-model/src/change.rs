@@ -34,6 +34,10 @@ pub enum ChangeKind {
     /// The formatting of text changed: its character style or the
     /// formatting set on it.
     Format,
+    /// A floating object was moved or resized: it keeps where it was
+    /// ([`crate::Object::moved`]) until the change is accepted or
+    /// rejected, as Pages '09 tracked it (D-003).
+    Placement,
 }
 
 /// The style and the formatting that a paragraph had before a change of
@@ -213,6 +217,32 @@ impl crate::Edit {
                 self.edit_story(story, resolve)?;
             }
         }
+        // The objects moved or resized: accepted, they stay where they
+        // are; rejected, they go back where they were, unless the
+        // paragraph they moved with is gone (REV-01).
+        let moved: Vec<crate::Object> = self
+            .document()
+            .objects()
+            .iter()
+            .filter(|o| o.moved.is_some_and(|m| kinds.contains_key(&m.change)))
+            .cloned()
+            .collect();
+        for object in moved {
+            let before = object.moved.expect("it was moved");
+            let there = match before.anchor {
+                crate::Anchor::Paragraph(id) => self.document().paragraph(id).is_ok(),
+                _ => true,
+            };
+            let mut placed = if accept || !there {
+                object
+            } else {
+                let mut placed = crate::reframed(&object, before.frame);
+                placed.anchor = before.anchor;
+                placed
+            };
+            placed.moved = None;
+            self.untracked(|edit| edit.replace_object(placed))?;
+        }
         for id in &resolved {
             self.set_change(*id, None)?;
         }
@@ -248,7 +278,7 @@ fn resolve_text(
     let goes = |kind: ChangeKind| match kind {
         ChangeKind::Insertion => !accept,
         ChangeKind::Deletion => accept,
-        ChangeKind::Format => false,
+        ChangeKind::Format | ChangeKind::Placement => false,
     };
     let kind_of = |id: Option<NodeId>| id.and_then(|id| kinds.get(&id).copied());
     let ids: Vec<NodeId> = edit.document().body().iter().map(Paragraph::id).collect();
@@ -387,7 +417,7 @@ fn run_goes(
     match change {
         Some(ChangeKind::Insertion) => !accept,
         Some(ChangeKind::Deletion) => accept || former == Some(ChangeKind::Insertion),
-        Some(ChangeKind::Format) => false,
+        Some(ChangeKind::Format | ChangeKind::Placement) => false,
         None => !accept && former == Some(ChangeKind::Insertion),
     }
 }

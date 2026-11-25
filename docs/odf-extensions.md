@@ -275,6 +275,26 @@ These sit on the `style:graphic-properties` of the graphic style of a
 - **Value:** sixteen hexadecimal digits, an identifier that a copy keeps.
 - **Fallback:** none; other programs match by their own rules.
 
+#### `desk:moved-from`
+
+- **Feature:** where a floating object was before a tracked change
+  moved or resized it, which rejecting the change puts it back to, as
+  Pages '09 tracked it (W148, REV-01, D-003). ODF tracks changes of
+  text only.
+- **On:** a drawing object fixed on a page or anchored to a paragraph
+  of the body, as `write_draw_object` writes it.
+- **Value:** words apart: the `text:id` of the `text:changed-region` of
+  the change, a `text:format-change` that no text marks, one for all
+  the objects the change moved; `page` and the page from 1, or
+  `paragraph` and the index of the paragraph in the body from 0, with
+  the paragraphs that deletions took counted where they were; and the
+  `x`, `y`, width and height of the frame there, as lengths, as Desk
+  keeps the frame (from the left edge of the paper for an object of a
+  paragraph).
+- **Fallback:** the object where it is, as if the change were
+  accepted; other programs read the region as a change that holds no
+  text, and leave it out.
+
 #### `desk:shape`
 
 - **Feature:** the shapes of Desk with settings that the user changes
