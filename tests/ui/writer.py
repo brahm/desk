@@ -477,7 +477,19 @@ def main():
 
         # With Check Grammar, the proofreader of Pages '09 that Desk keeps
         # finds a word written twice in the text selected (TXT-11).
-        grammar = wait_for("Check Grammar", lambda: showing_named(app, "Check Grammar"))
+        grammar = wait_for(
+            "Check Grammar",
+            lambda: next(
+                (
+                    n
+                    for n in walk(app)
+                    if n.get_role() == Atspi.Role.CHECK_BOX
+                    and n.get_name() == "Check Grammar"
+                    and showing(n)
+                ),
+                None,
+            ),
+        )
         if not grammar.get_state_set().contains(Atspi.StateType.CHECKED):
             Atspi.Action.do_action(grammar, 0)
         wait_for(
