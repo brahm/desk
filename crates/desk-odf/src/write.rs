@@ -231,6 +231,9 @@ fn write_settings(document: &TextDocument) -> Option<String> {
         if let Some(levels) = view.outline_levels {
             config_item(&mut w, "DeskOutlineLevels", "short", &levels.to_string());
         }
+        if let Some(markup) = &view.markup {
+            config_item(&mut w, "DeskMarkupView", "string", markup);
+        }
         w.end().end().end();
     }
     if has_text {

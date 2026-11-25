@@ -130,7 +130,7 @@ pub fn clamp(document: &Document, spot: Spot) -> Spot {
 }
 
 /// The lines of a paragraph, with the page each is on.
-fn lines_of(
+pub(crate) fn lines_of(
     layout: &DocumentLayout,
     paragraph: usize,
 ) -> impl Iterator<Item = (usize, &PlacedLine)> {
@@ -326,7 +326,7 @@ pub fn selection_rects(layout: &DocumentLayout, selection: &Selection) -> Vec<Sp
 
 /// One character back or forward, across paragraphs. A character is what
 /// people see as one, such as a letter with its accents.
-pub fn move_char(document: &Document, spot: Spot, forward: bool) -> Spot {
+fn char_step(document: &Document, spot: Spot, forward: bool) -> Spot {
     let text = text_of(document, spot.paragraph);
     let boundaries: Vec<usize> = text
         .grapheme_indices(true)
@@ -351,6 +351,105 @@ pub fn move_char(document: &Document, spot: Spot, forward: bool) -> Spot {
     }
 }
 
+/// One character back or forward, across paragraphs, past text that the
+/// view hides (REV-04).
+pub fn move_char(document: &Document, spot: Spot, forward: bool) -> Spot {
+    past_hidden(document, spot, forward, char_step)
+}
+
+/// To the start of the previous word or the end of the next one, as
+/// Option and an arrow do on the Mac and Control and an arrow on GNOME,
+/// past text that the view hides (REV-04).
+pub fn move_word(document: &Document, spot: Spot, forward: bool) -> Spot {
+    past_hidden(document, spot, forward, word_step)
+}
+
+/// A step from a spot that lands out of the text the view hides, and
+/// moves where it shows: a step over hidden text alone takes another.
+fn past_hidden(
+    document: &Document,
+    spot: Spot,
+    forward: bool,
+    step: fn(&Document, Spot, bool) -> Spot,
+) -> Spot {
+    let mut from = spot;
+    loop {
+        let to = skip_hidden(document, step(document, from, forward), forward);
+        if to == from || !shows_same(document, spot, to) {
+            return to;
+        }
+        from = to;
+    }
+}
+
+/// The ranges of a paragraph whose text the view hides: the deletions,
+/// in the views of markup without them (REV-04).
+fn hidden_ranges(document: &Document, paragraph: usize) -> Vec<(usize, usize)> {
+    let mut out: Vec<(usize, usize)> = Vec::new();
+    if document.markup().shows_deletions() {
+        return out;
+    }
+    let Some(paragraph) = document.body().get(paragraph) else {
+        return out;
+    };
+    let mut offset = 0;
+    for run in paragraph.runs() {
+        let end = offset + run.len();
+        if document.is_deleted(run) {
+            match out.last_mut() {
+                Some(last) if last.1 == offset => last.1 = end,
+                _ => out.push((offset, end)),
+            }
+        }
+        offset = end;
+    }
+    out
+}
+
+/// A spot out of the text the view hides: past its end going forward,
+/// before its start going back. Elsewhere, the spot itself.
+pub fn skip_hidden(document: &Document, spot: Spot, forward: bool) -> Spot {
+    for (start, end) in hidden_ranges(document, spot.paragraph) {
+        if forward && (start..end).contains(&spot.offset) {
+            return Spot::new(spot.paragraph, end);
+        }
+        if !forward && spot.offset > start && spot.offset <= end {
+            return Spot::new(spot.paragraph, start);
+        }
+    }
+    spot
+}
+
+/// A selection out of the text the view hides (REV-04): an end inside
+/// it goes to its start, and a selection of hidden text alone is a
+/// cursor, so that typing does not replace what does not show.
+pub fn out_of_hidden(document: &Document, selection: Selection) -> Selection {
+    let inside = |spot: Spot| {
+        hidden_ranges(document, spot.paragraph)
+            .into_iter()
+            .find(|&(start, end)| start < spot.offset && spot.offset < end)
+            .map_or(spot, |(start, _)| Spot::new(spot.paragraph, start))
+    };
+    let (anchor, focus) = (inside(selection.anchor), inside(selection.focus));
+    if anchor != focus && shows_same(document, anchor, focus) {
+        return Selection::cursor(anchor.min(focus));
+    }
+    Selection { anchor, focus }
+}
+
+/// Whether two spots of a paragraph show at the same place, with only
+/// hidden text between them.
+fn shows_same(document: &Document, a: Spot, b: Spot) -> bool {
+    if a.paragraph != b.paragraph {
+        return false;
+    }
+    let (from, to) = (a.offset.min(b.offset), a.offset.max(b.offset));
+    from == to
+        || hidden_ranges(document, a.paragraph)
+            .iter()
+            .any(|&(start, end)| start <= from && to <= end)
+}
+
 /// The word around a spot: its start and end, or the spot itself between
 /// words.
 fn words(text: &str) -> Vec<(usize, usize)> {
@@ -362,14 +461,14 @@ fn words(text: &str) -> Vec<(usize, usize)> {
 
 /// To the start of the previous word or the end of the next one, as
 /// Option and an arrow do on the Mac and Control and an arrow on GNOME.
-pub fn move_word(document: &Document, spot: Spot, forward: bool) -> Spot {
+fn word_step(document: &Document, spot: Spot, forward: bool) -> Spot {
     let text = text_of(document, spot.paragraph);
     let words = words(&text);
     if forward {
         match words.iter().find(|w| w.1 > spot.offset) {
             Some(w) => Spot::new(spot.paragraph, w.1),
             None if spot.paragraph + 1 < document.body().len() => {
-                move_word(document, Spot::new(spot.paragraph + 1, 0), true)
+                word_step(document, Spot::new(spot.paragraph + 1, 0), true)
             }
             None => Spot::new(spot.paragraph, text.len()),
         }
@@ -381,7 +480,7 @@ pub fn move_word(document: &Document, spot: Spot, forward: bool) -> Spot {
                     spot.paragraph - 1,
                     text_of(document, spot.paragraph - 1).len(),
                 );
-                move_word(document, previous, false)
+                word_step(document, previous, false)
             }
             None => Spot::new(spot.paragraph, 0),
         }

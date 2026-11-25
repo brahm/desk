@@ -1019,6 +1019,7 @@ pub fn flow_text_boxes(
     let styles = document.styles();
     let settings = document.text_settings();
     let items = styles.list_items(paragraphs.iter());
+    let hidden = crate::hidden_changes(document);
     // Where the next line goes: its slot, and its top from the top of the
     // column.
     let mut slot = 0;
@@ -1030,7 +1031,10 @@ pub fn flow_text_boxes(
             settings,
             paragraph,
             items[i].as_ref(),
-            Default::default(),
+            desk_text::FieldValues {
+                hidden: hidden.clone(),
+                ..Default::default()
+            },
         );
         system.screen_spacing(&mut text);
         let format = text.paragraph();
@@ -1486,6 +1490,7 @@ fn shape_lines_from(
     let styles = document.styles();
     let settings = document.text_settings();
     let items = styles.list_items(paragraphs.iter());
+    let hidden = crate::hidden_changes(document);
     let origin = (placed.x + space.inset, placed.y);
     let mut out = Vec::new();
     let mut after = 0.0f32;
@@ -1495,7 +1500,10 @@ fn shape_lines_from(
             settings,
             paragraph,
             items[i].as_ref(),
-            Default::default(),
+            desk_text::FieldValues {
+                hidden: hidden.clone(),
+                ..Default::default()
+            },
         );
         system.screen_spacing(&mut text);
         let format = text.paragraph();

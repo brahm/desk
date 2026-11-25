@@ -535,6 +535,7 @@ fn full_document() -> TextDocument {
             outline_levels: Some(3),
             outline_first_line: Some(true),
             outline_thumbnails: Some(false),
+            markup: Some("final".into()),
         },
         ..Default::default()
     }

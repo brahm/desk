@@ -1886,6 +1886,7 @@ pub fn import_logged(source: &iwork::PagesDocument) -> Result<(Document, ImportL
                 first_line: outliner.lines.is_some(),
                 thumbnails: outliner.thumbnails,
             },
+            markup: desk_model::Markup::Markup,
         }));
     }
     let meta = &source.metadata;

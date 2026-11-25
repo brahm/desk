@@ -845,6 +845,7 @@ pub(crate) fn view_settings(settings: &str) -> crate::text::ViewSettings {
             Some("DeskOutlineLevels") => out.outline_levels = text.parse().ok(),
             Some("DeskOutlineFirstLine") => out.outline_first_line = Some(text == "true"),
             Some("DeskOutlineThumbnails") => out.outline_thumbnails = Some(text == "true"),
+            Some("DeskMarkupView") => out.markup = Some(text.to_owned()),
             _ => {}
         }
     }

@@ -1393,17 +1393,19 @@ impl TextEditor {
         let before = self.selection();
         let (start, end) = if before.is_empty() {
             let document = self.state.borrow().editor.snapshot();
-            let other = match (forward, word) {
-                (true, false) => text_nav::move_char(&document, before.focus, true),
-                (false, false) => text_nav::move_char(&document, before.focus, false),
-                (true, true) => text_nav::move_word(&document, before.focus, true),
-                (false, true) => text_nav::move_word(&document, before.focus, false),
+            // From where the cursor shows, past text the view hides
+            // (REV-04).
+            let from = text_nav::skip_hidden(&document, before.focus, forward);
+            let other = if word {
+                text_nav::move_word(&document, from, forward)
+            } else {
+                text_nav::move_char(&document, from, forward)
             };
-            if other == before.focus {
+            if other == from {
                 return;
             }
             Selection {
-                anchor: before.focus,
+                anchor: from,
                 focus: other,
             }
             .ordered()
@@ -2785,7 +2787,9 @@ impl TextEditor {
     /// computer is renamed (W149, W150).
     pub fn show_comment_marks(&self) {
         let local = crate::comments_page::author();
-        self.view.set_change_marks(self.change_marks(&local));
+        let (marks, bars) = self.change_view(&local);
+        self.view.set_change_marks(marks);
+        self.view.set_change_bars(bars);
         let color = self.comment_colors(&local);
         self.view.set_comment_marks(
             self.comment_marks()
@@ -3671,10 +3675,13 @@ impl TextEditor {
         let (rects, caret) = {
             let mut state = self.state.borrow_mut();
             let document = state.editor.document();
-            let selection = Selection {
-                anchor: text_nav::clamp(document, selection.anchor),
-                focus: text_nav::clamp(document, selection.focus),
-            };
+            let selection = text_nav::out_of_hidden(
+                document,
+                Selection {
+                    anchor: text_nav::clamp(document, selection.anchor),
+                    focus: text_nav::clamp(document, selection.focus),
+                },
+            );
             if state.selection != selection {
                 state.pending = None;
                 if !state.adding {

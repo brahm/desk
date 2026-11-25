@@ -221,6 +221,15 @@ impl Edit {
             if self.tracking() {
                 attrs.change = Some(Some(self.insertion_at(position)?));
                 attrs.formatted = None;
+            } else if let Some(Some(change)) = attrs.change
+                && self
+                    .doc
+                    .changes()
+                    .get(change)
+                    .is_some_and(|c| c.kind == crate::ChangeKind::Deletion)
+            {
+                // Text typed next to a deletion is not deleted (REV-04).
+                attrs.change = None;
             }
             self.apply(Op::ReplaceText {
                 paragraph: position.paragraph,
@@ -1374,6 +1383,12 @@ impl Editor {
     /// The document.
     pub fn document(&self) -> &Document {
         &self.document
+    }
+
+    /// Sets how the tracked changes of the document show, outside the
+    /// history (W148, REV-04).
+    pub fn set_markup(&mut self, markup: crate::Markup) {
+        self.document.set_markup(markup);
     }
 
     /// A snapshot of the document, which later edits do not change.

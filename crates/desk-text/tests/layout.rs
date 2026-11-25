@@ -1760,3 +1760,38 @@ fn a_line_past_a_tall_object_still_goes_lower_for_its_word() {
     assert!(first.top > 10_150.0, "{}", first.top);
     assert!(first.width > 100.0, "{}", first.width);
 }
+
+#[test]
+fn rev_04_deleted_text_that_does_not_show_takes_no_room() {
+    let mut system = TextSystem::new();
+    let gone = desk_model::NodeId::new(9).unwrap();
+    let deleted = CharFormat {
+        change: Some(gone),
+        ..sans()
+    };
+    let runs = [("ab", sans()), ("XY", deleted), ("cd", sans())];
+    let shown = ParagraphText::from_runs(ParaFormat::default(), sans(), runs.clone());
+    let hidden = ParagraphText::from_runs_in(
+        &TextSettings::default(),
+        desk_text::FieldValues {
+            hidden: Some(Arc::new([gone].into())),
+            ..desk_text::FieldValues::default()
+        },
+        ParaFormat::default(),
+        sans(),
+        runs,
+    );
+    assert_eq!(shown.text(), "abXYcd");
+    assert_eq!(hidden.text(), "abcd");
+    // Where the text was, a cursor stands before it, and after it at the
+    // same place.
+    assert_eq!(hidden.to_model(2), 2);
+    assert_eq!(hidden.to_model(3), 5);
+    assert_eq!(hidden.to_model(4), 6);
+    let shown_line = system.layout(&shown, &Column::new(400.0), 0.0).lines[0].clone();
+    let line = system.layout(&hidden, &Column::new(400.0), 0.0).lines[0].clone();
+    assert!(line.advance < shown_line.advance);
+    assert_eq!(line.range, 0..6);
+    assert!((line.caret_x(2) - line.caret_x(4)).abs() < 0.01);
+    assert!(line.caret_x(5) > line.caret_x(4));
+}

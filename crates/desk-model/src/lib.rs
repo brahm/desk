@@ -103,7 +103,7 @@ pub use chart_style::ChartStyle;
 pub use comment::{CellComment, Comment, CommentIds, CommentPlace, Comments, Reply};
 pub use connection::{Connection, bend_through, bent_controls, bent_middle, connect, flattened};
 pub use document::{
-    Container, Document, FixedGuide, Metadata, OutlineOptions, PageSetup, PagedFlow,
+    Container, Document, FixedGuide, Markup, Metadata, OutlineOptions, PageSetup, PagedFlow,
     ParagraphSpacing, Statistics, TextSettings, Tracking, ViewSettings, ViewZoom,
 };
 pub use drop_cap_style::DropCapStyle;

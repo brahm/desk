@@ -2315,6 +2315,21 @@ paragraph, and objects on a second page.
   document changes, so that moving the cursor does not lay out the
   notes and text boxes again.
 
+### 25 November: the views of markup (step 11 of W2, first part)
+
+- The three views of Pages 15.4, markup, markup without deletions and
+  final, are a setting of how the document shows and not an edit: they
+  are outside the undo, and the file keeps the view in `settings.xml`,
+  as the zoom, so that it opens as it was left.
+- The text engine leaves out the text of a deletion when the view hides
+  it, so that the lines close up and the cursor goes past where it was;
+  each paragraph still lays out on its own, so a deleted paragraph break
+  still shows until step 12 joins the paragraphs (B-071).
+- A bar in the left margin marks each line with changes, lighter when
+  they only change its formatting, as in Pages; final shows none. The
+  bubbles that show each change in the margin come in the second pull
+  request.
+
 ## Decisions, with their reasons and consequences
 
 Ids `D-nnn` and `R-nnn` are those of [decisions.md](decisions.md).

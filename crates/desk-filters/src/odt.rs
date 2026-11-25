@@ -3172,6 +3172,11 @@ fn view_settings(view: &odf::ViewSettings) -> Option<desk_model::ViewSettings> {
             first_line: view.outline_first_line.unwrap_or(false),
             thumbnails: view.outline_thumbnails.unwrap_or(false),
         },
+        markup: view
+            .markup
+            .as_deref()
+            .and_then(desk_model::Markup::from_key)
+            .unwrap_or_default(),
     })
 }
 
@@ -3189,6 +3194,8 @@ fn odf_view(view: desk_model::ViewSettings) -> odf::ViewSettings {
         outline_levels: view.outline_options.levels.map(i16::from),
         outline_first_line: Some(view.outline_options.first_line),
         outline_thumbnails: Some(view.outline_options.thumbnails),
+        // Written only when it is not the markup every document opens in.
+        markup: (view.markup != desk_model::Markup::Markup).then(|| view.markup.key().to_owned()),
     }
 }
 

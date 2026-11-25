@@ -59,6 +59,8 @@ struct State {
     /// The text of tracked changes, with what each did and the colour of
     /// its author (W148, W150).
     change_marks: Vec<(SpanRect, desk_model::ChangeKind, desk_model::AuthorColor)>,
+    /// The bars in the margin beside the lines with changes (REV-04).
+    change_bars: Vec<ChangeBar>,
     /// The color around the pages that full screen chose (DOC-07); none
     /// leaves the grey of the window.
     backdrop: Option<desk_model::Rgba>,
@@ -278,6 +280,7 @@ impl DocumentView {
             comment_marks: Vec::new(),
             comment_flags: Vec::new(),
             change_marks: Vec::new(),
+            change_bars: Vec::new(),
         }));
         let view = Self {
             scrolled,
@@ -498,6 +501,19 @@ impl DocumentView {
             let mut state = self.state.borrow_mut();
             let changed = state.change_marks != marks;
             state.change_marks = marks;
+            changed
+        };
+        if changed {
+            self.area.queue_draw();
+        }
+    }
+
+    /// Puts the change bars in the margin (REV-04).
+    pub fn set_change_bars(&self, bars: Vec<ChangeBar>) {
+        let changed = {
+            let mut state = self.state.borrow_mut();
+            let changed = state.change_bars != bars;
+            state.change_bars = bars;
             changed
         };
         if changed {
@@ -1119,6 +1135,7 @@ fn draw_marks(
 ) {
     draw_comments(cr, state, page, rect, scale);
     draw_changes(cr, state, page, rect, scale);
+    draw_change_bars(cr, state, page, rect, scale);
     draw_invisibles(cr, state, page, rect, scale);
     draw_squiggles(cr, state, page, rect, scale);
     // The accent color of GNOME, lighter without focus.
@@ -1521,6 +1538,42 @@ fn draw_comments(
         cr.fill_preserve().ok();
         let (r, g, b) = rgb(color.ink());
         cr.set_source_rgb(r, g, b);
+        cr.stroke().ok();
+    }
+}
+
+/// A bar in the left margin of a page beside a line with tracked
+/// changes (REV-04).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ChangeBar {
+    /// The page.
+    pub page: usize,
+    /// Where it is across the page, in points from its left edge.
+    pub x: f64,
+    /// The top of the line, in points from the top of the page.
+    pub y0: f64,
+    /// The bottom of the line.
+    pub y1: f64,
+    /// Whether the changes of the line only change its formatting, which
+    /// makes it lighter.
+    pub format_only: bool,
+}
+
+/// The change bars of a page, in the grey of the marks of the margin.
+fn draw_change_bars(
+    cr: &gtk::cairo::Context,
+    state: &State,
+    page: usize,
+    rect: &PageRect,
+    scale: f64,
+) {
+    cr.set_line_width((2.0 * scale).max(1.0));
+    for bar in state.change_bars.iter().filter(|b| b.page == page) {
+        let alpha = if bar.format_only { 0.3 } else { 0.7 };
+        cr.set_source_rgba(0.4, 0.4, 0.4, alpha);
+        let x = rect.x + bar.x * scale;
+        cr.move_to(x, rect.y + bar.y0 * scale);
+        cr.line_to(x, rect.y + bar.y1 * scale);
         cr.stroke().ok();
     }
 }
