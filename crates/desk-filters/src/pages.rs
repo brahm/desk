@@ -480,6 +480,8 @@ fn para_attrs(properties: &Properties) -> ParaAttrs {
     ParaAttrs {
         toc_entry: None,
         break_change: None,
+        format_change: None,
+        formatted: None,
         hyphenate: flag(properties, "hyphenate"),
         alignment: properties.number("alignment").map(|n| match n as i64 {
             1 => Alignment::Right,

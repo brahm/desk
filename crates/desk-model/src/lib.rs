@@ -98,7 +98,7 @@ pub use autocorrect::{
     smart_quote,
 };
 pub use case_change::CaseChange;
-pub use change::{Change, ChangeKind, ChangeSpan, Changes, Formatting};
+pub use change::{Change, ChangeKind, ChangeSpan, Changes, Formatting, ParaFormatting};
 pub use chart_style::ChartStyle;
 pub use comment::{CellComment, Comment, CommentIds, CommentPlace, Comments, Reply};
 pub use connection::{Connection, bend_through, bent_controls, bent_middle, connect, flattened};

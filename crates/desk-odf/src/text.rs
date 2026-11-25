@@ -1124,6 +1124,12 @@ pub struct ChangedRegion {
     /// had no formatting of its own, which other programs do not keep
     /// (odf-extensions.md).
     pub previous_style: Option<String>,
+    /// `desk:paragraph-style-name` of a `text:format-change`: the
+    /// paragraph style that holds the style and formatting that the
+    /// paragraphs between its marks had before, or empty when that is not
+    /// known, for a change of the formatting of paragraphs
+    /// (odf-extensions.md).
+    pub previous_paragraph_style: Option<String>,
 }
 
 /// A comment (`office:annotation`). One with an `office:name` is on the
