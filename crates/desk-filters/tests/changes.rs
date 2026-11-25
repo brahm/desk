@@ -799,11 +799,12 @@ fn b_070_a_change_in_deleted_text_comes_back_whole_in_odt() {
             let formatted =
                 edit.add_change(ChangeKind::Format, "Bo", Some("2026-11-24T09:31:00"))?;
             let gone = edit.add_change(ChangeKind::Deletion, "Ana", None)?;
-            // Ana deleted "two", the break and "ABC": "two" and "A" were
-            // Bo's, and "B" was bold and "C" italic before Bo underlined
-            // them.
+            // Ana deleted "two", the break and "ABC": "two", the break
+            // and "A" were Bo's (B-072), and "B" was bold and "C" italic
+            // before Bo underlined them.
             edit.mark_change(Position::new(first, 4), Position::new(first, 7), gone)?;
             edit.mark_break_change(first, Some(gone))?;
+            edit.mark_break_former(first, added)?;
             edit.mark_change(Position::new(second, 0), Position::new(second, 3), gone)?;
             edit.mark_former(
                 Position::new(first, 4),
@@ -877,6 +878,14 @@ fn b_070_a_change_in_deleted_text_comes_back_whole_in_odt() {
             .count()
     };
     assert_eq!(insertions(&read), 1);
+    let first = read.body().iter().next().unwrap();
+    let added = read
+        .changes()
+        .iter()
+        .find(|c| c.kind == ChangeKind::Insertion)
+        .unwrap()
+        .id;
+    assert_eq!(first.attrs().break_former.flatten(), Some(added));
 }
 
 /// B-069: the change of the formatting of a paragraph stays on its
@@ -976,4 +985,120 @@ fn b_069_a_change_of_a_paragraph_around_a_deletion_stays_on_its_paragraph() {
             ("three".into(), false)
         ]
     );
+}
+
+/// B-072: a paragraph break that another author added keeps that
+/// insertion in ODT when a tracked deletion takes it, apart from the
+/// insertion of the text before it.
+#[test]
+fn b_072_a_deleted_break_keeps_its_insertion_in_odt() {
+    use desk_model::Position;
+    let mut document = Document::new_word_processing();
+    document
+        .transact("Changes", |edit| {
+            let start = edit.document().start();
+            let mut at = edit.insert_text(start, "one two")?;
+            for text in ["three", "four"] {
+                at = edit.split_paragraph(at)?;
+                at = edit.insert_text(at, text)?;
+            }
+            let ids: Vec<_> = edit.document().body().iter().map(|p| p.id()).collect();
+            let added =
+                edit.add_change(ChangeKind::Insertion, "Bo", Some("2026-11-24T09:30:00"))?;
+            let gone = edit.add_change(ChangeKind::Deletion, "Ana", Some("2026-11-24T10:00:00"))?;
+            // Bo added "two" and the break after "three"; Ana deleted
+            // "two" and both breaks.
+            edit.mark_change(Position::new(ids[0], 4), Position::new(ids[0], 7), gone)?;
+            edit.mark_former(
+                Position::new(ids[0], 4),
+                Position::new(ids[0], 7),
+                added,
+                None,
+            )?;
+            edit.mark_break_change(ids[0], Some(gone))?;
+            edit.mark_break_change(ids[1], Some(gone))?;
+            edit.mark_break_former(ids[1], added)?;
+            Ok(())
+        })
+        .unwrap();
+    let bytes = write_odt(&document).unwrap();
+    keep("b-072-deleted-break.odt", &bytes);
+    let (mut read, log) = read_odt_logged(&bytes).unwrap();
+    assert!(log.is_empty(), "{:?}", log.entries());
+    // Only the break after "three" is in Bo's insertion: the one after
+    // "one two" is in none.
+    let bo = |d: &Document, id: Option<desk_model::NodeId>| {
+        id.and_then(|id| d.changes().get(id))
+            .map(|c| (c.kind, c.author.to_string()))
+    };
+    let breaks: Vec<_> = read
+        .body()
+        .iter()
+        .map(|p| bo(&read, p.attrs().break_former.flatten()))
+        .collect();
+    assert_eq!(
+        breaks,
+        [None, Some((ChangeKind::Insertion, "Bo".to_owned())), None]
+    );
+    // Rejecting Bo's insertions takes "two" and the break after "three",
+    // which Ana's deletion still holds.
+    let added: Vec<_> = read
+        .changes()
+        .iter()
+        .filter(|c| c.kind == ChangeKind::Insertion)
+        .map(|c| c.id)
+        .collect();
+    read.transact("Resolve", |edit| {
+        edit.resolve_changes(false, |c| added.contains(&c))
+            .map(|_| ())
+    })
+    .unwrap();
+    let texts: Vec<_> = read.body().iter().map(|p| p.text().to_owned()).collect();
+    assert_eq!(texts, ["one ", "threefour"]);
+}
+
+/// B-072 review: a change of formatting that deleted text was in goes on
+/// past a break the deletion took, which no change of formatting holds,
+/// and comes back from ODT as one change.
+#[test]
+fn b_072_a_change_of_formatting_goes_on_past_a_deleted_break_in_odt() {
+    use desk_model::Position;
+    let mut document = Document::new_word_processing();
+    document
+        .transact("Changes", |edit| {
+            let start = edit.document().start();
+            let at = edit.insert_text(start, "one two")?;
+            let at = edit.split_paragraph(at)?;
+            edit.insert_text(at, "three four")?;
+            let ids: Vec<_> = edit.document().body().iter().map(|p| p.id()).collect();
+            let formatted =
+                edit.add_change(ChangeKind::Format, "Bo", Some("2026-11-24T09:30:00"))?;
+            let gone = edit.add_change(ChangeKind::Deletion, "Ana", Some("2026-11-24T10:00:00"))?;
+            // Bo formatted "two" and "three"; Ana deleted them and the
+            // break between them.
+            edit.mark_change(Position::new(ids[0], 4), Position::new(ids[0], 7), gone)?;
+            edit.mark_break_change(ids[0], Some(gone))?;
+            edit.mark_change(Position::new(ids[1], 0), Position::new(ids[1], 5), gone)?;
+            for (p, from, to) in [(ids[0], 4, 7), (ids[1], 0, 5)] {
+                edit.mark_former(
+                    Position::new(p, from),
+                    Position::new(p, to),
+                    formatted,
+                    None,
+                )?;
+            }
+            Ok(())
+        })
+        .unwrap();
+    let bytes = write_odt(&document).unwrap();
+    keep("b-072-format-across-break.odt", &bytes);
+    let (read, log) = read_odt_logged(&bytes).unwrap();
+    assert!(log.is_empty(), "{:?}", log.entries());
+    let formats = read
+        .changes()
+        .iter()
+        .filter(|c| c.kind == ChangeKind::Format)
+        .count();
+    assert_eq!(formats, 1);
+    assert!(read.body().iter().all(|p| p.attrs().break_former.is_none()));
 }

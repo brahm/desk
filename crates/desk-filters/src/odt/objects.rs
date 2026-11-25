@@ -2187,7 +2187,7 @@ impl Exporter<'_> {
                 }
                 odf::DrawKind::TextBox {
                     paragraphs: {
-                        let mut track = super::Track::default();
+                        let mut track = super::Track::new(self.document);
                         text.paragraphs
                             .iter()
                             .map(|p| self.paragraph(p, &mut track))
@@ -2239,7 +2239,7 @@ impl Exporter<'_> {
                 g.column_count = Some(u32::from(inside.columns));
                 g.column_gap = Some(odf_length(inside.column_gap));
             }
-            let mut track = super::Track::default();
+            let mut track = super::Track::new(self.document);
             text = inside
                 .paragraphs
                 .iter()

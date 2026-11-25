@@ -689,6 +689,7 @@ fn para_attrs(p: &odf::ParagraphProperties, t: &odf::TextProperties) -> ParaAttr
         list_override: None,
         toc_entry: None,
         break_change: None,
+        break_former: None,
         format_change: None,
         formatted: None,
     }
@@ -2972,12 +2973,39 @@ fn export_spans(
     }
     comments(&mut spans, offset, last);
     let ends = paragraph.attrs().break_change.flatten();
+    // The insertion that a deleted break was in before (B-072).
+    let break_former = paragraph
+        .attrs()
+        .break_former
+        .flatten()
+        .filter(|_| track_on && ends.is_some())
+        .map(|id| (id, None));
     // The change before goes on past the break only when the deletion it
-    // is in took the break too.
-    if before_change != ends || ends.is_none() {
+    // is in took the break too. An insertion goes on only when the break
+    // was in it before, as reading takes one open past a break to hold
+    // it; a change of formatting, which no break is in, goes on.
+    let insertion = former_open
+        .as_ref()
+        .is_some_and(|(id, _)| track.as_deref().is_some_and(|t| t.insertions.contains(id)));
+    if before_change != ends
+        || ends.is_none()
+        || (insertion && former_open != break_former)
+        || (break_former.is_some() && former_open != break_former)
+    {
         close_former(&mut spans, &mut former_open, None);
     }
     switch(&mut spans, (ends, None), None, &mut |_| None);
+    if let Some((id, _)) = break_former
+        && former_open.is_none()
+    {
+        spans.push(odf::Span {
+            field: Some(odf::Field::ChangeStart {
+                id: id.get().to_string(),
+            }),
+            ..odf::Span::default()
+        });
+        former_open = break_former;
+    }
     if let Some(track) = track {
         track.change = open.0;
         track.former = former_open;
@@ -2992,15 +3020,32 @@ fn export_spans(
 /// (B-070); and the change that was open at the start of the paragraph
 /// [`export_spans`] exported last, which [`paragraph_change`] reads for
 /// that paragraph (B-069).
-#[derive(Default)]
 pub(super) struct Track {
     change: Option<NodeId>,
     /// The change open at the start of the paragraph last exported.
     came: Option<NodeId>,
     former: Option<(NodeId, Option<Arc<desk_model::Formatting>>)>,
+    /// The insertions of the document, the changes a break can be in
+    /// before a deletion takes it (B-072).
+    insertions: std::collections::HashSet<NodeId>,
 }
 
 impl Track {
+    /// No change open yet, in a text of a document.
+    pub(super) fn new(document: &Document) -> Self {
+        Self {
+            change: None,
+            came: None,
+            former: None,
+            insertions: document
+                .changes()
+                .iter()
+                .filter(|c| c.kind == desk_model::ChangeKind::Insertion)
+                .map(|c| c.id)
+                .collect(),
+        }
+    }
+
     /// The deletion of the break before the paragraph last exported,
     /// which joins it to the one before: none for another change.
     pub(super) fn came_deleted(&self, document: &Document) -> Option<NodeId> {
@@ -3185,7 +3230,7 @@ fn export_margins(
         }
         let mut out = Vec::new();
         // The tracked change open past a break (W148).
-        let mut tracked = Track::default();
+        let mut tracked = Track::new(document);
         for paragraph in paragraphs {
             let style_name = names[&paragraph.style()].clone();
             let own = ParaAttrs {
@@ -3610,7 +3655,7 @@ pub fn export(document: &Document) -> odf::TextDocument {
     };
     let comment_marks = comments::export(document);
     // The tracked change open past the break of the paragraph before.
-    let mut tracked = Track::default();
+    let mut tracked = Track::new(document);
     // The master pages of the sections with headers and footers of their
     // own, by the paragraph that starts each (EST-16).
     let masters = section_masters(document);
@@ -3652,6 +3697,7 @@ pub fn export(document: &Document) -> odf::TextDocument {
             list_override: None,
             toc_entry: None,
             break_change: None,
+            break_former: None,
             format_change: None,
             formatted: None,
             ..paragraph.attrs().clone()
@@ -3834,7 +3880,7 @@ pub fn export(document: &Document) -> odf::TextDocument {
         let note = document.notes().get(*id).expect("the body refers to it");
         let mut paragraphs = Vec::new();
         // The tracked change open past a break (W148).
-        let mut tracked = Track::default();
+        let mut tracked = Track::new(document);
         for paragraph in note.paragraphs.iter() {
             let own = paragraph.attrs().without_structure();
             let style_name = names[&paragraph.style()].clone();

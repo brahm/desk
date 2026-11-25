@@ -67,6 +67,7 @@ pub(crate) fn joined_paragraph(
         let paragraph = body.get(i)?;
         runs.extend(paragraph.runs().cloned());
         attrs.break_change = paragraph.attrs().break_change;
+        attrs.break_former = paragraph.attrs().break_former;
     }
     Paragraph::from_runs(first.id(), first.style(), attrs, runs).ok()
 }
