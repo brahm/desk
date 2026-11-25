@@ -594,18 +594,25 @@ fn rev_01_changes_of_formatting_of_libreoffice_are_read() {
 
 #[test]
 fn rev_01_changes_of_formatting_around_others_or_of_nothing() {
-    let region = |id: &str, kind: &str, style: &str| {
+    // At times of their own: regions of the same author, kind and date
+    // are one change (B-073).
+    let region = |id: &str, kind: &str, style: &str, time: &str| {
         format!(
-            r#"<text:changed-region text:id="{id}"><text:{kind}{style}><office:change-info><dc:creator>Ana</dc:creator><dc:date>2026-11-25T10:00:00</dc:date></office:change-info></text:{kind}></text:changed-region>"#
+            r#"<text:changed-region text:id="{id}"><text:{kind}{style}><office:change-info><dc:creator>Ana</dc:creator><dc:date>2026-11-25T{time}</dc:date></office:change-info></text:{kind}></text:changed-region>"#
         )
     };
     let content = format!(
         r#"{HEAD}<text:tracked-changes xmlns:desk="https://brahm.com.br/ns/desk/1.0">{}{}{}</text:tracked-changes>
 <text:p><text:change-start text:change-id="f"/>ab<text:change-start text:change-id="i"/>cd<text:change-end text:change-id="i"/>ef<text:change-end text:change-id="f"/></text:p>
 <text:p><text:change-start text:change-id="e"/><text:change-end text:change-id="e"/></text:p>{TAIL}"#,
-        region("f", "format-change", r#" desk:style-name="Missing""#),
-        region("i", "insertion", ""),
-        region("e", "format-change", ""),
+        region(
+            "f",
+            "format-change",
+            r#" desk:style-name="Missing""#,
+            "10:00:00"
+        ),
+        region("i", "insertion", "", "10:00:00"),
+        region("e", "format-change", "", "10:05:00"),
     );
     let (document, log) = read_odt_logged(&odt(&content)).unwrap();
     // The insertion keeps its text; the change of an empty paragraph is
@@ -1101,4 +1108,54 @@ fn b_072_a_change_of_formatting_goes_on_past_a_deleted_break_in_odt() {
         .count();
     assert_eq!(formats, 1);
     assert!(read.body().iter().all(|p| p.attrs().break_former.is_none()));
+}
+
+/// B-073: a change that another change interrupts, an insertion part of
+/// which another author deleted, comes back from ODT as one change, and
+/// changes whose date is unknown stay apart.
+#[test]
+fn b_073_a_change_another_interrupts_comes_back_as_one() {
+    use desk_model::Position;
+    let mut document = Document::new_word_processing();
+    let first = document.body().iter().next().unwrap().id();
+    let (bo, _) = document
+        .transact("Changes", |edit| {
+            let start = edit.document().start();
+            edit.insert_text(start, "one two three four five")?;
+            let bo = edit.add_change(ChangeKind::Insertion, "Bo", Some("2026-11-24T09:30:00"))?;
+            let ana = edit.add_change(ChangeKind::Deletion, "Ana", Some("2026-11-24T10:00:00"))?;
+            let cy = edit.add_change(ChangeKind::Insertion, "Cy", None)?;
+            let dee = edit.add_change(ChangeKind::Insertion, "Cy", None)?;
+            // Bo added "one two three", whose "two" Ana deleted; Cy
+            // added "four" and, at another time unknown, "five".
+            edit.mark_change(Position::new(first, 0), Position::new(first, 14), bo)?;
+            edit.mark_change(Position::new(first, 4), Position::new(first, 7), ana)?;
+            edit.mark_former(Position::new(first, 4), Position::new(first, 7), bo, None)?;
+            edit.mark_change(Position::new(first, 14), Position::new(first, 18), cy)?;
+            edit.mark_change(Position::new(first, 19), Position::new(first, 23), dee)?;
+            Ok(bo)
+        })
+        .unwrap();
+    let _ = bo;
+    let bytes = write_odt(&document).unwrap();
+    keep("b-073-interrupted.odt", &bytes);
+    let (mut read, log) = read_odt_logged(&bytes).unwrap();
+    assert!(log.is_empty(), "{:?}", log.entries());
+    let of = |d: &Document, author: &str| {
+        d.changes()
+            .iter()
+            .filter(|c| &*c.author == author)
+            .map(|c| c.id)
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(of(&read, "Bo").len(), 1);
+    assert_eq!(of(&read, "Ana").len(), 1);
+    assert_eq!(of(&read, "Cy").len(), 2);
+    // Rejecting Bo's one insertion takes all it added.
+    let bo = of(&read, "Bo")[0];
+    read.transact("Resolve", |edit| {
+        edit.resolve_changes(false, |c| c == bo).map(|_| ())
+    })
+    .unwrap();
+    assert_eq!(read.body().iter().next().unwrap().text(), "four five");
 }

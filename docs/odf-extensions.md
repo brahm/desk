@@ -728,6 +728,13 @@ a deletion keep any content of a paragraph; other
 programs that do not look for marks there read the text as deleted
 alone, and the region as a change that holds no text.
 
+ODF names one `text:changed-region` for each pair of marks, so the
+pieces of a change that another interrupts, as the text of an
+insertion before and after a deletion in it, are regions of their own.
+Desk reads the regions of the same kind, author and date as one change
+(B-073), as they are when it writes them; regions whose date is not
+known stay changes of their own.
+
 #### `desk:annotation`
 
 - **Feature:** a comment on an object itself, as Pages 15.4 puts one on

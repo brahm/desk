@@ -2446,6 +2446,20 @@ paragraph, and objects on a second page.
   a place of its own for Previous and Next: it shows again when the
   deletion is rejected.
 
+### 25 November: an interrupted change reads back as one (step 13 of W2, second part)
+
+- ODF names one region for each pair of marks, so a change that another
+  interrupts, as an insertion part of which another author deleted,
+  was written as several regions and read back as several changes
+  (B-073). Reading now takes the regions of the same kind, author and
+  date as one change, as Desk writes them; regions whose date is not
+  known stay apart, as nothing tells them to be one.
+- The import log counts what it leaves out by those changes, not by
+  regions, so the pieces of one change are not listed as left out.
+- The test of changes of formatting around others gives the change of
+  the empty paragraph a time of its own, so that it stays a change of
+  its own that the log lists.
+
 ## Decisions, with their reasons and consequences
 
 Ids `D-nnn` and `R-nnn` are those of [decisions.md](decisions.md).

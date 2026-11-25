@@ -38,6 +38,33 @@ pub(super) struct Taken {
 }
 
 /// Whether a field of the text is the mark of a tracked change.
+/// What makes regions one change: its kind, author and date, when the
+/// date is known, or the region alone (B-073).
+pub(super) type ChangeKey<'a> = (ChangeKind, Option<&'a str>, Result<Arc<str>, &'a str>);
+
+/// The change that a region is part of, as [`ChangeKey`] tells them.
+pub(super) fn key(region: &odf::ChangedRegion) -> ChangeKey<'_> {
+    (
+        kind_of(region.kind),
+        region.creator.as_deref(),
+        known_date(region).ok_or(region.id.as_str()),
+    )
+}
+
+/// The date of a region, when it is known.
+fn known_date(region: &odf::ChangedRegion) -> Option<Arc<str>> {
+    super::comments::date(region.date.as_deref()).filter(|d| &**d != odf::UNKNOWN_DATE)
+}
+
+/// The kind of change that a region is.
+fn kind_of(kind: odf::ChangeKind) -> ChangeKind {
+    match kind {
+        odf::ChangeKind::Deletion => ChangeKind::Deletion,
+        odf::ChangeKind::FormatChange => ChangeKind::Format,
+        odf::ChangeKind::Insertion => ChangeKind::Insertion,
+    }
+}
+
 pub(super) fn is_mark(field: &odf::Field) -> bool {
     matches!(
         field,
@@ -87,19 +114,25 @@ pub(super) fn import(
     let texts = super::comments::by_text(document, events);
     document.transact("Tracked Changes", |edit| {
         let mut ids: HashMap<&str, (NodeId, ChangeKind)> = HashMap::new();
+        // The regions of one change: the pieces of a change that another
+        // interrupts are regions of their own (B-073).
+        let mut changes: HashMap<ChangeKey<'_>, NodeId> = HashMap::new();
         for region in &read {
-            let kind = match region.kind {
-                odf::ChangeKind::Deletion => ChangeKind::Deletion,
-                odf::ChangeKind::FormatChange => ChangeKind::Format,
-                odf::ChangeKind::Insertion => ChangeKind::Insertion,
+            let kind = kind_of(region.kind);
+            let key = key(region);
+            let id = match changes.get(&key) {
+                Some(&id) => id,
+                None => {
+                    let date = known_date(region);
+                    let id = edit.add_change(
+                        kind,
+                        region.creator.as_deref().unwrap_or_default(),
+                        date.as_deref(),
+                    )?;
+                    changes.insert(key, id);
+                    id
+                }
             };
-            let date =
-                super::comments::date(region.date.as_deref()).filter(|d| &**d != odf::UNKNOWN_DATE);
-            let id = edit.add_change(
-                kind,
-                region.creator.as_deref().unwrap_or_default(),
-                date.as_deref(),
-            )?;
             ids.insert(region.id.as_str(), (id, kind));
         }
         for (story, events) in texts {
