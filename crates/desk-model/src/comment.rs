@@ -52,6 +52,20 @@ pub struct CellComment {
     pub col: u32,
 }
 
+/// A cell of a table that a tracked change changed (REV-05): the change,
+/// the table and the row and column of the cell.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct CellChange {
+    /// The change, of the kind [`crate::ChangeKind::Cell`].
+    pub id: NodeId,
+    /// The table.
+    pub table: NodeId,
+    /// The row of the cell.
+    pub row: u32,
+    /// The column of the cell.
+    pub col: u32,
+}
+
 /// A comment, the first of its thread.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Comment {

@@ -653,7 +653,7 @@ impl Edit {
         let members: Vec<Object> = members
             .into_iter()
             .map(|mut o| {
-                o.moved = None;
+                o.untrack();
                 o
             })
             .collect();
@@ -680,7 +680,7 @@ impl Edit {
             for (i, member) in members.iter().enumerate() {
                 let mut member = member.clone();
                 member.anchor = group.anchor;
-                member.moved = None;
+                member.untrack();
                 freed.push(member.id);
                 self.insert_object(index + i, member)?;
             }

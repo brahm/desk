@@ -18,7 +18,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use desk_model::{
-    ChangeKind, Document, Formatting, NodeId, Op, ParaFormatting, Paragraph, Position,
+    ChangeKind, Document, Formatting, NodeId, ObjectKind, Op, ParaFormatting, Paragraph, Position,
 };
 use desk_odf as odf;
 
@@ -185,12 +185,12 @@ pub(super) fn prune(document: &mut Document) -> Result<(), FilterError> {
             carried.extend(paragraph.attrs().format_change.flatten());
         }
     }
-    // And objects, those that changes moved.
+    // And objects, those that changes moved, and the cells of tables.
     carried.extend(
         document
             .objects()
             .iter()
-            .filter_map(|o| o.moved.map(|m| m.change)),
+            .flat_map(desk_model::Object::changes),
     );
     let unused: Vec<NodeId> = document
         .changes()
@@ -549,9 +549,12 @@ fn export(
             kind: match change.kind {
                 ChangeKind::Insertion => odf::ChangeKind::Insertion,
                 ChangeKind::Deletion => odf::ChangeKind::Deletion,
-                // A change of the place of objects has a region of its
-                // own, which no text marks (see `object_text`).
-                ChangeKind::Format | ChangeKind::Placement => odf::ChangeKind::FormatChange,
+                // A change of the place of objects or of cells has a
+                // region of its own, which no text marks (see
+                // `object_text`).
+                ChangeKind::Format | ChangeKind::Placement | ChangeKind::Cell => {
+                    odf::ChangeKind::FormatChange
+                }
             },
             creator: Some(change.author.to_string()),
             date: change.date.as_deref().map(str::to_owned),
@@ -608,7 +611,10 @@ fn export(
                         // goes with it (B-070).
                         Some((
                             index,
-                            ChangeKind::Insertion | ChangeKind::Format | ChangeKind::Placement,
+                            ChangeKind::Insertion
+                            | ChangeKind::Format
+                            | ChangeKind::Placement
+                            | ChangeKind::Cell,
                         )) => {
                             let name = regions[index].id.clone();
                             let start = odf::Span {
@@ -730,6 +736,42 @@ pub(super) fn export_all(
             .is_some_and(|name| count[name] < 2)
         {
             region.change_name = None;
+        }
+    }
+    // A region for each change of the cells of tables, which the table
+    // that `desk:table` keeps names by the identifier of the change, as
+    // the region does in its name (REV-05).
+    for object in document.objects().iter() {
+        let ObjectKind::Table(table) = &object.kind else {
+            continue;
+        };
+        for r in 0..table.rows() {
+            for c in 0..table.cols() {
+                let Some(tracked) = &table.cell(r, c).tracked else {
+                    continue;
+                };
+                let name = format!("c{}", tracked.change.get());
+                let Some(change) = NodeId::new(tracked.change.get())
+                    .and_then(|id| document.changes().get(id))
+                    .filter(|c| c.kind == ChangeKind::Cell)
+                else {
+                    continue;
+                };
+                if regions
+                    .iter()
+                    .any(|r| r.change_name.as_deref() == Some(name.as_str()))
+                {
+                    continue;
+                }
+                regions.push(odf::ChangedRegion {
+                    id: format!("ct{}", regions.len() + 1),
+                    kind: odf::ChangeKind::FormatChange,
+                    creator: Some(change.author.to_string()),
+                    date: change.date.as_deref().map(str::to_owned),
+                    change_name: Some(name),
+                    ..odf::ChangedRegion::default()
+                });
+            }
         }
     }
     // The regions are written in content.xml: the automatic styles of
@@ -900,6 +942,81 @@ pub(super) fn import_moves(
                 anchor,
                 frame,
             });
+            edit.replace_object(object)?;
+        }
+        Ok(())
+    })?;
+    Ok(())
+}
+
+/// Puts the cells of tables that `desk:table` says tracked changes
+/// changed in those changes: each names the change by the identifier it
+/// had where the file was written, which the region of the change has in
+/// its name (W148, REV-05). A cell whose change the file has not is in
+/// none.
+pub(super) fn import_cells(
+    source: &odf::TextDocument,
+    document: &mut Document,
+) -> Result<(), FilterError> {
+    let tracked: Vec<NodeId> = document
+        .objects()
+        .iter()
+        .filter(|o| match &o.kind {
+            ObjectKind::Table(table) => (0..table.rows())
+                .any(|r| (0..table.cols()).any(|c| table.cell(r, c).tracked.is_some())),
+            _ => false,
+        })
+        .map(|o| o.id)
+        .collect();
+    if tracked.is_empty() {
+        return Ok(());
+    }
+    let regions: HashMap<&str, &odf::ChangedRegion> = source
+        .tracked_changes
+        .iter()
+        .filter(|r| r.kind == odf::ChangeKind::FormatChange)
+        .filter_map(|r| Some((r.change_name.as_deref()?, r)))
+        .collect();
+    document.transact("Tracked Changes", |edit| {
+        let mut changes: HashMap<ChangeKey<'_>, NodeId> = HashMap::new();
+        for id in tracked {
+            let Some(mut object) = edit.document().objects().get(id).cloned() else {
+                continue;
+            };
+            let ObjectKind::Table(table) = &mut object.kind else {
+                continue;
+            };
+            let table = std::sync::Arc::make_mut(table);
+            for r in 0..table.rows() {
+                for c in 0..table.cols() {
+                    let Some(tracked) = table.cell(r, c).tracked.clone() else {
+                        continue;
+                    };
+                    let name = format!("c{}", tracked.change.get());
+                    let change = match regions.get(name.as_str()) {
+                        Some(region) => match changes.get(&key(region)) {
+                            Some(&change) => Some(change),
+                            None => {
+                                let date = known_date(region);
+                                let change = edit.add_change(
+                                    ChangeKind::Cell,
+                                    region.creator.as_deref().unwrap_or_default(),
+                                    date.as_deref(),
+                                )?;
+                                changes.insert(key(region), change);
+                                Some(change)
+                            }
+                        },
+                        None => None,
+                    };
+                    table.cell_mut(r, c).tracked = change.and_then(|change| {
+                        Some(std::sync::Arc::new(desk_model::table::Tracked {
+                            change: std::num::NonZeroU64::new(change.get())?,
+                            ..(*tracked).clone()
+                        }))
+                    });
+                }
+            }
             edit.replace_object(object)?;
         }
         Ok(())

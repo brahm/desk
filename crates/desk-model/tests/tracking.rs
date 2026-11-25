@@ -1131,3 +1131,258 @@ fn rev_01_an_object_moved_then_put_in_the_text_or_grouped_leaves_its_change() {
     // Moved again, they are in a change again.
     step(&mut editor, &[other]);
 }
+
+/// A table of two by two, fixed on the first page, "a" in its first cell.
+fn table_object(editor: &mut Editor) -> NodeId {
+    use desk_model::table::Content;
+    use desk_model::{Anchor, Frame, Object, ObjectKind, Table};
+    editor
+        .edit("Insert Table", |edit| {
+            let mut table = Table::new(2, 2);
+            table.cell_mut(0, 0).content = Content::Text("a".into());
+            let mut object = Object::new(
+                edit.new_id(),
+                ObjectKind::Table(std::sync::Arc::new(table)),
+                Frame::from_pt(100.0, 100.0, 144.0, 40.0),
+            );
+            object.anchor = Anchor::Page(0);
+            let id = object.id;
+            edit.add_object(object)?;
+            Ok(id)
+        })
+        .unwrap()
+}
+
+/// Changes the cells of a table, as the window does.
+fn change_table(editor: &mut Editor, id: NodeId, change: impl FnOnce(&mut desk_model::Table)) {
+    editor
+        .edit("Cells", |edit| {
+            let mut object = edit.document().objects().get(id).unwrap().clone();
+            let desk_model::ObjectKind::Table(table) = &mut object.kind else {
+                unreachable!()
+            };
+            change(std::sync::Arc::make_mut(table));
+            edit.replace_object(object)
+        })
+        .unwrap();
+}
+
+fn cell(editor: &Editor, id: NodeId, r: u32, c: u32) -> desk_model::table::Cell<String> {
+    let desk_model::ObjectKind::Table(table) = &editor.document().objects().get(id).unwrap().kind
+    else {
+        unreachable!()
+    };
+    table.cell(r, c).clone()
+}
+
+#[test]
+fn rev_05_a_cell_changed_keeps_what_it_was() {
+    use desk_model::table::{CellFill, Color, Content};
+    let (mut editor, _) = typed("ab");
+    let table = table_object(&mut editor);
+    track(&mut editor, Tracking::On);
+    change_table(&mut editor, table, |t| {
+        t.cell_mut(0, 0).content = Content::Text("b".into());
+        t.cell_mut(1, 1).style.fill = Some(CellFill::Color(Color::rgb(255, 0, 0)));
+    });
+    // Each cell changed is a change of its own, by the author.
+    assert_eq!(editor.document().changes().len(), 2);
+    assert!(
+        editor
+            .document()
+            .changes()
+            .iter()
+            .all(|c| c.kind == ChangeKind::Cell && c.author.as_ref() == "Ana")
+    );
+    let first = cell(&editor, table, 0, 0).tracked.unwrap();
+    assert_eq!(first.content, Content::Text("a".into()));
+    assert!(cell(&editor, table, 0, 1).tracked.is_none());
+    // Changed again, it stays in its change, with what it was first.
+    change_table(&mut editor, table, |t| {
+        t.cell_mut(0, 0).content = Content::Text("c".into());
+    });
+    assert_eq!(
+        cell(&editor, table, 0, 0).tracked.unwrap().change,
+        first.change
+    );
+    // Rejected, the cells are as they were.
+    editor
+        .edit("Reject", |edit| edit.resolve_changes(false, |_| true))
+        .unwrap();
+    assert_eq!(
+        cell(&editor, table, 0, 0).content,
+        Content::Text("a".into())
+    );
+    assert_eq!(cell(&editor, table, 1, 1).style.fill, None);
+    assert!(cell(&editor, table, 0, 0).tracked.is_none());
+    assert!(editor.document().changes().is_empty());
+    // Accepted, they keep what they are.
+    editor.undo().unwrap();
+    editor
+        .edit("Accept", |edit| edit.resolve_changes(true, |_| true))
+        .unwrap();
+    assert_eq!(
+        cell(&editor, table, 0, 0).content,
+        Content::Text("c".into())
+    );
+    assert!(cell(&editor, table, 1, 1).tracked.is_none());
+}
+
+#[test]
+fn rev_05_a_cell_put_back_or_deleted_is_in_no_change() {
+    use desk_model::table::Content;
+    let (mut editor, _) = typed("ab");
+    let table = table_object(&mut editor);
+    track(&mut editor, Tracking::On);
+    change_table(&mut editor, table, |t| {
+        t.cell_mut(0, 0).content = Content::Text("b".into());
+        t.cell_mut(1, 0).content = Content::Text("x".into());
+    });
+    change_table(&mut editor, table, |t| {
+        t.cell_mut(0, 0).content = Content::Text("a".into());
+    });
+    assert!(cell(&editor, table, 0, 0).tracked.is_none());
+    assert_eq!(editor.document().changes().len(), 1);
+    // A row added is no change; the row of a changed cell deleted takes
+    // its change away.
+    change_table(&mut editor, table, |t| t.insert_rows(2, 1).unwrap());
+    assert_eq!(editor.document().changes().len(), 1);
+    change_table(&mut editor, table, |t| t.delete_rows(1, 1).unwrap());
+    assert!(editor.document().changes().is_empty());
+}
+
+#[test]
+fn rev_05_a_cell_changed_by_several_authors_says_so_and_a_table_grown_is_not_moved() {
+    use desk_model::table::Content;
+    let (mut editor, _) = typed("ab");
+    let table = table_object(&mut editor);
+    track(&mut editor, Tracking::On);
+    change_table(&mut editor, table, |t| {
+        t.cell_mut(0, 0).content = Content::Text("b".into());
+    });
+    assert!(!cell(&editor, table, 0, 0).tracked.unwrap().others);
+    // The same author again: still theirs alone.
+    change_table(&mut editor, table, |t| {
+        t.cell_mut(0, 0).content = Content::Text("c".into());
+    });
+    assert!(!cell(&editor, table, 0, 0).tracked.unwrap().others);
+    // Another author: the same change, of several authors.
+    editor.set_author("Bo");
+    change_table(&mut editor, table, |t| {
+        t.cell_mut(0, 0).content = Content::Text("d".into());
+    });
+    let tracked = cell(&editor, table, 0, 0).tracked.unwrap();
+    assert!(tracked.others);
+    assert_eq!(tracked.content, Content::Text("a".into()));
+    assert_eq!(editor.document().changes().len(), 1);
+    // A table that grows with its cells is not moved; moved, it is.
+    editor
+        .edit("Cells", |edit| {
+            let mut object = edit.document().objects().get(table).unwrap().clone();
+            object.frame.height = desk_model::Length::from_pt(80.0);
+            edit.replace_object(object)
+        })
+        .unwrap();
+    assert_eq!(editor.document().changes().len(), 1);
+    assert!(
+        editor
+            .document()
+            .objects()
+            .get(table)
+            .unwrap()
+            .moved
+            .is_none()
+    );
+    editor
+        .edit("Move", |edit| {
+            let mut object = edit.document().objects().get(table).unwrap().clone();
+            object.frame.x = desk_model::Length::from_pt(150.0);
+            object.frame.height = desk_model::Length::from_pt(60.0);
+            edit.replace_object(object)
+        })
+        .unwrap();
+    assert_eq!(editor.document().changes().len(), 2);
+    // Rejected, it goes back where it was with the size of its cells.
+    editor
+        .edit("Reject", |edit| {
+            edit.resolve_changes(false, |_| true)?;
+            Ok(())
+        })
+        .unwrap();
+    let object = editor.document().objects().get(table).unwrap().clone();
+    assert_eq!(
+        (object.frame.x, object.frame.height),
+        (
+            desk_model::Length::from_pt(100.0),
+            desk_model::Length::from_pt(60.0)
+        )
+    );
+    assert!(editor.document().changes().is_empty());
+}
+
+#[test]
+fn rev_05_a_table_grouped_leaves_the_changes_of_its_cells() {
+    use desk_model::table::Content;
+    let (mut editor, _) = typed("ab");
+    let table = table_object(&mut editor);
+    let shape = floating_shape(&mut editor);
+    track(&mut editor, Tracking::On);
+    change_table(&mut editor, table, |t| {
+        t.cell_mut(0, 0).content = Content::Text("b".into());
+    });
+    assert_eq!(editor.document().changes().len(), 1);
+    let group = editor
+        .edit("Group", |edit| edit.group_objects(&[table, shape]))
+        .unwrap()
+        .unwrap();
+    assert!(editor.document().changes().is_empty());
+    editor
+        .edit("Ungroup", |edit| edit.ungroup_objects(&[group]))
+        .unwrap();
+    assert!(cell(&editor, table, 0, 0).tracked.is_none());
+    // Changed again, it is in a change again.
+    change_table(&mut editor, table, |t| {
+        t.cell_mut(0, 0).content = Content::Text("c".into());
+    });
+    assert_eq!(editor.document().changes().len(), 1);
+    assert_eq!(
+        cell(&editor, table, 0, 0).tracked.unwrap().content,
+        Content::Text("b".into())
+    );
+}
+
+#[test]
+fn rev_05_a_cell_whose_change_is_gone_is_tracked_again() {
+    use desk_model::table::Content;
+    let (mut editor, _) = typed("ab");
+    let table = table_object(&mut editor);
+    track(&mut editor, Tracking::On);
+    // A cell read with a change that the document does not have.
+    editor
+        .edit("Stale", |edit| {
+            edit.untracked(|edit| {
+                let mut object = edit.document().objects().get(table).unwrap().clone();
+                let desk_model::ObjectKind::Table(t) = &mut object.kind else {
+                    unreachable!()
+                };
+                let t = std::sync::Arc::make_mut(t);
+                t.cell_mut(0, 0).tracked = Some(std::sync::Arc::new(desk_model::table::Tracked {
+                    change: std::num::NonZeroU64::new(999).unwrap(),
+                    content: Content::Text("old".into()),
+                    format: desk_model::table::Format::Automatic,
+                    style: t.cell(0, 0).style.clone(),
+                    others: false,
+                }));
+                edit.replace_object(object)
+            })
+        })
+        .unwrap();
+    change_table(&mut editor, table, |t| {
+        t.cell_mut(0, 0).content = Content::Text("b".into());
+    });
+    assert_eq!(editor.document().changes().len(), 1);
+    assert_eq!(
+        cell(&editor, table, 0, 0).tracked.unwrap().content,
+        Content::Text("a".into())
+    );
+}

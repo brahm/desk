@@ -93,6 +93,16 @@ fn placed_changes(document: &Document) -> Vec<Placed> {
             change: true,
         })
     }));
+    // The cells that changes changed, each on its cell (REV-05).
+    out.extend(document.cell_changes().into_iter().map(|c| Placed {
+        id: c.id,
+        story: None,
+        start: Spot::default(),
+        end: Spot::default(),
+        object: Some(c.table),
+        cell: Some((c.row, c.col)),
+        change: true,
+    }));
     out
 }
 
@@ -165,7 +175,11 @@ fn placed(document: &Document) -> Vec<Placed> {
 }
 
 /// Where a cell of a table is on the pages.
-fn cell_rect(layout: &DocumentLayout, table: NodeId, (row, col): (u32, u32)) -> Option<SpanRect> {
+pub(super) fn cell_rect(
+    layout: &DocumentLayout,
+    table: NodeId,
+    (row, col): (u32, u32),
+) -> Option<SpanRect> {
     let (page, placed) = super::objects::find(layout, table)?;
     let (x, y, w, h) = placed.table.as_ref()?.cell_rect(row, col)?;
     let (x0, y0) = (f64::from(placed.x), f64::from(placed.y));
@@ -804,6 +818,12 @@ impl TextEditor {
             Some(o) => object == Some(o) && p.cell == cell,
             None => object.is_none() && p.story == story && p.start <= start && end <= p.end,
         };
+        // A table with a cell selected is in the change that moved it,
+        // when the cell is in no change of its own (REV-05).
+        let moved =
+            |p: &Placed| p.change && p.object.is_some() && p.object == object && p.cell.is_none();
+        let on_cell = cell.is_some() && ordered.iter().any(|p| p.change && on(p));
+        let on = |p: &Placed| on(p) || (cell.is_some() && !on_cell && moved(p));
         let remembered = state.reviewed.and_then(|item| {
             ordered
                 .iter()

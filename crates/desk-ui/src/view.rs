@@ -58,7 +58,7 @@ struct State {
     comment_flags: Vec<(SpanRect, desk_model::AuthorColor)>,
     /// The text of tracked changes, with what each did and the colour of
     /// its author (W148, W150).
-    change_marks: Vec<(SpanRect, desk_model::ChangeKind, desk_model::AuthorColor)>,
+    change_marks: Vec<ChangeMark>,
     /// The bars in the margin beside the lines with changes (REV-04).
     change_bars: Vec<ChangeBar>,
     /// The color around the pages that full screen chose (DOC-07); none
@@ -493,10 +493,7 @@ impl DocumentView {
     }
 
     /// Marks the text of tracked changes (W148).
-    pub fn set_change_marks(
-        &self,
-        marks: Vec<(SpanRect, desk_model::ChangeKind, desk_model::AuthorColor)>,
-    ) {
+    pub fn set_change_marks(&self, marks: Vec<ChangeMark>) {
         let changed = {
             let mut state = self.state.borrow_mut();
             let changed = state.change_marks != marks;
@@ -1578,19 +1575,45 @@ fn draw_change_bars(
     }
 }
 
+/// A mark of a tracked change: where it is, what the change did and the
+/// colour of its author, none for a cell that several authors changed
+/// (W148, REV-05).
+pub type ChangeMark = (
+    SpanRect,
+    desk_model::ChangeKind,
+    Option<desk_model::AuthorColor>,
+);
+
+/// The gray of the mark of a cell that several authors changed (REV-05).
+const SEVERAL_AUTHORS: desk_model::Rgba = desk_model::Rgba::rgb(119, 118, 123);
+
 /// The text of tracked changes on a page, in the colour of each author:
 /// a line under text added, through text deleted, a dashed line under
-/// text whose formatting changed (W148, REV-04), and a dashed frame around
-/// an object moved or resized (REV-01).
+/// text whose formatting changed (W148, REV-04), a dashed frame around
+/// an object moved or resized (REV-01), and a triangle in the top right
+/// corner of a cell changed, gray when several authors changed it
+/// (REV-05).
 fn draw_changes(cr: &gtk::cairo::Context, state: &State, page: usize, rect: &PageRect, scale: f64) {
     cr.set_line_width((1.5 * scale).max(1.0));
     for (span, kind, color) in state.change_marks.iter().filter(|(s, _, _)| s.page == page) {
-        let ink = color.ink();
+        let ink = color.map_or(SEVERAL_AUTHORS, desk_model::AuthorColor::ink);
         cr.set_source_rgb(
             f64::from(ink.r) / 255.0,
             f64::from(ink.g) / 255.0,
             f64::from(ink.b) / 255.0,
         );
+        if *kind == desk_model::ChangeKind::Cell {
+            // A cell changed: a triangle in its top right corner, as
+            // Pages '09 marked it.
+            let side = (span.x1 - span.x0).min(span.y1 - span.y0).min(8.0);
+            let (x, y) = (rect.x + span.x1 * scale, rect.y + span.y0 * scale);
+            cr.move_to(x - side * scale, y);
+            cr.line_to(x, y);
+            cr.line_to(x, y + side * scale);
+            cr.close_path();
+            cr.fill().ok();
+            continue;
+        }
         if *kind == desk_model::ChangeKind::Placement {
             // An object moved or resized: a dashed frame around it.
             let dash = (3.0 * scale).max(2.0);
@@ -1610,8 +1633,8 @@ fn draw_changes(cr: &gtk::cairo::Context, state: &State, page: usize, rect: &Pag
             desk_model::ChangeKind::Insertion | desk_model::ChangeKind::Format => {
                 span.y1 - (span.y1 - span.y0) * 0.12
             }
-            // Framed above.
-            desk_model::ChangeKind::Placement => continue,
+            // Framed or marked in the corner of the cell above.
+            desk_model::ChangeKind::Placement | desk_model::ChangeKind::Cell => continue,
             desk_model::ChangeKind::Deletion => (span.y0 + span.y1) / 2.0,
         };
         let y = rect.y + y * scale;

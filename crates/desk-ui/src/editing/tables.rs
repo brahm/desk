@@ -322,6 +322,27 @@ impl TextEditor {
     /// Changes the selected table as one step of the history, and the
     /// selected cells with it; the frame takes the size of the table.
     pub fn change_table(&self, name: &str, change: impl FnOnce(&mut Table, &mut CellSelection)) {
+        self.edit_table(name, Some(|_: &mut Table| {}), change);
+    }
+
+    /// Changes the rows, columns, borders, merges or order of the selected
+    /// table, or moves or fills its cells, as one step of the history:
+    /// none of it is a tracked change of its cells, as Pages '09 tracked
+    /// none (REV-05).
+    pub fn rearrange_table(&self, name: &str, change: impl FnOnce(&mut Table, &mut CellSelection)) {
+        self.edit_table(name, None::<fn(&mut Table)>, change);
+    }
+
+    /// Changes the selected table with `change` in one step of the
+    /// history: tracked when `arrange` is given, which first rearranges
+    /// the table without being tracked, as a paste adds the rows and
+    /// columns it needs before it writes the cells (REV-05).
+    fn edit_table(
+        &self,
+        name: &str,
+        arrange: Option<impl FnOnce(&mut Table)>,
+        change: impl FnOnce(&mut Table, &mut CellSelection),
+    ) {
         let Some((table, _)) = self.table_selection() else {
             return;
         };
@@ -339,7 +360,12 @@ impl TextEditor {
                 anchor: (0, 0),
                 focus: (table.rows() - 1, table.cols() - 1),
             });
-        let mut changed = (*table).clone();
+        let tracked = arrange.is_some();
+        let mut arranged = (*table).clone();
+        if let Some(arrange) = arrange {
+            arrange(&mut arranged);
+        }
+        let mut changed = arranged.clone();
         change(&mut changed, &mut cells);
         if changed == *table {
             if self.state.borrow().cells != Some(cells) {
@@ -358,6 +384,7 @@ impl TextEditor {
         cells.anchor = clamp(cells.anchor);
         cells.focus = clamp(cells.focus);
         let (w, h) = self.table_size(&changed);
+        let arranged = (arranged != *table).then(|| Arc::new(arranged));
         let changed = Arc::new(changed);
         let aside = crate::preferences::get().move_objects_aside;
         self.arrange_objects(name, move |edit, _| {
@@ -365,10 +392,19 @@ impl TextEditor {
                 return Ok(None);
             };
             let old = object.frame;
+            if let Some(arranged) = arranged {
+                let mut object = object.clone();
+                object.kind = ObjectKind::Table(arranged);
+                edit.untracked(|edit| edit.replace_object(object))?;
+            }
             object.kind = ObjectKind::Table(changed);
             object.frame.width = desk_model::Length::from_pt(w);
             object.frame.height = desk_model::Length::from_pt(h);
-            edit.replace_object(object)?;
+            if tracked {
+                edit.replace_object(object)?;
+            } else {
+                edit.untracked(|edit| edit.replace_object(object))?;
+            }
             if aside {
                 edit.move_aside(id, old)?;
             }
@@ -434,7 +470,7 @@ impl TextEditor {
 
     /// Sets the borders of the selected cells (TAB-25).
     pub fn set_cell_borders(&self, which: BorderSet, border: Option<desk_model::table::Border>) {
-        self.change_table("Borders", |table, cells| {
+        self.rearrange_table("Borders", |table, cells| {
             let area = cells.area(table);
             table.set_borders(area, which, border);
         });
@@ -442,7 +478,7 @@ impl TextEditor {
 
     /// Adds rows above or below the selected ones (TAB-10).
     pub fn add_rows(&self, below: bool) {
-        self.change_table("Add Row", |table, cells| {
+        self.rearrange_table("Add Row", |table, cells| {
             let area = cells.area(table);
             let at = if below { area.row_end() } else { area.row };
             if table.insert_rows(at, area.rows).is_ok() && !below {
@@ -454,7 +490,7 @@ impl TextEditor {
 
     /// Adds columns before or after the selected ones (TAB-10).
     pub fn add_cols(&self, after: bool) {
-        self.change_table("Add Column", |table, cells| {
+        self.rearrange_table("Add Column", |table, cells| {
             let area = cells.area(table);
             let at = if after { area.col_end() } else { area.col };
             if table.insert_cols(at, area.cols).is_ok() && !after {
@@ -466,7 +502,7 @@ impl TextEditor {
 
     /// Deletes the selected rows (TAB-11).
     pub fn delete_rows(&self) {
-        self.change_table("Delete Row", |table, cells| {
+        self.rearrange_table("Delete Row", |table, cells| {
             let area = cells.area(table);
             let _ = table.delete_rows(area.row, area.rows);
         });
@@ -474,7 +510,7 @@ impl TextEditor {
 
     /// Deletes the selected columns (TAB-11).
     pub fn delete_cols(&self) {
-        self.change_table("Delete Column", |table, cells| {
+        self.rearrange_table("Delete Column", |table, cells| {
             let area = cells.area(table);
             let _ = table.delete_cols(area.col, area.cols);
         });
@@ -483,7 +519,7 @@ impl TextEditor {
     /// Merges the selected cells, or unmerges a merged cell (TAB-23, TAB-24).
     pub fn merge_cells(&self) {
         let locale = self.locale();
-        self.change_table("Merge Cells", |table, cells| {
+        self.rearrange_table("Merge Cells", |table, cells| {
             let area = cells.area(table);
             if area.rows == 1 && area.cols == 1 {
                 return;
@@ -499,7 +535,7 @@ impl TextEditor {
 
     /// Unmerges the selected merged cells (TAB-24).
     pub fn unmerge_cells(&self) {
-        self.change_table("Unmerge Cells", |table, cells| {
+        self.rearrange_table("Unmerge Cells", |table, cells| {
             for (r, c) in cells.area(table).cells() {
                 if table
                     .merge_at(r, c)
@@ -513,7 +549,7 @@ impl TextEditor {
 
     /// Sorts the body rows by the column of the cell selected (TAB-15).
     pub fn sort_rows(&self, ascending: bool) {
-        self.change_table("Sort", |table, cells| {
+        self.rearrange_table("Sort", |table, cells| {
             let area = cells.area(table);
             let rows = (area.rows > 1).then(|| (area.row, area.row_end()));
             table.sort(cells.focus.1, ascending, rows, desk_layout::today());
@@ -523,7 +559,7 @@ impl TextEditor {
     /// Fills the selected cells from the first row or column of them
     /// (TAB-19).
     pub fn fill_cells(&self, direction: FillDirection) {
-        self.change_table("Fill", |table, cells| {
+        self.rearrange_table("Fill", |table, cells| {
             let area = cells.area(table);
             let (source, count) = match direction {
                 FillDirection::Down => (Area { rows: 1, ..area }, area.rows - 1),
@@ -562,7 +598,7 @@ impl TextEditor {
     /// Makes the selected rows or columns as high or wide as each other
     /// (TAB-13).
     pub fn distribute_cells(&self, rows: bool) {
-        self.change_table("Distribute", |table, cells| {
+        self.rearrange_table("Distribute", |table, cells| {
             let area = cells.area(table);
             if rows {
                 let rows: Vec<u32> = (area.row..area.row_end()).collect();
@@ -806,7 +842,7 @@ impl TextEditor {
             Landing::Cell(r, c) => (r, c),
             Landing::AddRow => {
                 // A new row of the body, before the footer if there is one.
-                self.change_table("Add Row", |table, cells| {
+                self.rearrange_table("Add Row", |table, cells| {
                     let at = table.body_end();
                     if table.insert_rows(at, 1).is_ok() {
                         cells.anchor = (at, 0);
@@ -817,7 +853,7 @@ impl TextEditor {
             }
             Landing::AddColumn => {
                 let r = cells.focus.0;
-                self.change_table("Add Column", |table, cells| {
+                self.rearrange_table("Add Column", |table, cells| {
                     if table.insert_cols(cols, 1).is_ok() {
                         cells.anchor = (r, cols);
                         cells.focus = (r, cols);
@@ -1160,11 +1196,18 @@ impl TextEditor {
         };
         let locale = self.locale();
         let text = text.to_owned();
-        self.change_table("Paste", |table, sel| {
-            let area = table.paste_text(cells.focus, &text, &locale);
-            sel.anchor = (area.row, area.col);
-            sel.focus = (area.row_end() - 1, area.col_end() - 1);
-        });
+        let grow = text.clone();
+        self.edit_table(
+            "Paste",
+            Some(move |table: &mut Table| {
+                table.grow_for_text(cells.focus, &grow);
+            }),
+            |table, sel| {
+                let area = table.paste_text(cells.focus, &text, &locale);
+                sel.anchor = (area.row, area.col);
+                sel.focus = (area.row_end() - 1, area.col_end() - 1);
+            },
+        );
         true
     }
 }

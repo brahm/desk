@@ -189,16 +189,13 @@ impl Edit {
             }
         }
         if object.anchor != Anchor::InText {
-            let mut placed = object.clone();
+            // Out of the change that moved it, which goes when no object
+            // is left in it.
+            let mut placed = object;
             placed.anchor = Anchor::InText;
             placed.rotation = 0;
             placed.moved = None;
             self.replace_object(placed)?;
-            // Out of the change that moved it, which goes when no object
-            // is left in it.
-            if let Some(moved) = object.moved {
-                self.drop_unplaced(moved.change)?;
-            }
         }
         // Moving an object that is there already, its mark is no text
         // added, which rejecting would take away with the object: it
@@ -246,8 +243,8 @@ impl Edit {
         // A copy is a new object, without the comments of the first, on
         // it or on its cells.
         copy.comments = crate::CommentIds::none();
-        // Nor its tracked change of place (W148).
-        copy.moved = None;
+        // Nor its tracked changes of place or of cells (W148, REV-05).
+        copy.untrack();
         if let crate::ObjectKind::Table(table) = &mut copy.kind
             && !table.comments().is_empty()
         {

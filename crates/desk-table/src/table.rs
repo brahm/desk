@@ -1025,6 +1025,20 @@ impl<T: CellText> Table<T> {
         }
         out
     }
+
+    /// The cells that a tracked change changed, by row and column, each
+    /// with its change (REV-05), row by row.
+    pub fn tracked_cells(&self) -> Vec<((u32, u32), std::num::NonZeroU64)> {
+        let mut out = Vec::new();
+        for r in 0..self.rows() {
+            for c in 0..self.cols() {
+                if let Some(tracked) = &self.cell(r, c).tracked {
+                    out.push(((r, c), tracked.change));
+                }
+            }
+        }
+        out
+    }
 }
 
 /// Which borders of an area a change sets (TAB-25).

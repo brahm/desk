@@ -31,15 +31,11 @@ impl<T: CellText> Table<T> {
         out
     }
 
-    /// Types `text`, lines of values separated by tabs, into the cells
-    /// from `at`, adding rows and columns at the end of the table where it
-    /// does not reach. The cells that the text filled, which become the
-    /// selection.
-    ///
-    /// Each value is typed as if the user typed it, so numbers, dates and
-    /// formulas are read by `locale`. Line ends of other systems (`\r\n`)
-    /// are taken as well.
-    pub fn paste_text(&mut self, at: (u32, u32), text: &str, locale: &Locale) -> Area {
+    /// Adds the rows and columns that text of tabs and lines pasted at
+    /// `at` needs, as [`Table::paste_text`] does before it writes the
+    /// cells, and gives the values of its lines. Once grown, the table
+    /// takes no more.
+    pub fn grow_for_text<'a>(&mut self, at: (u32, u32), text: &'a str) -> Vec<Vec<&'a str>> {
         let (r0, c0) = at;
         let lines: Vec<Vec<&str>> = text
             .trim_end_matches(['\n', '\r'])
@@ -65,12 +61,27 @@ impl<T: CellText> Table<T> {
         if new_rows > rows {
             let _ = self.insert_rows(row_at, new_rows - rows);
         }
-        // Text pasted in the body of a table with a footer, past the rows
-        // it could add, leaves the footer as it is.
-        let last_row = self.last_row_for(r0);
         if new_cols > cols {
             let _ = self.insert_cols(cols, new_cols - cols);
         }
+        lines
+    }
+
+    /// Types `text`, lines of values separated by tabs, into the cells
+    /// from `at`, adding rows and columns at the end of the table where it
+    /// does not reach. The cells that the text filled, which become the
+    /// selection.
+    ///
+    /// Each value is typed as if the user typed it, so numbers, dates and
+    /// formulas are read by `locale`. Line ends of other systems (`\r\n`)
+    /// are taken as well.
+    pub fn paste_text(&mut self, at: (u32, u32), text: &str, locale: &Locale) -> Area {
+        let (r0, c0) = at;
+        let lines = self.grow_for_text(at, text);
+        let width = lines.iter().map(Vec::len).max().unwrap_or(1).max(1) as u32;
+        // Text pasted in the body of a table with a footer, past the rows
+        // it could add, leaves the footer as it is.
+        let last_row = self.last_row_for(r0);
         for (i, values) in lines.iter().enumerate() {
             let r = r0.saturating_add(i as u32);
             for (j, value) in values.iter().enumerate() {

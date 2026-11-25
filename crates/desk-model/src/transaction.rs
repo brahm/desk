@@ -137,7 +137,7 @@ impl Edit {
             crate::ChangeKind::Format => tracker.format,
             // Each object moved is a change of its own, which is
             // accepted or rejected alone.
-            crate::ChangeKind::Placement => None,
+            crate::ChangeKind::Placement | crate::ChangeKind::Cell => None,
         };
         if let Some(id) = made {
             return Ok(id);
@@ -149,7 +149,7 @@ impl Edit {
             crate::ChangeKind::Insertion => tracker.insertion = Some(id),
             crate::ChangeKind::Deletion => tracker.deletion = Some(id),
             crate::ChangeKind::Format => tracker.format = Some(id),
-            crate::ChangeKind::Placement => {}
+            crate::ChangeKind::Placement | crate::ChangeKind::Cell => {}
         }
         Ok(id)
     }
@@ -186,7 +186,7 @@ impl Edit {
 
     /// Runs some edits with their changes made as they are, even while
     /// the edit tracks changes.
-    pub(crate) fn untracked<T>(
+    pub fn untracked<T>(
         &mut self,
         edits: impl FnOnce(&mut Self) -> Result<T, ModelError>,
     ) -> Result<T, ModelError> {
@@ -1286,81 +1286,184 @@ impl Edit {
         self.insert_object(index, object)
     }
 
-    /// Removes an object.
+    /// Removes an object, with the tracked changes that only it was in
+    /// (W148).
     pub fn remove_object(&mut self, id: crate::NodeId) -> Result<(), ModelError> {
-        let moved = self.doc.objects().get(id).and_then(|o| o.moved);
+        let changes = self
+            .doc
+            .objects()
+            .get(id)
+            .map(crate::Object::changes)
+            .unwrap_or_default();
         self.apply(Op::RemoveObject { object: id })?;
-        if let Some(moved) = moved {
-            self.drop_unplaced(moved.change)?;
-        }
-        Ok(())
+        self.drop_unused(&changes)
     }
 
     /// Replaces an object with another with the same identifier. While
     /// the edit tracks changes, a floating object moved or resized keeps
-    /// where it was, in a change, until the change is accepted or
-    /// rejected, each in a change of its own; one already in such a
-    /// change stays in it, and one put back where it was is in none
-    /// (W148, REV-01).
+    /// where it was until the change is accepted or rejected (REV-01),
+    /// and so does a cell of a table whose content, format or look
+    /// changes keep what it was (REV-05), each in a change of its own;
+    /// one already in such a change stays in it, and one put back as it
+    /// was is in none (W148).
     pub fn replace_object(&mut self, mut object: crate::Object) -> Result<(), ModelError> {
         let floating = |anchor: crate::Anchor| {
             matches!(anchor, crate::Anchor::Page(_) | crate::Anchor::Paragraph(_))
         };
-        let before = self
-            .doc
-            .objects()
-            .get(object.id)
-            .map(|o| (o.anchor, o.frame, o.moved));
-        let mut unplaced = None;
+        let old = self.doc.objects().get(object.id).cloned();
+        // The size of a table follows its rows, columns and cells, which
+        // are not moved: only where it is (REV-05).
+        let table = matches!(object.kind, crate::ObjectKind::Table(_));
+        let (width, height) = (object.frame.width, object.frame.height);
+        let place = |frame: crate::Frame| {
+            if table {
+                crate::Frame {
+                    width,
+                    height,
+                    ..frame
+                }
+            } else {
+                frame
+            }
+        };
         if self.tracking()
-            && let Some((anchor, frame, moved)) = before
-            && object.moved == moved
-            && floating(anchor)
-            && floating(object.anchor)
+            && let Some(old) = &old
         {
-            match moved {
-                Some(m) if m.anchor == object.anchor && m.frame == object.frame => {
-                    object.moved = None;
-                    unplaced = Some(m.change);
+            if object.moved == old.moved && floating(old.anchor) && floating(object.anchor) {
+                match old.moved {
+                    Some(m) if m.anchor == object.anchor && place(m.frame) == object.frame => {
+                        object.moved = None;
+                    }
+                    Some(_) => {}
+                    None if (old.anchor, place(old.frame)) != (object.anchor, object.frame) => {
+                        let change = self.tracked(crate::ChangeKind::Placement)?;
+                        object.moved = Some(crate::Moved {
+                            change,
+                            anchor: old.anchor,
+                            frame: old.frame,
+                        });
+                    }
+                    None => {}
                 }
-                Some(_) => {}
-                None if (anchor, frame) != (object.anchor, object.frame) => {
-                    let change = self.tracked(crate::ChangeKind::Placement)?;
-                    object.moved = Some(crate::Moved {
-                        change,
-                        anchor,
-                        frame,
-                    });
-                }
-                None => {}
+            }
+            if let (crate::ObjectKind::Table(before), crate::ObjectKind::Table(after)) =
+                (&old.kind, &mut object.kind)
+            {
+                self.track_cells(before, after)?;
             }
         }
-        if self.doc.objects().get(object.id) != Some(&object) {
+        if old.as_ref() != Some(&object) {
+            let kept: std::collections::HashSet<crate::NodeId> =
+                object.changes().into_iter().collect();
+            let gone: Vec<crate::NodeId> = old
+                .as_ref()
+                .map(crate::Object::changes)
+                .unwrap_or_default()
+                .into_iter()
+                .filter(|c| !kept.contains(c))
+                .collect();
             self.apply(Op::ReplaceObject { object })?;
-        }
-        if let Some(change) = unplaced {
-            self.drop_unplaced(change)?;
+            self.drop_unused(&gone)?;
         }
         Ok(())
     }
 
-    /// Takes away a change of the places of objects that no object is in
-    /// any longer (W148).
-    pub(crate) fn drop_unplaced(&mut self, change: crate::NodeId) -> Result<(), ModelError> {
-        let used = self
+    /// Tracks the cells of a table that an edit changes: what each
+    /// held, how its value was written and how it looked, unless the
+    /// edit already says what it was. Only an edit that keeps the rows
+    /// and columns changes cells (REV-05).
+    fn track_cells(
+        &mut self,
+        before: &crate::Table,
+        after: &mut std::sync::Arc<crate::Table>,
+    ) -> Result<(), ModelError> {
+        if (before.rows(), before.cols()) != (after.rows(), after.cols()) {
+            return Ok(());
+        }
+        for r in 0..before.rows() {
+            for c in 0..before.cols() {
+                let (old, new) = (before.cell(r, c), after.cell(r, c));
+                let same = |content: &crate::table::Content<String>,
+                            format: &crate::table::Format,
+                            style: &crate::table::CellStyle| {
+                    (content, format, style) == (&new.content, &new.format, &new.style)
+                };
+                if new.tracked != old.tracked || same(&old.content, &old.format, &old.style) {
+                    continue;
+                }
+                // A cell whose change is gone is in none.
+                let live = old.tracked.as_ref().filter(|t| {
+                    crate::NodeId::new(t.change.get())
+                        .is_some_and(|id| self.doc.changes().get(id).is_some())
+                });
+                let tracked = match live {
+                    Some(t) if same(&t.content, &t.format, &t.style) => None,
+                    Some(t) => {
+                        // Another author changing it again joins the
+                        // change, which shows they are several.
+                        let tracker = self.tracker.as_ref().expect("the edit tracks changes");
+                        let id = crate::NodeId::new(t.change.get()).expect("not zero");
+                        let theirs = self
+                            .doc
+                            .changes()
+                            .get(id)
+                            .is_some_and(|c| c.author != tracker.author);
+                        if t.others || !theirs {
+                            continue;
+                        }
+                        Some(std::sync::Arc::new(crate::table::Tracked {
+                            others: true,
+                            ..(**t).clone()
+                        }))
+                    }
+                    None => {
+                        let change = self.tracked(crate::ChangeKind::Cell)?;
+                        Some(std::sync::Arc::new(crate::table::Tracked {
+                            change: std::num::NonZeroU64::new(change.get())
+                                .expect("identifiers are not zero"),
+                            content: old.content.clone(),
+                            format: old.format.clone(),
+                            style: old.style.clone(),
+                            others: false,
+                        }))
+                    }
+                };
+                std::sync::Arc::make_mut(after).cell_mut(r, c).tracked = tracked;
+            }
+        }
+        Ok(())
+    }
+
+    /// Takes away the changes of objects or cells that nothing is in any
+    /// longer (W148).
+    pub(crate) fn drop_unused(&mut self, changes: &[crate::NodeId]) -> Result<(), ModelError> {
+        let of_objects: Vec<crate::NodeId> = changes
+            .iter()
+            .copied()
+            .filter(|&id| {
+                self.doc.changes().get(id).is_some_and(|c| {
+                    matches!(
+                        c.kind,
+                        crate::ChangeKind::Placement | crate::ChangeKind::Cell
+                    )
+                })
+            })
+            .collect();
+        if of_objects.is_empty() {
+            return Ok(());
+        }
+        let used: std::collections::HashSet<crate::NodeId> = self
             .doc
             .objects()
             .iter()
-            .any(|o| o.moved.is_some_and(|m| m.change == change));
-        let placement = self
-            .doc
-            .changes()
-            .get(change)
-            .is_some_and(|c| c.kind == crate::ChangeKind::Placement);
-        if used || !placement {
-            return Ok(());
+            .flat_map(crate::Object::changes)
+            .collect();
+        for change in of_objects {
+            if !used.contains(&change) {
+                self.set_change(change, None)?;
+            }
         }
-        self.set_change(change, None)
+        Ok(())
     }
 
     /// Sets the settings of the text of the whole document.

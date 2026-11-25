@@ -2575,6 +2575,42 @@ paragraph, and objects on a second page.
   View, which selects no object, goes past those of comments and
   changes.
 
+### 25 November: changes in table cells (step 13 of W2, seventh part)
+
+- A cell written, formatted or filled while tracking is a change of its
+  own, by its author, as Pages '09 tracked them (REV-05, D-003): the
+  cell keeps what it held, the format of its value and its style
+  before, which rejecting gives back and accepting forgets. Written
+  back to what it was, it is in no change. Rows and columns added,
+  deleted or sorted, borders, merging, splitting, filling, moving cells
+  and table styles are not tracked, as in Pages '09; a cell deleted
+  with its row takes its change with it.
+- The cell shows a triangle in its top right corner, in the colour of
+  the author, gray once another author changed it too. Previous and
+  Next of the bar go to it and select the cell, the bubble says
+  Changed: Cell, and Accept and Reject take the changes of the cells
+  selected.
+- The size of a table follows its cells: a table that grows or shrinks
+  with them is not moved, and one moved and rejected goes back where it
+  was with the size of its cells now.
+- ODT keeps each change of a cell in `desk:table`, under `tracked`,
+  with a region of its own named by `desk:change-name`, which other
+  programs read as a change of no text.
+- The text of cells has no changes inside it: a cell is changed whole,
+  so the paragraphs of a cell have no deleted break to join (B-074).
+- The review found that filling and copying cells copied the change of
+  the cell they came from, which rejecting then put back in all of
+  them: a cell filled, copied or taken out of its table is in no
+  change. A table grouped kept the changes of its cells, which the
+  document no longer had, and its cells were not tracked again: grouped
+  or ungrouped, it leaves them, and a cell whose change is gone is
+  tracked anew. A paste that made the table grow was not tracked: the
+  rows and columns are added first, untracked, and the cells written
+  after are. Rejecting the changes of cells now fits the table to them
+  again, a moved table keeps its bubble with an unchanged cell
+  selected, and the changes no longer used are found once for all,
+  not once for each.
+
 ## Decisions, with their reasons and consequences
 
 Ids `D-nnn` and `R-nnn` are those of [decisions.md](decisions.md).
