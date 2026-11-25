@@ -2504,6 +2504,17 @@ paragraph, and objects on a second page.
 - The list item in a note is not kept because the paragraphs of notes
   are written and read in ODT without their lists at all; that moves to
   W5, which reads LibreOffice ODT in full (B-075).
+- The review found that the paragraphs a deletion takes lost what
+  their own automatic style says: a section that starts there numbers
+  its pages again from the number its paragraph gives, the end of a
+  section goes back to the layout of the pages, and an item keeps a
+  style overriding its list only when that style is not the list's
+  own. Their bookmarks are kept too, with the identifiers the body
+  gives them, so that an entry of a table of contents in the region
+  still finds its page.
+- The headers and footers of a section that starts at a taken
+  paragraph with a master page of its own are not kept: they are built
+  for the body only. That moves to W5 with B-075 (B-076).
 
 ## Decisions, with their reasons and consequences
 

@@ -463,11 +463,12 @@ fn restore(
     let mut ranges = vec![(at, at.offset + first.len())];
     let (last, middle) = rest.split_last().expect("there are two or more");
     let mut place = index + 1;
+    // They keep their identifiers, which page references name (B-068).
     for p in middle {
         let mut attrs = p.attrs().clone();
         attrs.break_change = Some(Some(change));
         attrs.break_former = None;
-        let id = edit.new_id();
+        let id = p.id();
         edit.apply(Op::InsertParagraph {
             index: place,
             paragraph: Paragraph::from_runs(id, p.style(), attrs, marked(p))?,
@@ -482,7 +483,7 @@ fn restore(
     attrs.break_former = former;
     let mut runs = marked(last);
     runs.extend(tail);
-    let id = edit.new_id();
+    let id = last.id();
     edit.apply(Op::InsertParagraph {
         index: place,
         paragraph: Paragraph::from_runs(id, last.style(), attrs, runs)?,
@@ -562,9 +563,9 @@ fn export(
         let mut here = match current.take() {
             // Joined to the paragraph before: what is anchored to it and
             // the bookmarks at it go there.
+            // Its bookmarks stay with it, in the region (B-068).
             Some(mut here) => {
                 here.frames.extend(paragraph.frames.iter().cloned());
-                here.marks.extend(paragraph.marks.iter().cloned());
                 here
             }
             None => odf::Paragraph {
@@ -667,6 +668,7 @@ fn taken(paragraph: &odf::Paragraph) -> odf::Paragraph {
         list: paragraph.list.clone(),
         section: paragraph.section.clone(),
         toc: paragraph.toc,
+        marks: paragraph.marks.clone(),
         ..odf::Paragraph::default()
     }
 }

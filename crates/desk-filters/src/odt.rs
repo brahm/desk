@@ -1249,12 +1249,19 @@ fn import_text(source: &odf::TextDocument) -> Result<Document, FilterError> {
     let mut lists: HashMap<&str, StyleId> = HashMap::new();
     // The automatic list styles that only items override their list
     // with: their levels go on the items.
-    let overriding: HashSet<&str> = source
-        .body
-        .iter()
-        // Those of items that deletions took too (B-068).
-        .chain(source.tracked_changes.iter().flat_map(|r| &r.deleted))
-        .filter_map(|p| p.list.as_ref()?.style_override.as_deref())
+    // Those of items that deletions took too (B-068), but not those that
+    // a list has as its own.
+    let items = || {
+        source
+            .body
+            .iter()
+            .chain(source.tracked_changes.iter().flat_map(|r| &r.deleted))
+            .filter_map(|p| p.list.as_ref())
+    };
+    let own: HashSet<&str> = items().map(|m| m.style.as_str()).collect();
+    let overriding: HashSet<&str> = items()
+        .filter_map(|m| m.style_override.as_deref())
+        .filter(|name| !own.contains(name))
         .collect();
     for (automatic, style) in source.list_styles.iter().map(|s| (false, s)).chain(
         source
@@ -1464,16 +1471,7 @@ fn import_text(source: &odf::TextDocument) -> Result<Document, FilterError> {
     {
         setup.footer_margin = margin;
     }
-    // The columns of the pages are the layout outside any section.
-    let page_layout = Layout {
-        columns: page.columns.as_ref().map_or(desk_model::Columns::ONE, |c| {
-            sections::columns(
-                c,
-                (setup.width - setup.margin_left - setup.margin_right).to_pt(),
-            )
-        }),
-        ..Layout::default()
-    };
+    let page_layout = page_layout(source, &setup);
     setup.layout = page_layout;
     let mut current_layout = page_layout;
     // The sections with master pages of their own, by their first
@@ -1487,6 +1485,18 @@ fn import_text(source: &odf::TextDocument) -> Result<Document, FilterError> {
     for (paragraph, id) in source.body.iter().zip(&body_ids) {
         for mark in &paragraph.marks {
             marks.entry(mark.clone()).or_insert(*id);
+        }
+    }
+    // Those of the paragraphs that deletions took, which keep their
+    // bookmarks (B-068).
+    let mut taken_ids = TakenIds::new();
+    for region in &source.tracked_changes {
+        for (i, paragraph) in region.deleted.iter().enumerate() {
+            let id = document.new_id();
+            taken_ids.insert((region.id.clone(), i), id);
+            for mark in &paragraph.marks {
+                marks.entry(mark.clone()).or_insert(id);
+            }
         }
     }
     // Where the comments of the body start and end, in order: the
@@ -1819,6 +1829,7 @@ fn import_text(source: &odf::TextDocument) -> Result<Document, FilterError> {
                 &ids,
                 &lists,
                 &Marks::new(),
+                &TakenIds::new(),
                 default,
                 relative,
                 tracked,
@@ -1902,6 +1913,7 @@ fn import_text(source: &odf::TextDocument) -> Result<Document, FilterError> {
         &ids,
         &lists,
         &Marks::new(),
+        &TakenIds::new(),
         default,
         relative,
         object_tracked,
@@ -1987,6 +1999,7 @@ fn import_text(source: &odf::TextDocument) -> Result<Document, FilterError> {
         &ids,
         &lists,
         &marks,
+        &taken_ids,
         default,
         relative,
         tracked,
@@ -2144,6 +2157,7 @@ fn import_tracked(
     ids: &HashMap<(odf::Family, &str), StyleId>,
     lists: &HashMap<&str, StyleId>,
     marks: &Marks,
+    taken_ids: &TakenIds,
     default: StyleId,
     relative: bool,
     events: changes::Events,
@@ -2165,7 +2179,7 @@ fn import_tracked(
         }
         let mut paragraphs = Vec::new();
         let mut inner = Vec::new();
-        for paragraph in &region.deleted {
+        for (i, paragraph) in region.deleted.iter().enumerate() {
             let mut found = Vec::new();
             let mut built = import_paragraph(
                 source,
@@ -2224,23 +2238,65 @@ fn import_tracked(
                 });
                 attrs.toc_entry = Some(Some(TocEntry { target }));
             }
-            if let Some(name) = paragraph.section.as_deref().filter(|n| !n.is_empty())
-                && let Some(style) = source.section_styles.iter().find(|s| s.name == name)
-            {
-                let layout = sections::layout(style, document.page_setup());
-                let start = match sections::section(style, None) {
-                    Some(section) => {
+            if let Some(name) = paragraph.section.as_deref() {
+                // The number its pages start at, from its own style, as in
+                // the body.
+                let page_number = paragraph
+                    .style
+                    .as_deref()
+                    .and_then(|name| {
+                        source
+                            .automatic_styles
+                            .iter()
+                            .find(|s| s.family == odf::Family::Paragraph && s.name == name)
+                    })
+                    .and_then(|s| s.properties.paragraph.page_number)
+                    .flatten();
+                let restart = |layout: Layout| {
+                    page_number.map(|n| {
+                        Start::Section(
+                            Section {
+                                first_number: Some(n),
+                                ..Section::default()
+                            },
+                            layout,
+                        )
+                    })
+                };
+                let setup = *document.page_setup();
+                let start = if name.is_empty() {
+                    // The end of a section: the layout of the pages again.
+                    let layout = page_layout(source, &setup);
+                    Some(restart(layout).unwrap_or(Start::Layout(layout)))
+                } else {
+                    source
+                        .section_styles
+                        .iter()
+                        .find(|s| s.name == name)
+                        .map(|style| {
+                            let layout = sections::layout(style, &setup);
+                            match sections::section(style, page_number) {
+                                Some(section) => Start::Section(section, layout),
+                                None => restart(layout).unwrap_or(Start::Layout(layout)),
+                            }
+                        })
+                };
+                if let Some(start) = start {
+                    if matches!(start, Start::Section(..)) {
                         // The break of a section is part of it.
                         attrs.page_break_before = None;
-                        Start::Section(section, layout)
                     }
-                    None => Start::Layout(layout),
-                };
-                attrs.start = Some(Some(std::sync::Arc::new(start)));
+                    attrs.start = Some(Some(std::sync::Arc::new(start)));
+                }
             }
-            if &attrs != built.attrs() {
+            // The identifier its bookmarks were given (B-068).
+            let id = taken_ids
+                .get(&(region.id.clone(), i))
+                .copied()
+                .unwrap_or(built.id());
+            if &attrs != built.attrs() || id != built.id() {
                 built = Paragraph::from_runs(
-                    built.id(),
+                    id,
                     built.style(),
                     attrs,
                     built.runs().cloned().collect::<Vec<_>>(),
@@ -2403,6 +2459,7 @@ fn import_note(
         ids,
         &HashMap::new(),
         &Marks::new(),
+        &TakenIds::new(),
         default,
         relative,
         tracked,
@@ -2528,6 +2585,28 @@ fn odf_field(field: &Field) -> (odf::Field, String) {
 /// The paragraphs of the body by the names of their bookmarks of one
 /// point, which page references name (EST-22).
 type Marks = HashMap<String, NodeId>;
+
+/// The layout outside any section: the columns of the pages.
+fn page_layout(source: &odf::TextDocument, setup: &PageSetup) -> Layout {
+    Layout {
+        columns: source
+            .page_layout
+            .columns
+            .as_ref()
+            .map_or(desk_model::Columns::ONE, |c| {
+                sections::columns(
+                    c,
+                    (setup.width - setup.margin_left - setup.margin_right).to_pt(),
+                )
+            }),
+        ..Layout::default()
+    }
+}
+
+/// The identifiers of the paragraphs that deletions took, by the region and
+/// their place in it, given ahead so that the page references to their
+/// bookmarks find them (B-068).
+type TakenIds = HashMap<(String, usize), NodeId>;
 
 /// The paragraph style and the formatting that a paragraph style of ODF
 /// names: a common style, or an automatic one over its parent or the
