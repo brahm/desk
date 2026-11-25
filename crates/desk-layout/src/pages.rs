@@ -498,6 +498,11 @@ impl MarginRoom {
             .collect();
         let mut heights = HashMap::new();
         let width = setup.body_width().to_pt() as f32;
+        let values = FieldValues {
+            objects: crate::objects::inline_sizes(document),
+            hidden: crate::hidden_changes(document),
+            ..FieldValues::default()
+        };
         for (key, margins) in document.all_headers_footers() {
             for place in MarginPlace::ALL {
                 let shown = match place.kind {
@@ -508,11 +513,6 @@ impl MarginRoom {
                 if !shown || paragraphs.iter().all(Paragraph::is_empty) {
                     continue;
                 }
-                let values = FieldValues {
-                    objects: crate::objects::inline_sizes(document),
-                    hidden: crate::hidden_changes(document),
-                    ..FieldValues::default()
-                };
                 let (lines, bottom) = margin_block(document, paragraphs, width, &values, system);
                 let reach = match place.kind {
                     MarginKind::Header => bottom,

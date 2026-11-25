@@ -607,3 +607,50 @@ fn rev_06_changes_of_notes_are_resolved_too() {
     assert_eq!(text, "kept");
     assert!(editor.document().changes().is_empty());
 }
+
+#[test]
+fn rev_04_text_typed_by_a_deletion_is_not_deleted_and_copies_leave_hidden_text_out() {
+    let (mut editor, p) = typed("one two three");
+    track(&mut editor, Tracking::On);
+    editor
+        .edit("Delete", |edit| {
+            edit.delete(Position::new(p, 4), Position::new(p, 8))
+                .map(|_| ())
+        })
+        .unwrap();
+    assert_eq!(
+        runs(&editor, p),
+        [plain("one "), del("two ", "Ana"), plain("three")]
+    );
+    // Off, text typed after the deletion is not in it.
+    track(&mut editor, Tracking::Off);
+    editor
+        .edit("Typing", |edit| {
+            edit.insert_text(Position::new(p, 8), "and ")
+        })
+        .unwrap();
+    assert_eq!(
+        runs(&editor, p),
+        [plain("one "), del("two ", "Ana"), plain("and three")]
+    );
+    // A copy has the deleted text only while the view shows it.
+    let copied = |editor: &Editor| -> String {
+        let end = Position::new(p, 17);
+        let fragment = editor
+            .document()
+            .copy_fragment(Position::new(p, 0), end)
+            .unwrap();
+        fragment.paragraphs[0]
+            .runs
+            .iter()
+            .map(|(text, _, _)| text.as_str())
+            .collect()
+    };
+    assert_eq!(copied(&editor), "one two and three");
+    editor.set_markup(desk_model::Markup::WithoutDeletions);
+    assert_eq!(copied(&editor), "one and three");
+    assert_eq!(
+        editor.document().markup(),
+        desk_model::Markup::WithoutDeletions
+    );
+}

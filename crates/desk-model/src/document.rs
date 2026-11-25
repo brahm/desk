@@ -541,6 +541,15 @@ impl Document {
         self.view = view;
     }
 
+    /// Whether a run is text of a tracked deletion (W148).
+    pub fn is_deleted(&self, run: &crate::Run) -> bool {
+        run.attrs
+            .change
+            .flatten()
+            .and_then(|id| self.changes().get(id))
+            .is_some_and(|c| c.kind == crate::ChangeKind::Deletion)
+    }
+
     /// How the tracked changes show (W148, REV-04).
     pub fn markup(&self) -> Markup {
         self.view.map(|v| v.markup).unwrap_or_default()

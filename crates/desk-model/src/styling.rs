@@ -226,6 +226,7 @@ impl Document {
     /// The text between two positions with its styles, for Copy (TXT-04).
     pub fn copy_fragment(&self, start: Position, end: Position) -> Result<Fragment, ModelError> {
         let styles = self.styles();
+        let hides_deletions = !self.markup().shows_deletions();
         let mut lists: Vec<ListStyle> = Vec::new();
         let mut paragraphs = Vec::new();
         for (id, range) in self.paragraph_ranges(start, end)? {
@@ -244,6 +245,9 @@ impl Document {
             let runs = paragraph
                 .slice(range)?
                 .into_iter()
+                // Text deleted that the view hides is not copied, as it
+                // does not show (REV-04).
+                .filter(|run| !(hides_deletions && self.is_deleted(run)))
                 .map(|run| {
                     let style = run.style.and_then(|s| self.flat_character_style(s));
                     // A copy is not part of the tracked change of what it

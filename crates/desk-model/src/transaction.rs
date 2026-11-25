@@ -221,6 +221,15 @@ impl Edit {
             if self.tracking() {
                 attrs.change = Some(Some(self.insertion_at(position)?));
                 attrs.formatted = None;
+            } else if let Some(Some(change)) = attrs.change
+                && self
+                    .doc
+                    .changes()
+                    .get(change)
+                    .is_some_and(|c| c.kind == crate::ChangeKind::Deletion)
+            {
+                // Text typed next to a deletion is not deleted (REV-04).
+                attrs.change = None;
             }
             self.apply(Op::ReplaceText {
                 paragraph: position.paragraph,

@@ -45,7 +45,7 @@ impl TextEditor {
         let all = self.placed_change_marks(local);
         let bars = {
             let state = self.state.borrow();
-            change_bars(&all, Self::main_layout(&state))
+            change_bars(Self::main_document(&state), Self::main_layout(&state))
         };
         let marks = all
             .into_iter()
@@ -113,6 +113,8 @@ impl TextEditor {
         }
         self.state.borrow_mut().editor.set_markup(markup);
         self.lay_out_again();
+        // Out of the text that no longer shows.
+        self.select(self.selection());
         self.show_comment_marks();
     }
 }
@@ -120,32 +122,55 @@ impl TextEditor {
 /// The space between a change bar and the text, in points.
 const BAR_GAP: f64 = 9.0;
 
-/// A bar for each line with changes, in the left margin of its page:
-/// lighter when the changes of the line only change its formatting, as
-/// in Pages (REV-04).
+/// A bar for each line of the body with changes, in the left margin of
+/// its page, deleted text that does not show included: lighter when the
+/// changes of the line only change its formatting, as in Pages
+/// (REV-04).
 fn change_bars(
-    marks: &[(SpanRect, ChangeKind, desk_model::AuthorColor)],
+    document: &desk_model::Document,
     layout: &desk_layout::DocumentLayout,
 ) -> Vec<ChangeBar> {
     let mut bars: Vec<ChangeBar> = Vec::new();
-    for (rect, kind, _) in marks {
-        let margin = layout
-            .pages
-            .get(rect.page)
-            .map_or(0.0, |p| f64::from(p.margins.0));
-        let format_only = *kind == ChangeKind::Format;
-        let same = bars.iter_mut().find(|b| {
-            b.page == rect.page && (b.y0 - rect.y0).abs() < 0.5 && (b.y1 - rect.y1).abs() < 0.5
-        });
-        match same {
-            Some(bar) => bar.format_only &= format_only,
-            None => bars.push(ChangeBar {
-                page: rect.page,
-                x: (margin - BAR_GAP).max(1.0),
-                y0: rect.y0,
-                y1: rect.y1,
-                format_only,
-            }),
+    for (story, span) in document.change_places() {
+        let (None, Some(change)) = (story, document.changes().get(span.id)) else {
+            continue;
+        };
+        let (Some(start), Some(end)) =
+            (Spot::of(document, span.start), Spot::of(document, span.end))
+        else {
+            continue;
+        };
+        let format_only = change.kind == ChangeKind::Format;
+        for paragraph in start.paragraph..=end.paragraph {
+            for (page, line) in text_nav::lines_of(layout, paragraph) {
+                let range = &line.line.range;
+                // The lines that hold some of the change.
+                if Spot::new(paragraph, range.start) >= end
+                    || Spot::new(paragraph, range.end) <= start
+                {
+                    continue;
+                }
+                let (y0, y1) = (f64::from(line.top()), f64::from(line.bottom()));
+                let same = bars
+                    .iter_mut()
+                    .find(|b| b.page == page && (b.y0 - y0).abs() < 0.5 && (b.y1 - y1).abs() < 0.5);
+                match same {
+                    Some(bar) => bar.format_only &= format_only,
+                    None => {
+                        let margin = layout
+                            .pages
+                            .get(page)
+                            .map_or(0.0, |p| f64::from(p.margins.0));
+                        bars.push(ChangeBar {
+                            page,
+                            x: (margin - BAR_GAP).max(1.0),
+                            y0,
+                            y1,
+                            format_only,
+                        });
+                    }
+                }
+            }
         }
     }
     bars
@@ -332,6 +357,48 @@ mod tests {
             editor.undo();
             assert_eq!(editor.markup(), Markup::WithoutDeletions);
             assert_eq!(editor.document().markup(), Markup::WithoutDeletions);
+        });
+    }
+
+    #[test]
+    fn rev_04_the_cursor_goes_past_deleted_text_that_does_not_show() {
+        crate::with_gtk(|| {
+            let mut document = Document::new_word_processing();
+            let p = document.start().paragraph;
+            document
+                .transact("Changes", |edit| {
+                    let start = edit.document().start();
+                    edit.insert_text(start, "one two three")?;
+                    let gone = edit.add_change(ChangeKind::Deletion, "Bo", None)?;
+                    edit.mark_change(Position::new(p, 4), Position::new(p, 8), gone)?;
+                    Ok(())
+                })
+                .unwrap();
+            let editor = TextEditor::new(&crate::view::DocumentView::new(), document);
+            editor.select(Selection {
+                anchor: Spot::new(0, 5),
+                focus: Spot::new(0, 6),
+            });
+            editor.set_markup(Markup::WithoutDeletions);
+            // The selection in the text gone is a cursor before it.
+            assert_eq!(editor.selection(), Selection::cursor(Spot::new(0, 4)));
+            // A line whose only change does not show keeps its bar.
+            assert_eq!(editor.change_view("Ana").1.len(), 1);
+            let document = editor.document();
+            assert_eq!(
+                text_nav::move_char(&document, Spot::new(0, 4), true),
+                Spot::new(0, 9)
+            );
+            assert_eq!(
+                text_nav::move_char(&document, Spot::new(0, 8), false),
+                Spot::new(0, 3)
+            );
+            // Delete takes the next character that shows.
+            editor.delete(true, false);
+            assert_eq!(
+                editor.document().body().get(0).unwrap().text(),
+                "one two hree"
+            );
         });
     }
 
