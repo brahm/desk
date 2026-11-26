@@ -2897,6 +2897,21 @@ paragraph, and objects on a second page.
   from a template, the Page Template of the Format pane, Reapply Page
   Template, Edit Page Templates, Define as Placeholder and the Tag.
 
+### 26 November: page templates in the window (step 9 of W3, second part)
+
+- The Add Page menu of a page layout document has Page Templates, a
+  dialog that adds a page from a template after the page in sight,
+  applies one to that page, deletes one or makes the page a template
+  under a name, and Reapply Page Template. The Section tab shows the
+  Page Template of the page of the selection or in sight, and the
+  Arrange tab makes the selected objects placeholders of text or media
+  with a tag.
+- *Moved to W5:* the Edit Page Templates mode of Pages 15.4, where a
+  template is edited as a page, with a background of its own for each
+  template (B-078); a template is edited here by making it again from a
+  page under its name. Links to a page of a page layout document
+  (B-079), which need a mark that pages keep when they move.
+
 ## Decisions, with their reasons and consequences
 
 Ids `D-nnn` and `R-nnn` are those of [decisions.md](decisions.md).

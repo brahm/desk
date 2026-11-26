@@ -61,6 +61,8 @@ mod object_styles_pane;
 mod object_text_pane;
 mod objects_pane;
 mod outline_view;
+mod page_templates;
+mod page_templates_pane;
 mod picture_pane;
 mod preferences;
 mod properties;

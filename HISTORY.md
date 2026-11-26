@@ -8,6 +8,11 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
 
 ## Changes since 0.7.0 (unreleased)
 
+* Added: Page templates in the window: Page Templates and Reapply Page
+  Template in the Add Page menu, the Page Template of the Section tab, a
+  template made from the page in sight, and the Placeholder and Tag of
+  the selected objects in the Arrange tab. (#249)
+
 * Added: Page templates of page layout documents, as in Pages 15.4: a
   page added from a template copies its objects, its text and media
   placeholders keep their content when the template is applied again or

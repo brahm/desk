@@ -108,6 +108,10 @@ pub struct Inspector {
     notes: Rc<crate::notes_pane::NotesGroup>,
     links: Rc<crate::links_pane::LinksGroup>,
     toc: Rc<crate::links_pane::TocGroup>,
+    /// The Page Template of the Section tab and the Placeholder of the
+    /// Arrange tab of a page layout document (W095).
+    page_template: Rc<crate::page_templates_pane::TemplateGroup>,
+    placeholder: Rc<crate::page_templates_pane::PlaceholderGroup>,
     lists: Rc<ListsGroup>,
     effects: Rc<Effects>,
     /// The Metrics and Wrap inspectors of the selected objects.
@@ -242,6 +246,8 @@ impl Inspector {
         let notes = crate::notes_pane::NotesGroup::new(editor.clone(), units);
         let links = crate::links_pane::LinksGroup::new(editor.clone());
         let toc = crate::links_pane::TocGroup::new(editor.clone());
+        let page_template = crate::page_templates_pane::TemplateGroup::new(editor.clone());
+        let placeholder = crate::page_templates_pane::PlaceholderGroup::new(editor.clone());
         let objects = crate::objects_pane::ObjectGroups::new(editor.clone(), units);
         let object_text = crate::object_text_pane::ObjectTextGroups::new(editor.clone());
         let text = crate::format_pane::TextFormat::new(editor.clone());
@@ -307,7 +313,13 @@ impl Inspector {
             Tab::new(
                 "arrange",
                 n_("Arrange"),
-                &[&arrange_group, metrics, wrap, &object_link],
+                &[
+                    &arrange_group,
+                    metrics,
+                    wrap,
+                    &object_link,
+                    placeholder.widget(),
+                ],
             )
         };
         let styles = object_styles.group();
@@ -417,7 +429,7 @@ impl Inspector {
                     toc.widget(),
                 ],
             ),
-            Tab::new("section", n_("Section"), &[section]),
+            Tab::new("section", n_("Section"), &[page_template.widget(), section]),
             // The Bookmarks tab of Pages 15.4 (W101).
             Tab::new("bookmarks", n_("Bookmarks"), &[bookmarks, suggestions]),
             Tab::new("info", n_("Info"), &[&statistics.group]),
@@ -459,6 +471,8 @@ impl Inspector {
             notes,
             links,
             toc,
+            page_template,
+            placeholder,
             lists,
             effects,
             objects,
@@ -754,6 +768,8 @@ impl Inspector {
         self.notes.show(format);
         self.toc.show(format);
         self.links.show(format);
+        self.page_template.show(format);
+        self.placeholder.show(format);
         self.effects.show(&format.character, paragraph);
     }
 }
