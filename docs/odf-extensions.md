@@ -857,10 +857,12 @@ alone, and the region as a change that holds no text.
 #### `desk:name`
 
 - **Feature:** the name of a comment on an object, which its replies
-  name (W149).
-- **On:** `desk:annotation`.
-- **Value:** a name unique in the document.
-- **Fallback:** none, as for `desk:annotation`.
+  name (W149), and the name of a page template (W095).
+- **On:** `desk:annotation` and `desk:page-template`.
+- **Value:** a name unique in the document for a comment, and among the
+  templates for a template. Desk reads at most 256 characters of the
+  name of a template, and the first template of a name.
+- **Fallback:** none, as for `desk:annotation` and `desk:page-template`.
 
 ### Sections (`style:section-properties`)
 
@@ -931,6 +933,71 @@ its `dc:title` is the name they go by. A package keeps at most 64. Desk reads th
 styles of the document of the same names; other programs leave them
 out, and a package whose captured pages are lost still opens.
 
+### Page templates (`desk:page-templates`)
+
+The page templates of a page layout document (W095, PXV-20), as Pages
+15.4 has them, are in one `desk:page-templates` in `office:text`, after
+the objects anchored to pages and before the first paragraph. ODF master
+pages hold what each page shows behind its own objects, not a page to
+add whose objects become those of the page, so they cannot hold one. The
+objects of a page that came from a template are ordinary objects of its
+page, which carry the attributes below.
+
+#### `desk:page-templates`
+
+- **Feature:** the page templates of a page layout document (W095).
+- **On:** `office:text`, as its child; one at most.
+- **Value:** a `desk:page-template` for each template, in the order of
+  their list. Desk reads at most 1000.
+- **Fallback:** none; other programs leave it out with the objects in
+  it, and show the pages with the objects that came from templates as
+  ordinary objects.
+
+#### `desk:page-template`
+
+- **Feature:** one page template (W095).
+- **On:** `desk:page-templates`, as its child.
+- **Value:** its name in `desk:name`, the pages that come from it in
+  `desk:pages`, and its objects as drawing objects anchored to page 1,
+  each with an `xml:id` that the objects copied from it name.
+- **Fallback:** none, as for `desk:page-templates`.
+
+#### `desk:pages`
+
+- **Feature:** the pages whose template a page template is (W095).
+- **On:** `desk:page-template`.
+- **Value:** the numbers of the pages from 1, apart by spaces; numbers
+  past the last page or past 10000 are ignored, and a page named by two
+  templates takes the last.
+- **Fallback:** none, as for `desk:page-templates`.
+
+#### `desk:placeholder`
+
+- **Feature:** a placeholder of a page template, Define as Placeholder
+  Text and Define as Media Placeholder of Pages 15.4 (W095), whose
+  content a page keeps when it takes the template again.
+- **On:** any drawing object written by `write_draw_object`, of a
+  template or of a page.
+- **Value:** `text` or `media`.
+- **Fallback:** the object, with its content, as an ordinary object.
+
+#### `desk:placeholder-tag`
+
+- **Feature:** the tag of a placeholder, which carries its content to the
+  placeholder of the same tag of another template (W095).
+- **On:** an object with `desk:placeholder`.
+- **Value:** the tag; Desk reads at most 256 characters.
+- **Fallback:** none; the tag has no meaning without the placeholder.
+
+#### `desk:template-object`
+
+- **Feature:** the object of the page template that an object of a page
+  copies, which Reapply Page Template puts back (W095).
+- **On:** a drawing object anchored to a page.
+- **Value:** the `xml:id` of an object of a `desk:page-template`; one
+  that names none is ignored.
+- **Fallback:** the object, as an ordinary object of its page.
+
 ## Extensions the new target needs
 
 A first pass over [the inventory](../corpus/inventory/README.md): the
@@ -949,7 +1016,6 @@ specified here, by the rules above, in the phase that implements it.
 | Equations entered as LaTeX | All | ODF stores MathML only | MathML, with the LaTeX source as the extension |
 | Text fill with gradient or image, text outline options | All | ODF text properties have a colour only | The main colour |
 | Drop caps beyond the ODF model, automatic fractions, phonetic guide details | Writer | ODF covers part of each | The ODF drop cap, the literal characters, ODF ruby |
-| Page templates (pages of the template to add), section masters | Writer | ODF master pages have no "page to insert" with placeholders | Ordinary master pages |
 | Placeholder text and media placeholders | All | ODF has a placeholder field for text only | Ordinary content |
 | Replies of comments in Tables and Slides | Tables, Slides | ODF 1.3 annotations have no reply relation; Writer uses `desk:parent-name` (above) | Flat annotations, in order |
 | Tracking of format and table-cell changes | Writer | ODF tracks insertions, deletions and some format changes only | The changes ODF can express |

@@ -97,6 +97,11 @@ pub enum Op {
         /// Its paragraphs; none to empty it.
         paragraphs: Vec<Paragraph>,
     },
+    /// Sets the page templates and the template of each page (W095).
+    SetPageTemplates {
+        /// All of them.
+        templates: crate::PageTemplates,
+    },
     /// Sets the pages captured to insert again (EST-20).
     SetCapturedPages {
         /// All of them, in order.

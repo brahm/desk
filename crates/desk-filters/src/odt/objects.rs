@@ -15,8 +15,9 @@ use std::sync::Arc;
 
 use desk_model::{
     Anchor, Document, FIELD_CHARACTER, Field, Fill, Frame, ImageFill, Length, MAX_TEXT_BOX_COLUMNS,
-    Media, NodeId, Object, ObjectKind, Op, POLYGON_SCALE, PageSetup, ParaAttrs, Paragraph, Repeat,
-    Shape, Stroke, TextBox, VerticalAlignment, Wrap,
+    Media, NodeId, Object, ObjectKind, Op, POLYGON_SCALE, PageSetup, PageTemplate, PageTemplates,
+    ParaAttrs, Paragraph, Placeholder, PlaceholderKind, Repeat, Shape, Stroke, TextBox,
+    VerticalAlignment, Wrap,
 };
 use desk_odf as odf;
 
@@ -1414,6 +1415,15 @@ fn import_one(
         .as_deref()
         .filter(|l| !l.is_empty())
         .map(Arc::from);
+    // A placeholder of a page template (W095).
+    built.placeholder = object.placeholder.as_deref().map(|kind| Placeholder {
+        kind: if kind == "media" {
+            PlaceholderKind::Media
+        } else {
+            PlaceholderKind::Text
+        },
+        tag: object.placeholder_tag.as_deref().map(Arc::from),
+    });
     // The comments on the object (W149).
     for mut comment in super::comments::object_comments(&object.annotations) {
         let id = document.new_id();
@@ -1674,6 +1684,7 @@ pub(super) fn import_objects<'a>(
         found.extend(p.frames.iter().map(|o| (o, ids.get(index).copied())));
     }
     import_inline_objects(source, document, &setup, paragraph)?;
+    let template_ids = import_page_templates(source, document, &setup, paragraph)?;
     found.sort_by_key(|(o, _)| o.z_index.unwrap_or(u32::MAX));
     // The frames by name, and the text boxes that go on in another.
     let mut names: HashMap<&str, NodeId> = HashMap::new();
@@ -1683,7 +1694,13 @@ pub(super) fn import_objects<'a>(
     let mut connectors: Vec<(NodeId, Option<&str>, Option<&str>)> = Vec::new();
     let mut moved = Vec::new();
     for (object, anchor) in found {
-        if let Some(built) = import_one(source, document, object, anchor, &setup, paragraph, 0)? {
+        if let Some(mut built) = import_one(source, document, object, anchor, &setup, paragraph, 0)?
+        {
+            // The object of the page template that it copies (W095).
+            built.template_object = object
+                .template_object
+                .as_deref()
+                .and_then(|id| template_ids.get(id).copied());
             if let Some(from) = &object.moved_from {
                 moved.push((built.id, from.as_str()));
             }
@@ -1754,6 +1771,118 @@ pub(super) fn import_objects<'a>(
         }
     }
     Ok(moved)
+}
+
+/// Whether an object or an object in it has comments.
+fn has_annotations(object: &odf::DrawObject) -> bool {
+    !object.annotations.is_empty()
+        || matches!(&object.kind, odf::DrawKind::Group(members) if members.iter().any(has_annotations))
+}
+
+/// Takes the comments off an object and the objects in it.
+fn drop_annotations(object: &mut odf::DrawObject) {
+    object.annotations.clear();
+    if let odf::DrawKind::Group(members) = &mut object.kind {
+        members.iter_mut().for_each(drop_annotations);
+    }
+}
+
+/// Reads the page templates of a page layout document and the template
+/// of each page (W095, odf-extensions.md), giving back the objects of the
+/// templates by their `xml:id`, which the objects copied from them name.
+fn import_page_templates<'a>(
+    source: &'a odf::TextDocument,
+    document: &mut Document,
+    setup: &PageSetup,
+    paragraph: &mut dyn FnMut(&mut Document, &odf::Paragraph) -> Result<Paragraph, FilterError>,
+) -> Result<HashMap<&'a str, NodeId>, FilterError> {
+    let mut ids = HashMap::new();
+    // The page setup takes the count of pages after the objects.
+    let Some(count) = source.text_settings.layout_pages else {
+        return Ok(ids);
+    };
+    let mut templates = PageTemplates::default();
+    let mut pages: Vec<Option<Arc<str>>> = vec![None; count as usize];
+    for template in &source.page_templates {
+        let name: Arc<str> = Arc::from(template.name.as_str());
+        let mut found: Vec<&odf::DrawObject> = template.objects.iter().collect();
+        found.sort_by_key(|o| o.z_index.unwrap_or(u32::MAX));
+        let mut objects = Vec::new();
+        // The shapes by id, which its connectors join (OBJ-31).
+        let mut shapes: HashMap<&str, NodeId> = HashMap::new();
+        for object in found {
+            // A template has no comments: those of its objects would be
+            // on no object of the document, and are left out.
+            let without_comments;
+            let read = if has_annotations(object) {
+                let mut copy = object.clone();
+                drop_annotations(&mut copy);
+                without_comments = copy;
+                &without_comments
+            } else {
+                object
+            };
+            if let Some(mut built) = import_one(source, document, read, None, setup, paragraph, 0)?
+            {
+                built.anchor = Anchor::Page(0);
+                built.template_object = None;
+                if let ObjectKind::TextBox(text) = &mut built.kind {
+                    text.next = None;
+                }
+                if let Some(id) = &object.id {
+                    ids.insert(id.as_str(), built.id);
+                    shapes.insert(id.as_str(), built.id);
+                }
+                objects.push((object, built));
+            }
+        }
+        // The connectors of the template join its shapes.
+        let joined: Vec<(NodeId, Option<NodeId>, Option<NodeId>)> = objects
+            .iter()
+            .filter_map(|(object, built)| {
+                let odf::DrawKind::Connector {
+                    start_shape,
+                    end_shape,
+                    ..
+                } = &object.kind
+                else {
+                    return None;
+                };
+                let end = |name: &Option<String>| {
+                    shapes
+                        .get(name.as_deref()?)
+                        .copied()
+                        .filter(|other| *other != built.id)
+                };
+                Some((built.id, end(start_shape), end(end_shape)))
+            })
+            .collect();
+        let mut objects: Vec<Object> = objects.into_iter().map(|(_, built)| built).collect();
+        for (id, start, end) in joined {
+            if let Some(object) = objects.iter_mut().find(|o| o.id == id)
+                && let ObjectKind::Shape(Shape::Connection(line)) = &mut object.kind
+            {
+                line.start = start;
+                line.end = end;
+            }
+        }
+        for &page in &template.pages {
+            if let Some(slot) = (page as usize)
+                .checked_sub(1)
+                .and_then(|i| pages.get_mut(i))
+            {
+                *slot = Some(name.clone());
+            }
+        }
+        templates
+            .templates
+            .push_back(PageTemplate { name, objects });
+    }
+    if !templates.templates.is_empty() {
+        templates.pages = pages.into_iter().collect();
+        document.apply(Op::SetPageTemplates { templates })?;
+    }
+    Ok(ids)
 }
 
 /// What export needs to name the styles of the objects and their text.
@@ -2339,6 +2468,19 @@ impl Exporter<'_> {
         out.text = text;
         out.origin = object.origin.map(|o| format!("{o:016x}"));
         out.link = object.link.as_deref().map(str::to_owned);
+        // A placeholder of a page template, and the object of the
+        // template that it copies (W095).
+        if let Some(placeholder) = &object.placeholder {
+            out.placeholder = Some(
+                match placeholder.kind {
+                    PlaceholderKind::Text => "text",
+                    PlaceholderKind::Media => "media",
+                }
+                .to_owned(),
+            );
+            out.placeholder_tag = placeholder.tag.as_deref().map(str::to_owned);
+        }
+        out.template_object = object.template_object.map(shape_id);
         // Where it was before a tracked change moved it (W148).
         out.moved_from = object.moved.and_then(|m| moved_from(self.document, &m));
         // The comments on the object (W149).
@@ -2572,10 +2714,66 @@ pub(super) fn export_objects(exporter: &mut Exporter<'_>, out: &mut odf::TextDoc
             None => out.page_objects.push(drawn),
         }
     }
+    export_page_templates(exporter, out);
     out.gradients = std::mem::take(&mut exporter.gradients);
     out.markers = std::mem::take(&mut exporter.markers);
     out.fill_images = std::mem::take(&mut exporter.fill_images);
     out.charts.append(&mut exporter.charts);
+}
+
+/// The page templates of a page layout document, with the pages from 1
+/// that come from each (W095, odf-extensions.md). The objects of a
+/// template are on page 1, each with the `xml:id` that the objects
+/// copied from it name.
+fn export_page_templates(exporter: &mut Exporter<'_>, out: &mut odf::TextDocument) {
+    let document = exporter.document;
+    if document.page_setup().layout_pages.is_none() {
+        return;
+    }
+    let templates = document.page_templates();
+    for template in templates.templates.iter() {
+        let pages = templates
+            .pages
+            .iter()
+            .enumerate()
+            .filter(|(_, n)| n.as_deref() == Some(&*template.name))
+            .map(|(i, _)| i as u32 + 1)
+            .collect();
+        let objects = template
+            .objects
+            .iter()
+            .enumerate()
+            .map(|(z, object)| {
+                let mut drawn = exporter.object(object, "page", Some(0), 0.0);
+                drawn.z_index = Some(z as u32);
+                drawn.id = Some(shape_id(object.id));
+                // A connector joins shapes of the template, which are not
+                // among the objects of the document.
+                if let (
+                    ObjectKind::Shape(Shape::Connection(line)),
+                    odf::DrawKind::Connector {
+                        start_shape,
+                        end_shape,
+                        ..
+                    },
+                ) = (&object.kind, &mut drawn.kind)
+                {
+                    let joined = |end: Option<NodeId>| {
+                        end.filter(|id| template.objects.iter().any(|o| o.id == *id))
+                            .map(shape_id)
+                    };
+                    *start_shape = joined(line.start);
+                    *end_shape = joined(line.end);
+                }
+                drawn
+            })
+            .collect();
+        out.page_templates.push(odf::PageTemplate {
+            name: template.name.to_string(),
+            pages,
+            objects,
+        });
+    }
 }
 
 /// Writes the objects of the masters of the sections in their master

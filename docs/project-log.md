@@ -2877,6 +2877,26 @@ paragraph, and objects on a second page.
 - *Not done:* the text of an empty table, which Pages 15.4 shows when no
   paragraph uses its styles; the empty entry stays blank (EST-22).
 
+### 26 November: page templates in the model and ODF (step 9 of W3, first part)
+
+- A page layout document has page templates, as in Pages 15.4: a name
+  and the objects of a page. A page added from one gets copies of its
+  objects, each remembering the object it copies; applying the template
+  again puts them back and keeps the content of its placeholders, and
+  another template takes that content by the tag of the placeholder.
+  A template is made from a page, replaced or taken away, and the
+  template of each page follows the pages when they are added, moved,
+  pasted or deleted.
+- *ODF:* there is no standard place, since a master page shows objects
+  behind a page rather than giving them to it. The templates go in one
+  `desk:page-templates` of the text, which other programs leave out,
+  with the pages of each; the objects of a page carry
+  `desk:placeholder`, `desk:placeholder-tag` and
+  `desk:template-object`, and stay ordinary objects elsewhere.
+- *Next:* the window, in the second pull request of the step: Add Page
+  from a template, the Page Template of the Format pane, Reapply Page
+  Template, Edit Page Templates, Define as Placeholder and the Tag.
+
 ## Decisions, with their reasons and consequences
 
 Ids `D-nnn` and `R-nnn` are those of [decisions.md](decisions.md).

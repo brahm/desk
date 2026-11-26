@@ -95,7 +95,7 @@ W091	3.6 Paragraph, lists and columns	Linked text boxes	Different	15.4	D-001	In	
 W092	3.7 Document structure	Size, orientation, margins	Equal	Equal in both	-	In	Done	-	done	Paper and margins (EST-02, EST-03)
 W093	3.7 Document structure	Facing pages	Equal	Equal in both	-	In	Done	-	done	Facing pages (EST-11)
 W094	3.7 Document structure	Sections	Different	15.4, plus what the '09 did	D-001, D-003	In	Done	-	W3	Sections, with the Section tab of the 15: format of page numbers, hiding headers and footers on the first page, a new section (EST-16 to EST-19); the captured pages of the '09, inserted again (EST-20)
-W095	3.7 Document structure	Page templates	Different	15.4	D-001	In	Missing	-	W3	Page templates with tags
+W095	3.7 Document structure	Page templates	Different	15.4	D-001	In	Partial	-	W3	Page templates with placeholders and tags in the model and ODF (PXV-20): adding a page from one, reapplying it, making one from a page; the window is missing
 W096	3.7 Document structure	Header and footer	Different	15.4, plus what the '09 did	D-001, D-003	In	Done	-	W3	The three fields of the 15, left, centre and right, a third of the text each, and the free header of the '09 when the left one is alone (EST-12)
 W097	3.7 Document structure	Master / section layout objects (watermark)	Equal (new name)	Equal in both	-	In	Done	-	done	Section master objects (EST-21, INT-05)
 W098	3.7 Document structure	Page background and border	Different	15.4	D-001	In	Done	-	W3	The background of the pages of each section, a color, gradient, advanced gradient or picture (PXV-21); 15.4 has no page border, made as a locked section layout shape (W097); the background per page of page layout comes with page templates (W095); Pages '09 files have no page background to import

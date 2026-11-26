@@ -86,6 +86,7 @@ pub fn read_odt(bytes: &[u8]) -> Result<TextDocument, OdfError> {
             document
                 .page_objects
                 .iter()
+                .chain(document.page_templates.iter().flat_map(|t| &t.objects))
                 .chain(document.body.iter().flat_map(|p| p.all_objects()))
                 .chain(
                     std::iter::once(&document.master)
@@ -159,6 +160,7 @@ pub fn read_odt(bytes: &[u8]) -> Result<TextDocument, OdfError> {
     let lost = document
         .page_objects
         .iter()
+        .chain(document.page_templates.iter().flat_map(|t| &t.objects))
         .chain(document.body.iter().flat_map(|p| p.all_objects()))
         .flat_map(|o| o.embedded())
         .filter(|href| !document.charts.iter().any(|(h, _)| h == href))

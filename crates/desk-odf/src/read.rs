@@ -132,6 +132,9 @@ pub fn read_streams(
             &mut document.page_objects,
         );
         document.toc_levels = toc_levels(text);
+        if let Some(templates) = text.child(DESK, "page-templates") {
+            document.page_templates = read_page_templates(templates);
+        }
         if let Some(tracked) = text.child(TEXT, "tracked-changes") {
             document.track_changes = tracked.attr(TEXT, "track-changes") != Some("false");
             document.tracked_changes = tracked
@@ -153,6 +156,43 @@ pub fn read_streams(
         document.meta = read_meta(meta);
     }
     Ok(document)
+}
+
+/// The page templates of a page layout document (W095,
+/// odf-extensions.md): the `desk:page-template`s of `desk:page-templates`,
+/// with the pages from 1 that come from each, the first of a name kept.
+fn read_page_templates(e: &Element) -> Vec<crate::PageTemplate> {
+    let mut out: Vec<crate::PageTemplate> = Vec::new();
+    for template in e.children_named(DESK, "page-template").take(1_000) {
+        let Some(name) = template
+            .attr(DESK, "name")
+            .map(|n| n.chars().take(crate::draw::MAX_NAME).collect::<String>())
+            .filter(|n| !n.trim().is_empty())
+        else {
+            continue;
+        };
+        if out.iter().any(|t| t.name == name) {
+            continue;
+        }
+        let pages = template
+            .attr(DESK, "pages")
+            .unwrap_or_default()
+            .split_whitespace()
+            .filter_map(|n| n.parse().ok())
+            .filter(|n| (1..=10_000).contains(n))
+            .take(10_000)
+            .collect();
+        let objects = template
+            .elements()
+            .filter_map(|o| crate::draw::draw_object(o, &paragraph))
+            .collect();
+        out.push(crate::PageTemplate {
+            name,
+            pages,
+            objects,
+        });
+    }
+    out
 }
 
 /// The levels of the first table of contents of a body that lists
@@ -1331,6 +1371,7 @@ fn collect_paragraphs(
         } else if name.is(OFFICE, "annotation")
             || name.is(TEXT, "tracked-changes")
             || name.is(OFFICE, "change-info")
+            || name.is(DESK, "page-templates")
         {
             // Comments, tracked changes and what is said of a change, as
             // its comment, are not part of the text flow.
