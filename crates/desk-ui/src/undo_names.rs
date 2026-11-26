@@ -15,6 +15,7 @@ const NAMES: &[&str] = &[
     n_("Add Linked Text Box"),
     n_("Add Row"),
     n_("Add to Thread"),
+    n_("Background"),
     n_("Breaks"),
     n_("Capitalize"),
     n_("Change Language and Region"),

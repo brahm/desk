@@ -370,6 +370,9 @@ pub struct PagedFlow {
     /// The headers and footers of the later sections that have their own,
     /// by the paragraph that starts each (EST-16).
     pub section_margins: imbl::OrdMap<NodeId, HeadersFooters>,
+    /// What fills the pages of each section that has a background, by
+    /// the paragraph that starts it, or none for the first (W098).
+    pub backgrounds: imbl::OrdMap<Option<NodeId>, crate::object::Fill>,
     /// The footnotes or endnotes (EST-13).
     pub notes: Notes,
     /// The comments on the text (W149).
@@ -497,6 +500,7 @@ impl Document {
                 body: TextFlow::new(Paragraph::new(first, body_style)),
                 margins: HeadersFooters::default(),
                 section_margins: imbl::OrdMap::new(),
+                backgrounds: imbl::OrdMap::new(),
                 notes: Notes::default(),
                 comments: Comments::default(),
                 changes: crate::Changes::default(),
@@ -662,6 +666,27 @@ impl Document {
             (Container::Pages(flow), None) => &flow.margins,
             (Container::Pages(flow), Some(id)) => flow.section_margins.get(&id).unwrap_or(&EMPTY),
         }
+    }
+
+    /// What fills the pages of a section, by the paragraph that starts
+    /// it, or of the first section with none; none for no fill (W098).
+    pub fn section_background(&self, section: Option<NodeId>) -> Option<&crate::object::Fill> {
+        let Container::Pages(flow) = &self.container;
+        flow.backgrounds.get(&section)
+    }
+
+    /// Every section that has a background, the first one as none, with
+    /// what fills its pages.
+    pub fn section_backgrounds(&self) -> Vec<(Option<NodeId>, &crate::object::Fill)> {
+        let Container::Pages(flow) = &self.container;
+        flow.backgrounds.iter().map(|(id, f)| (*id, f)).collect()
+    }
+
+    /// The section that paragraph `index` of the body is in, by the
+    /// paragraph that starts it, or none for the first (W098).
+    pub fn section_key(&self, index: usize) -> Option<NodeId> {
+        let (start, _) = self.section_at(index);
+        start.and_then(|i| self.body().get(i)).map(Paragraph::id)
     }
 
     /// Every section that has headers and footers of its own, the first
@@ -1264,6 +1289,19 @@ impl Document {
                     place,
                     paragraphs: old,
                 })
+            }
+            Op::SetSectionBackground { section, fill } => {
+                if let Some(id) = section
+                    && !self.body().iter().any(|p| p.id() == id)
+                {
+                    return Err(ModelError::UnknownParagraph(id));
+                }
+                let Container::Pages(flow) = &mut self.container;
+                let old = match fill {
+                    Some(fill) => flow.backgrounds.insert(section, fill),
+                    None => flow.backgrounds.remove(&section),
+                };
+                Ok(Op::SetSectionBackground { section, fill: old })
             }
             Op::SetNote { id, note } => {
                 if let Some(note) = &note {

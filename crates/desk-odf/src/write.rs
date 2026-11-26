@@ -15,6 +15,7 @@ use crate::text::{
 };
 use crate::units::{Length, decimal};
 use crate::xml::Writer;
+use crate::{MasterPage, PageFill};
 
 /// The ODF version written.
 pub const VERSION: &str = "1.3";
@@ -133,15 +134,33 @@ pub fn write_streams(document: &TextDocument) -> Streams {
     for style in &document.master_styles {
         write_style(&mut w, style);
     }
-    write_page_layout(&mut w, &document.page_layout);
+    let masters: Vec<(&str, &MasterPage)> = std::iter::once(("Standard", &document.master))
+        .chain(document.masters.iter().map(|(n, m)| (n.as_str(), m)))
+        .collect();
+    // A master page with a background has a page layout of its own
+    // (W098).
+    let mut layouts = Vec::new();
+    write_page_layout(&mut w, "pm1", &document.page_layout, None);
+    for (_, master) in &masters {
+        let name = match &master.background {
+            Some(fill) => {
+                let name = format!("pm{}", layouts.len() + 2);
+                write_page_layout(&mut w, &name, &document.page_layout, Some(fill));
+                name
+            }
+            None => "pm1".to_owned(),
+        };
+        layouts.push(name);
+    }
     w.end();
     w.start("office:master-styles");
-    for (name, master) in std::iter::once(("Standard", &document.master))
-        .chain(document.masters.iter().map(|(n, m)| (n.as_str(), m)))
-    {
+    for ((name, master), layout) in masters.into_iter().zip(&layouts) {
         w.start("style:master-page")
             .attr("style:name", name)
-            .attr("style:page-layout-name", "pm1");
+            .attr("style:page-layout-name", layout);
+        if master.match_previous {
+            w.attr("desk:match-previous", "true");
+        }
         for (name, part) in [
             ("style:header", &master.header),
             ("style:header-left", &master.header_left),
@@ -1087,8 +1106,8 @@ fn write_header_footer_style(
     w.end().end();
 }
 
-fn write_page_layout(w: &mut Writer, page: &PageLayout) {
-    w.start("style:page-layout").attr("style:name", "pm1");
+fn write_page_layout(w: &mut Writer, name: &str, page: &PageLayout, fill: Option<&PageFill>) {
+    w.start("style:page-layout").attr("style:name", name);
     if page.mirrored == Some(true) {
         w.attr("style:page-usage", "mirrored");
     }
@@ -1109,6 +1128,23 @@ fn write_page_layout(w: &mut Writer, page: &PageLayout) {
     len(w, "fo:margin-bottom", page.margin_bottom);
     len(w, "fo:margin-left", page.margin_left);
     len(w, "fo:margin-right", page.margin_right);
+    if let Some(fill) = fill {
+        w.attr("draw:fill", &fill.fill);
+        if let Some(color) = fill.color {
+            w.attr("draw:fill-color", &color.to_string());
+            w.attr("fo:background-color", &color.to_string());
+        }
+        w.attr_opt("draw:fill-gradient-name", fill.gradient_name.as_deref());
+        w.attr_opt("draw:fill-image-name", fill.image_name.as_deref());
+        w.attr_opt("style:repeat", fill.repeat.as_deref());
+        w.attr_opt("desk:fill-image-mode", fill.image_mode.as_deref());
+        if let Some(tint) = fill.tint {
+            w.attr("desk:fill-tint", &tint.to_string());
+        }
+        if let Some(opacity) = fill.tint_opacity {
+            w.attr("desk:fill-tint-opacity", &format!("{}%", decimal(opacity)));
+        }
+    }
     if let Some(columns) = &page.columns {
         write_columns(w, columns);
     }

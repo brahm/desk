@@ -93,6 +93,9 @@ pub struct Page {
     /// The number that the page shows, by the numbering of its section
     /// (EST-18).
     pub number: u32,
+    /// What fills the page behind all else: the background of its
+    /// section (W098).
+    pub background: Option<desk_model::Fill>,
     /// The index of its section in the body, from 0.
     pub section: usize,
     /// Whether it is the first page of its section.
@@ -275,12 +278,35 @@ pub fn paginate(document: &Document, system: &mut TextSystem) -> DocumentLayout 
         layout_pages(document, &mut layout, count);
     }
     place_margins(document, &mut layout, system);
+    place_backgrounds(document, &mut layout);
     crate::objects::place_master_objects(document, &mut layout);
     crate::objects::place_inline_objects(document, &mut layout);
     crate::objects::place_object_text(document, &mut layout, system);
     layout.field_values = values;
     layout.notes = plan.note_ids();
     layout
+}
+
+/// Gives each page the background of its section (W098). A section is
+/// known by the paragraph that starts it, the first on the first page of
+/// the section; a blank page before a section has the background of the
+/// section before. The pages of a page layout document have that of the
+/// first section.
+fn place_backgrounds(document: &Document, layout: &mut DocumentLayout) {
+    if document.section_backgrounds().is_empty() {
+        return;
+    }
+    let mut key = None;
+    for (index, page) in layout.pages.iter_mut().enumerate() {
+        if index > 0
+            && page.first_of_section
+            && !page.blank
+            && let Some(line) = page.lines.first()
+        {
+            key = document.section_key(line.paragraph);
+        }
+        page.background = document.section_background(key).cloned();
+    }
 }
 
 /// The pages of a page layout document: as many as it has, without the

@@ -5,6 +5,7 @@
 
 use std::collections::HashMap;
 
+use crate::PageFill;
 use crate::error::OdfError;
 use crate::ns::{
     CONFIG, DC, DESK, DRAW, FO, LOEXT, META, OFFICE, STYLE, SVG, TABLE, TEXT, XLINK, XML,
@@ -95,13 +96,15 @@ pub fn read_streams(
                 .extend(automatic.elements().filter_map(|e| reader.style(e)));
         }
         if let Some(master) = master_page(styles) {
-            document.master = read_master(master);
+            document.master = read_master(styles, master);
             let name = master.attr(STYLE, "name");
             if let Some(masters) = styles.child(OFFICE, "master-styles") {
                 document.masters = masters
                     .children_named(STYLE, "master-page")
                     .filter(|m| m.attr(STYLE, "name") != name)
-                    .filter_map(|m| Some((m.attr(STYLE, "name")?.to_owned(), read_master(m))))
+                    .filter_map(|m| {
+                        Some((m.attr(STYLE, "name")?.to_owned(), read_master(styles, m)))
+                    })
                     .collect();
             }
         }
@@ -951,8 +954,43 @@ fn master_page(styles: &Element) -> Option<&Element> {
         .or_else(|| masters.child(STYLE, "master-page"))
 }
 
-/// The headers and footers of a master page.
-fn read_master(master: &Element) -> MasterPage {
+/// What fills the pages of a master page: the `draw:fill` of its page
+/// layout, or its `fo:background-color` (W098).
+fn master_background(styles: &Element, master: &Element) -> Option<PageFill> {
+    let name = master.attr(STYLE, "page-layout-name")?;
+    let layout = styles
+        .child(OFFICE, "automatic-styles")?
+        .children_named(STYLE, "page-layout")
+        .find(|l| l.attr(STYLE, "name") == Some(name))?;
+    let p = layout.child(STYLE, "page-layout-properties")?;
+    let text = |ns, name| p.attr(ns, name).map(str::to_owned);
+    let color = p
+        .attr(DRAW, "fill-color")
+        .and_then(Color::parse)
+        .or_else(|| p.attr(FO, "background-color").and_then(Color::parse));
+    let fill = match p.attr(DRAW, "fill") {
+        Some("none") => return None,
+        Some(fill) => fill.to_owned(),
+        // Older programs give only the color.
+        None if color.is_some() => "solid".to_owned(),
+        None => return None,
+    };
+    Some(PageFill {
+        fill,
+        color,
+        gradient_name: text(DRAW, "fill-gradient-name"),
+        image_name: text(DRAW, "fill-image-name"),
+        repeat: text(STYLE, "repeat"),
+        image_mode: text(DESK, "fill-image-mode"),
+        tint: p.attr(DESK, "fill-tint").and_then(Color::parse),
+        tint_opacity: p
+            .attr(DESK, "fill-tint-opacity")
+            .and_then(crate::units::parse_percent),
+    })
+}
+
+/// The headers and footers of a master page, and its background.
+fn read_master(styles: &Element, master: &Element) -> MasterPage {
     let part = |name: &str| {
         master.child(STYLE, name).map(|e| {
             let mut paragraphs = Vec::new();
@@ -994,6 +1032,8 @@ fn read_master(master: &Element) -> MasterPage {
         footer: part("footer"),
         footer_first: part("footer-first"),
         footer_left: part("footer-left"),
+        background: master_background(styles, master),
+        match_previous: master.attr(DESK, "match-previous") == Some("true"),
         objects: master
             .elements()
             .filter_map(|e| crate::draw::draw_object(e, &paragraph))

@@ -2765,6 +2765,24 @@ paragraph, and objects on a second page.
   `desk:header-field`; another program shows them stacked, with their
   alignment, and loses no text.
 
+### 26 November: the background of pages (step 4 of W3)
+
+- Each section has a background for its pages, as in the Section tab of
+  Pages 15.4: no fill, a color, a gradient, an advanced gradient or a
+  picture, with or without a tint. The Section group of the Inspector
+  shows it first, with the rows of a fill that objects already had.
+- It is drawn behind all else, the master objects included, on every page
+  of the section; a blank page before a section keeps the background of
+  the section before.
+- *ODF:* the `draw:fill` of the page layout of the master page of the
+  section, which ODF 1.3 names, with `fo:background-color` beside a
+  color for older readers. A section with a background and the headers
+  of the section before gets a master page that copies them, marked
+  `desk:match-previous`, so other programs show the same pages.
+- *Left for page templates (W095), in this phase:* the background of each
+  page of a page layout document, which Pages 15.4 keeps per page and
+  per template.
+
 ## Decisions, with their reasons and consequences
 
 Ids `D-nnn` and `R-nnn` are those of [decisions.md](decisions.md).

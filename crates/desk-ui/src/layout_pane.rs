@@ -19,6 +19,7 @@ use std::rc::Rc;
 use desk_model::{Columns, Layout, Length, MAX_COLUMNS, PARTS, PageSetup, Section, SectionStart};
 
 use crate::editing::Format;
+use crate::fill_rows::{FillRows, Kind};
 use crate::formatting::EditorOf;
 use crate::i18n::tr;
 use crate::preferences::Units;
@@ -198,6 +199,8 @@ pub struct LayoutGroups {
     /// Whether the section shows the headers and footers of the one
     /// before (EST-12).
     previous_margins: compact::SwitchRow,
+    /// What fills the pages of the section (W098).
+    background: Rc<FillRows>,
     units: Cell<Units>,
     /// The page setup, layout and section shown.
     shown: RefCell<(PageSetup, Layout, Section)>,
@@ -291,7 +294,22 @@ impl LayoutGroups {
             .subtitle(tr("Those of the section before, rather than its own"))
             .active(true)
             .build();
+        // The background of its pages, first, as in Pages 15.4 (W098).
+        let background = FillRows::new(
+            &[
+                Kind::Plain,
+                Kind::Color,
+                Kind::Gradient,
+                Kind::Image,
+                Kind::TintedImage,
+                Kind::Advanced,
+            ],
+            &tr("No Fill"),
+        );
         let section_group = compact::Group::builder().title(tr("Section")).build();
+        for row in background.rows() {
+            section_group.add(row);
+        }
         section_group.add(&start);
         section_group.add(&continues);
         section_group.add(&first_number);
@@ -325,6 +343,7 @@ impl LayoutGroups {
             first_different,
             left_right_different,
             previous_margins,
+            background,
             units: Cell::new(units),
             shown: RefCell::new(Default::default()),
             updating: Cell::new(false),
@@ -444,6 +463,15 @@ impl LayoutGroups {
             });
         }
         let weak = Rc::downgrade(self);
+        self.background.connect_changed(move || {
+            if let Some(this) = weak.upgrade()
+                && !this.updating.get()
+                && let Some(editor) = (this.editor)()
+            {
+                editor.set_section_background(this.background.value());
+            }
+        });
+        let weak = Rc::downgrade(self);
         self.continues.connect_active_notify(move |_| {
             if let Some(this) = weak.upgrade()
                 && !this.updating.get()
@@ -496,6 +524,8 @@ impl LayoutGroups {
         // The first section has headers and footers of its own (EST-12).
         self.updating.set(true);
         self.previous_margins.set_visible(!format.first_section);
+        self.background
+            .show(format.background.as_ref(), desk_model::Rgba::WHITE);
         self.updating.set(false);
         self.show_structure(format.setup, format.layout, format.section);
     }

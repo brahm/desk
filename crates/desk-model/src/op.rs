@@ -97,6 +97,14 @@ pub enum Op {
         /// Its paragraphs; none to empty it.
         paragraphs: Vec<Paragraph>,
     },
+    /// Sets or removes the background of the pages of a section (W098).
+    SetSectionBackground {
+        /// The section, by the paragraph that starts it; none for the
+        /// first section.
+        section: Option<NodeId>,
+        /// What fills its pages; none for no fill.
+        fill: Option<crate::object::Fill>,
+    },
     /// Adds, replaces or removes a note (EST-13).
     SetNote {
         /// The note.

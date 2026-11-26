@@ -8,6 +8,9 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
 
 ## Changes since 0.7.0 (unreleased)
 
+* Added: Each section can fill its pages with a color, a gradient or a
+  picture, as the background of the Section tab of Pages 15.4. (#PR)
+
 * Added: Headers and footers have the three fields of Pages 15.4, left,
   centre and right, and a header with text in the left field alone stays
   the free header of Pages '09. (#241)

@@ -2621,12 +2621,23 @@ pub(super) fn export_master_objects(
             drop_placeholders(master_paragraphs(page), &stray);
         }
     }
+    // The master pages of sections with only a background of their own
+    // copy the master objects of the section whose headers they show
+    // (W098).
+    let copies = super::background_masters(document);
     for (z, object) in document.objects().iter().enumerate() {
         let Anchor::Master(section, _) = object.anchor else {
             continue;
         };
         let mut drawn = exporter.object(object, "page", None, 0.0);
         drawn.z_index = Some(z as u32);
+        for (copy, _) in copies.iter().filter(|(_, of)| **of == section) {
+            if let Some(name) = masters.get(copy)
+                && let Some((_, page)) = out.masters.iter_mut().find(|(n, _)| n == name)
+            {
+                page.objects.push(drawn.clone());
+            }
+        }
         let name = section.and_then(|id| masters.get(&id));
         let page = match name {
             Some(name) => out

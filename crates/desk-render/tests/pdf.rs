@@ -1264,3 +1264,22 @@ fn w052_a_gradient_applied_to_the_entire_page_runs_across_the_page() {
         "{start:?} {end:?}"
     );
 }
+
+#[test]
+fn w098_the_background_of_a_page_is_drawn_behind_all_else() {
+    let mut laid = layout(&[("Text", sans())], PageSetup::default());
+    let blue = desk_model::Fill::Color(Rgba::rgb(0, 0, 255));
+    laid.pages[0].background = Some(blue);
+    let list = DisplayList::from_page(&laid, &laid.pages[0]);
+    let Some(Item::Path {
+        path,
+        fill: Some(_),
+        stroke: None,
+    }) = list.items.first()
+    else {
+        panic!("{:?}", list.items.first());
+    };
+    // The whole paper.
+    assert!(path.contains(&desk_render::PathOp::Line(list.width, list.height)));
+    assert!(list.items.len() > 1);
+}

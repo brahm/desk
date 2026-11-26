@@ -696,6 +696,26 @@ their own setting says.
   centred and aligned right by their own paragraph properties: the text
   stays, stacked instead of side by side.
 
+### Page backgrounds (`style:page-layout-properties`, `style:master-page`)
+
+The background of the pages of a section (W098) is the `draw:fill` of the
+`style:page-layout-properties` of its master page, which ODF 1.3 names,
+with `fo:background-color` beside a color for older readers. Each master
+page with a background has a page layout of its own. A picture that fills
+the pages takes `desk:fill-image-mode`, `desk:fill-tint` and
+`desk:fill-tint-opacity` as a graphic style does.
+
+#### `desk:match-previous`
+
+- **Feature:** a section with a background of its own and the headers,
+  footers and master objects of the section before: "Match previous
+  section" of Pages 15.4 (W098).
+- **On:** `style:master-page`.
+- **Value:** a boolean.
+- **Fallback:** the master page holds copies of the headers, footers and
+  master objects of the section before, so other programs show the same
+  pages.
+
 ### Text: comments (`office:annotation`)
 
 A comment is the standard `office:annotation` where the text it is on
