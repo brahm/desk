@@ -25,6 +25,9 @@ pub enum LatexError {
     MissingArgument(String),
     /// Groups nested too deep.
     TooDeep,
+    /// A second superscript or subscript on the same base: `^`, `_` or
+    /// `'`.
+    DoubleScript(String),
 }
 
 impl fmt::Display for LatexError {
@@ -35,6 +38,7 @@ impl fmt::Display for LatexError {
             Self::Unbalanced => write!(f, "a brace or a \\left is not closed"),
             Self::MissingArgument(name) => write!(f, "{name} is missing what it applies to"),
             Self::TooDeep => write!(f, "groups are nested too deep"),
+            Self::DoubleScript(name) => write!(f, "{name} is written twice on the same base"),
         }
     }
 }
@@ -147,17 +151,28 @@ impl Parser {
                     self.at += 1;
                     let script = self.argument(if c == '^' { "^" } else { "_" })?;
                     let base = nodes.pop().unwrap_or_else(|| Node::new("mrow"));
-                    nodes.push(attach(base, script, c == '^'));
+                    nodes.push(attach(base, script, c == '^')?);
                 }
                 '\'' => {
                     self.at += 1;
                     let base = nodes.pop().unwrap_or_else(|| Node::new("mrow"));
-                    nodes.push(attach(base, Node::token("mo", "′"), true));
+                    nodes.push(prime(base)?);
                 }
                 '\\' => {
                     let name = self.command();
                     match name.as_str() {
-                        "\\" if stop == Stop::Environment => return Ok((nodes, Ended::Row)),
+                        "\\" if stop == Stop::Environment => {
+                            // The space after a row, as \\[4pt], is not kept.
+                            self.skip_spaces();
+                            if self.peek() == Some('[') {
+                                let close = self.chars[self.at..]
+                                    .iter()
+                                    .position(|c| *c == ']')
+                                    .ok_or(LatexError::Unbalanced)?;
+                                self.at += close + 1;
+                            }
+                            return Ok((nodes, Ended::Row));
+                        }
                         "right" => {
                             let fence = self.delimiter("right")?;
                             return if stop == Stop::Right {
@@ -197,7 +212,16 @@ impl Parser {
         };
         self.at += 1;
         Ok(Some(match c {
-            '{' => row(self.expression(Stop::Brace)?),
+            '{' => {
+                let nodes = self.expression(Stop::Brace)?;
+                // A group keeps its scripts to itself: {x^a}^b is not a
+                // double superscript.
+                if nodes.len() == 1 && SCRIPTED.contains(&nodes[0].name.as_str()) {
+                    Node::with("mrow", nodes)
+                } else {
+                    row(nodes)
+                }
+            }
             '0'..='9' | '.' => {
                 let mut number = c.to_string();
                 while let Some(d) = self.peek() {
@@ -625,7 +649,11 @@ impl Parser {
         match name {
             "cases" | "rcases" | "array" => table = table.attr("columnalign", "left"),
             "aligned" | "align" | "align*" | "split" => {
-                table = table.attr("columnalign", "right left");
+                // Pairs of columns aligned on their relation, apart from
+                // each other.
+                table = table
+                    .attr("columnalign", "right left right left right left right left")
+                    .attr("columnspacing", "0 2em 0 2em 0 2em 0");
             }
             _ => {}
         }
@@ -670,32 +698,50 @@ fn row(mut nodes: Vec<Node>) -> Node {
     }
 }
 
+/// The elements that hold scripts.
+const SCRIPTED: &[&str] = &["msub", "msup", "msubsup", "munder", "mover", "munderover"];
+
+fn is_primes(node: &Node) -> bool {
+    node.name == "mo" && !node.text.is_empty() && node.text.chars().all(|c| c == '′')
+}
+
 /// A script attached to a base, as a superscript or a subscript, joined
-/// with the other script when the base already has one.
-fn attach(base: Node, script: Node, superscript: bool) -> Node {
-    let limits = base_has_limits(&base);
-    match (base.name.as_str(), superscript) {
-        ("msub", true) if base.children.len() == 2 => {
-            let mut children = base.children;
+/// with the other script when the base already has one. A base cannot
+/// take two of the same, as in TeX.
+fn attach(base: Node, script: Node, superscript: bool) -> Result<Node, LatexError> {
+    let double = || LatexError::DoubleScript(if superscript { "^" } else { "_" }.into());
+    // The operator under a limit, as the sum of \sum_{i}.
+    let limits = base.children.first().is_some_and(base_has_limits);
+    let name = base.name.clone();
+    let mut children = base.children.clone();
+    Ok(match (name.as_str(), superscript) {
+        // x'^2 is x with the primes and 2 as one superscript.
+        ("msup" | "msubsup", true) if children.last().is_some_and(is_primes) => {
+            let primes = children.pop().unwrap_or_default();
+            children.push(Node::with("mrow", vec![primes, script]));
+            Node::with(&name, children)
+        }
+        ("msup" | "msubsup", true) | ("msub" | "msubsup", false) => return Err(double()),
+        ("msub", true) => {
             children.push(script);
             Node::with("msubsup", children)
         }
-        ("msup", false) if base.children.len() == 2 => {
-            let mut children = base.children;
+        ("msup", false) => {
             children.insert(1, script);
             Node::with("msubsup", children)
         }
-        ("munder", true) if base.children.len() == 2 && base.attributes.is_empty() => {
-            let mut children = base.children;
+        ("munder", true) if limits => {
             children.push(script);
             Node::with("munderover", children)
         }
-        ("mover", false) if base.children.len() == 2 && base.attributes.is_empty() => {
-            let mut children = base.children;
+        ("mover", false) if limits => {
             children.insert(1, script);
             Node::with("munderover", children)
         }
-        _ if limits => Node::with(
+        ("mover" | "munderover", true) | ("munder" | "munderover", false) if limits => {
+            return Err(double());
+        }
+        _ if base_has_limits(&base) => Node::with(
             if superscript { "mover" } else { "munder" },
             vec![base, script],
         ),
@@ -703,6 +749,25 @@ fn attach(base: Node, script: Node, superscript: bool) -> Node {
             if superscript { "msup" } else { "msub" },
             vec![base, script],
         ),
+    })
+}
+
+/// A prime on a base, as f', which more primes join.
+fn prime(base: Node) -> Result<Node, LatexError> {
+    let mut children = base.children.clone();
+    match base.name.as_str() {
+        "msup" | "msubsup" => match children.last_mut() {
+            Some(last) if is_primes(last) => {
+                last.text.push('′');
+                Ok(Node::with(&base.name, children))
+            }
+            _ => Err(LatexError::DoubleScript("'".into())),
+        },
+        "msub" => {
+            children.push(Node::token("mo", "′"));
+            Ok(Node::with("msubsup", children))
+        }
+        _ => Ok(Node::with("msup", vec![base, Node::token("mo", "′")])),
     }
 }
 
@@ -999,6 +1064,23 @@ mod tests {
             "<msup><mi>x</mi><mn>2</mn></msup><mn>3</mn>"
         );
         assert_eq!(mathml("f'"), "<msup><mi>f</mi><mo>′</mo></msup>");
+        assert_eq!(
+            mathml("f''^2"),
+            "<msup><mi>f</mi><mrow><mo>′′</mo><mn>2</mn></mrow></msup>"
+        );
+        assert_eq!(
+            mathml("x_1'"),
+            "<msubsup><mi>x</mi><mn>1</mn><mo>′</mo></msubsup>"
+        );
+        assert_eq!(
+            mathml("{x^a}^b"),
+            "<msup><mrow><msup><mi>x</mi><mi>a</mi></msup></mrow><mi>b</mi></msup>"
+        );
+        // A line over a letter takes scripts beside it.
+        assert_eq!(
+            mathml("\\overline{x}_i"),
+            "<msub><mover><mi>x</mi><mo>‾</mo></mover><mi>i</mi></msub>"
+        );
     }
 
     #[test]
@@ -1055,6 +1137,9 @@ mod tests {
              <mtr><mtd><mn>0</mn></mtd><mtd><mn>1</mn></mtd></mtr></mtable>\
              <mo fence=\"true\" stretchy=\"true\">)</mo></mrow>"
         );
+        let aligned = mathml("\\begin{aligned} a &= b \\\\[2pt] c &= d \\end{aligned}");
+        assert!(!aligned.contains("<mi>p</mi>"), "{aligned}");
+        assert_eq!(aligned.matches("<mtr>").count(), 2);
         let cases =
             mathml("f(x) = \\begin{cases} 1 & x > 0 \\\\ 0 & \\text{otherwise} \\\\ \\end{cases}");
         assert_eq!(cases.matches("<mtr>").count(), 2);
@@ -1086,6 +1171,13 @@ mod tests {
         assert_eq!(error(&"{".repeat(500)), LatexError::TooDeep);
         assert_eq!(error(&"\\sqrt".repeat(500)), LatexError::TooDeep);
         assert_eq!(error("a & b"), LatexError::Unbalanced);
+        assert_eq!(error("x^a^b"), LatexError::DoubleScript("^".into()));
+        assert_eq!(error("x_a_b"), LatexError::DoubleScript("_".into()));
+        assert_eq!(error("x^2'"), LatexError::DoubleScript("'".into()));
+        assert_eq!(error("\\sum_a_b"), LatexError::DoubleScript("_".into()));
+        // However many primes, the MathML is as deep.
+        let primes = latex_to_mathml(&format!("x{}", "'".repeat(1000)), false).unwrap();
+        assert!(parse(&primes).is_some());
     }
 
     #[test]

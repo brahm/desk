@@ -192,6 +192,9 @@ impl Reader<'_> {
         let name_end = rest
             .find(|c: char| c.is_whitespace() || c == '>' || c == '/')
             .unwrap_or(rest.len());
+        if !plain(&rest[..name_end]) {
+            return None;
+        }
         let name = local(&rest[..name_end]);
         if name.is_empty() {
             return None;
@@ -215,7 +218,7 @@ impl Reader<'_> {
             let close = rest[1..].find(quote)? + 1;
             let value = unescape(&rest[1..close])?;
             rest = &rest[close + 1..];
-            if attribute.is_empty() || attribute.contains(char::is_whitespace) {
+            if !plain(attribute) {
                 return None;
             }
             // Namespaces are not kept: every element is of MathML.
@@ -228,6 +231,15 @@ impl Reader<'_> {
             }
         }
     }
+}
+
+/// Whether a name is one that XML takes, of the letters, digits and
+/// marks that MathML names use.
+fn plain(name: &str) -> bool {
+    name.starts_with(|c: char| c.is_ascii_alphabetic() || c == '_')
+        && name
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.' | ':'))
 }
 
 fn local(name: &str) -> &str {
@@ -330,6 +342,9 @@ mod tests {
         assert!(parse("<math><mi>x</mi>").is_none());
         assert!(parse("<math/><math/>").is_none());
         assert!(parse("<math><mi>&bogus;</mi></math>").is_none());
+        // Names are names, so what is read is written back the same.
+        assert!(parse("<math><mi a\"/><x/=\"v\">x</mi></math>").is_none());
+        assert!(parse("<math><m<i>x</m<i></math>").is_none());
         let deep = "<mrow>".repeat(300) + &"</mrow>".repeat(300);
         assert!(parse(&format!("<math>{deep}</math>")).is_none());
     }

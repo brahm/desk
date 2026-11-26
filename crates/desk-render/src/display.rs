@@ -965,6 +965,8 @@ fn object_item(placed: &PlacedObject) -> Item {
             }
         }
         ObjectKind::Equation(_) => {
+            // Text is never drawn mirrored.
+            flips = false;
             if fill.is_some() || stroke.is_some() {
                 list.items.push(Item::Path {
                     path: shape_path(&Shape::Rectangle, x, y, w, h),
@@ -1658,7 +1660,6 @@ fn chart_paint(paint: &desk_model::chart::Paint, bounds: (f32, f32, f32, f32)) -
     }
 }
 
-/// What a chart draws, at a place on the page (GRF-01).
 /// What an equation draws, scaled into its frame at a place on the page
 /// (W104).
 fn equation_items(laid: &desk_layout::EquationLayout, x: f32, y: f32, w: f32, h: f32) -> Vec<Item> {
@@ -1699,6 +1700,7 @@ fn equation_items(laid: &desk_layout::EquationLayout, x: f32, y: f32, w: f32, h:
     }]
 }
 
+/// What a chart draws, at a place on the page (GRF-01).
 fn chart_items(laid: &desk_layout::ChartLayout, x: f32, y: f32) -> Vec<Item> {
     use desk_model::chart::{Mark, PathOp as ChartOp};
     let mut items = Vec::new();

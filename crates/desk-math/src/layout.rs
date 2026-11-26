@@ -247,7 +247,13 @@ impl Layout<'_> {
                 let single = text.chars().count() == 1;
                 let upright_greek = text.chars().all(|ch| ('Α'..='Ω').contains(&ch));
                 let italic = c.italic.unwrap_or(single && !upright_greek);
-                self.text(&text, c, italic, c.bold)
+                let mut laid = self.text(&text, c, italic, c.bold);
+                // A name of a function, as sin or log, keeps a thin space
+                // from what it applies to, as in TeX.
+                if !single && text.chars().all(char::is_alphabetic) {
+                    laid.class = Class::LargeOperator;
+                }
+                laid
             }
             "mn" | "mtext" | "ms" => {
                 let mut text = node.content();
@@ -400,7 +406,17 @@ impl Layout<'_> {
         let fence = one.filter(|ch| {
             OPENING.contains(*ch) || CLOSING.contains(*ch) || *ch == '|' || *ch == '‖'
         });
-        if node.get("stretchy") != Some("false") {
+        let minsize = node
+            .get("minsize")
+            .and_then(|v| length(v, c.size))
+            .filter(|v| *v > 0.0);
+        if let (Some(fence), Some(height)) = (fence, minsize) {
+            // A delimiter of a size, as \big( makes, keeps it.
+            let (class, movable) = (laid.class, laid.movable);
+            laid = delimiter(fence, height / 2.0, c);
+            laid.class = class;
+            laid.movable = movable;
+        } else if node.get("stretchy") != Some("false") {
             laid.fence = fence;
         }
         let explicit = |name: &str| node.get(name).and_then(|v| length(v, c.size));
@@ -439,6 +455,8 @@ impl Layout<'_> {
         }
         let mut row = Laid::empty();
         let mut previous: Option<Class> = None;
+        // The space after the box before, which what comes next may drop.
+        let mut pending = 0.0;
         let count = items.len();
         for (i, item) in items.into_iter().enumerate() {
             let mut class = item.class;
@@ -460,15 +478,18 @@ impl Layout<'_> {
                 class = Class::Ordinary;
             }
             let (before, after) = item.space.unwrap_or_else(|| spacing(class, c));
-            let before = if previous.is_none() { 0.0 } else { before };
-            row.width += before;
+            if let Some(previous) = previous {
+                // An operator takes no space before a fence or a comma, as
+                // the sin of sin(x).
+                let tight = previous == Class::LargeOperator
+                    && matches!(class, Class::Open | Class::Close | Class::Punctuation);
+                row.width += before + if tight { 0.0 } else { pending };
+            }
             row.ascent = row.ascent.max(item.ascent);
             row.descent = row.descent.max(item.descent);
             let x = row.width;
             row.width += item.width;
-            if i + 1 < count {
-                row.width += after;
-            }
+            pending = if i + 1 < count { after } else { 0.0 };
             row.put(item, x, 0.0);
             previous = Some(class);
         }
@@ -510,12 +531,19 @@ impl Layout<'_> {
             Some("thin") => c.rule() / 2.0,
             Some("medium") => c.rule(),
             Some("thick") => c.rule() * 2.0,
-            Some(value) => length(value, c.size)
-                .or_else(|| value.parse::<f32>().ok().map(|f| f * c.rule()))
-                .unwrap_or(c.rule()),
+            // A bare number is a multiple of the default rule.
+            Some(value) => match value.trim().parse::<f32>() {
+                Ok(times) => times * c.rule(),
+                Err(_) => length(value, c.size).unwrap_or(c.rule()),
+            },
             None => c.rule(),
         }
         .clamp(0.0, c.size);
+        let thickness = if thickness.is_finite() {
+            thickness
+        } else {
+            c.rule()
+        };
         let gap = if c.display {
             c.size * 0.15
         } else {
@@ -761,7 +789,20 @@ impl Layout<'_> {
             .unwrap_or("center")
             .split_whitespace()
             .collect();
-        let column_gap = c.size * 0.8;
+        let spacing: Vec<f32> = node
+            .get("columnspacing")
+            .unwrap_or("0.8em")
+            .split_whitespace()
+            .filter_map(|v| length(v, c.size))
+            .map(|v| v.max(0.0))
+            .collect();
+        let column_gap = |i: usize| {
+            spacing
+                .get(i)
+                .or(spacing.last())
+                .copied()
+                .unwrap_or(c.size * 0.8)
+        };
         let row_gap = c.size * 0.3;
         let mut laid = Laid::empty();
         let mut y = 0.0f32;
@@ -782,12 +823,13 @@ impl Layout<'_> {
                     _ => (widths[i] - cell.width) / 2.0,
                 };
                 placed.push((cell, x + dx, y));
-                x += widths[i] + column_gap;
+                x += widths[i] + column_gap(i);
             }
             y += descent + row_gap;
         }
         let height = (y - row_gap).max(0.0);
-        laid.width = widths.iter().sum::<f32>() + column_gap * columns.saturating_sub(1) as f32;
+        laid.width = widths.iter().sum::<f32>()
+            + (0..columns.saturating_sub(1)).map(column_gap).sum::<f32>();
         // Centred on the axis.
         let top = height / 2.0 + c.axis();
         laid.ascent = top;
@@ -1194,6 +1236,66 @@ mod tests {
             &measure,
         );
         assert!(drawing.width > 0.0);
+    }
+
+    #[test]
+    fn w104_from_the_review() {
+        let x_of = |drawing: &Drawing, t: &str| {
+            drawing.marks.iter().find_map(|m| match m {
+                Mark::Text { text, x, .. } if text == t => Some(*x),
+                _ => None,
+            })
+        };
+        // A function keeps a thin space from its argument, and none from
+        // its parenthesis.
+        let sin = draw(
+            &format!("<math {NS}><mi>sin</mi><mi>x</mi></math>"),
+            10.0,
+            &measure,
+        );
+        assert!(x_of(&sin, "x").unwrap() - x_of(&sin, "sin").unwrap() > 15.0 + 1.0);
+        let paren = draw(
+            &format!("<math {NS}><mi>sin</mi><mo>(</mo></math>"),
+            10.0,
+            &measure,
+        );
+        assert!((x_of(&paren, "(").unwrap() - x_of(&paren, "sin").unwrap() - 15.0).abs() < 0.01);
+        // A rule of no number, and a bare number times the rule.
+        let bar = |thickness: &str| {
+            let drawing = draw(
+                &format!(
+                    "<math {NS}><mfrac linethickness=\"{thickness}\"><mn>1</mn><mn>2</mn></mfrac></math>"
+                ),
+                12.0,
+                &measure,
+            );
+            assert!(drawing.height.is_finite() && drawing.width.is_finite());
+            drawing.marks.iter().find_map(|m| match m {
+                Mark::Rule { height, .. } => Some(*height),
+                _ => None,
+            })
+        };
+        assert_eq!(bar("NaN"), Some(0.6));
+        assert_eq!(bar("2"), Some(1.2));
+        assert_eq!(bar("3pt"), Some(3.0));
+        // A delimiter of a size is drawn at that size beside little text.
+        let big = draw(
+            &format!("<math {NS}><mo minsize=\"2.4em\" stretchy=\"true\">(</mo><mi>x</mi></math>"),
+            10.0,
+            &measure,
+        );
+        assert!(matches!(big.marks[0], Mark::Stroke { .. }));
+        assert!(big.height > 24.0);
+        // Columns without space between them.
+        let table = draw(
+            &format!(
+                "<math {NS}><mtable columnspacing=\"0\"><mtr><mtd><mi>a</mi></mtd>\
+                 <mtd><mi>b</mi></mtd></mtr></mtable></math>"
+            ),
+            10.0,
+            &measure,
+        );
+        assert!((x_of(&table, "b").unwrap() - x_of(&table, "a").unwrap() - 5.4).abs() < 0.01);
     }
 
     #[test]
