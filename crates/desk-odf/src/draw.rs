@@ -623,6 +623,9 @@ pub enum DrawKind {
         /// `desk:chart`: all that Desk keeps of a chart, which the object
         /// shows to other programs.
         desk: Option<String>,
+        /// `desk:latex`: the LaTeX that an equation was written in, whose
+        /// MathML the object holds (W104).
+        latex: Option<String>,
     },
 }
 
@@ -946,6 +949,7 @@ fn draw_object_at(
                 DrawKind::Object {
                     href: object.attr(XLINK, "href")?.to_owned(),
                     desk: object.attr(DESK, "chart").map(str::to_owned),
+                    latex: object.attr(DESK, "latex").map(str::to_owned),
                 }
             } else if let Some(table) = table {
                 DrawKind::Table(crate::table::read_table(table, paragraph))
@@ -1373,13 +1377,14 @@ fn write_shape(w: &mut Writer, object: &DrawObject, paragraph: &dyn Fn(&mut Writ
             crate::table::write_table(w, table, paragraph);
             w.end();
         }
-        DrawKind::Object { href, desk } => {
+        DrawKind::Object { href, desk, latex } => {
             w.start("draw:object")
                 .attr("xlink:href", href)
                 .attr("xlink:type", "simple")
                 .attr("xlink:show", "embed")
                 .attr("xlink:actuate", "onLoad");
             w.attr_opt("desk:chart", desk.as_deref());
+            w.attr_opt("desk:latex", latex.as_deref());
             w.end();
         }
         DrawKind::TextBox {

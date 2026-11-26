@@ -4818,3 +4818,54 @@ fn w095_the_connectors_of_a_template_stay_joined_in_odt() {
     });
     assert_eq!(joined, Some((Some(ids[0]), Some(ids[1]))));
 }
+
+#[test]
+fn w104_an_equation_is_mathml_in_an_object_with_its_latex() {
+    use desk_model::{Anchor, Equation, Frame, Object, ObjectKind};
+    let mut document = Document::new_page_layout();
+    let mathml = r#"<math xmlns="http://www.w3.org/1998/Math/MathML"><msup><mi>x</mi><mn>2</mn></msup></math>"#;
+    let mut written = Object::new(
+        document.new_id(),
+        ObjectKind::Equation(std::sync::Arc::new(Equation {
+            mathml: mathml.into(),
+            latex: Some("x^2".into()),
+        })),
+        Frame::from_pt(72.0, 72.0, 40.0, 20.0),
+    );
+    written.anchor = Anchor::Page(0);
+    let mut plain = written.clone();
+    plain.id = document.new_id();
+    plain.kind = ObjectKind::Equation(std::sync::Arc::new(Equation::from_mathml(mathml)));
+    for (index, object) in [written, plain].into_iter().enumerate() {
+        document.apply(Op::InsertObject { index, object }).unwrap();
+    }
+    let bytes = write_odt(&document).unwrap();
+    keep("filters-equations.odt", &bytes);
+    let read = read_odt(&bytes).unwrap();
+    let equations: Vec<Equation> = read
+        .objects()
+        .iter()
+        .filter_map(|o| match &o.kind {
+            ObjectKind::Equation(e) => Some((**e).clone()),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(equations.len(), 2);
+    assert_eq!(&*equations[0].mathml, mathml);
+    assert_eq!(equations[0].latex.as_deref(), Some("x^2"));
+    assert_eq!(equations[1].latex, None);
+    // The package lists each as a formula, as LibreOffice Math reads it.
+    let mut zip = zip::ZipArchive::new(std::io::Cursor::new(&bytes)).unwrap();
+    let mut manifest = String::new();
+    std::io::Read::read_to_string(
+        &mut zip.by_name("META-INF/manifest.xml").unwrap(),
+        &mut manifest,
+    )
+    .unwrap();
+    assert_eq!(
+        manifest
+            .matches("application/vnd.oasis.opendocument.formula")
+            .count(),
+        2
+    );
+}

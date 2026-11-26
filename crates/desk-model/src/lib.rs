@@ -59,6 +59,7 @@ mod custom_format;
 mod document;
 mod document_language;
 mod drop_cap_style;
+mod equation;
 mod error;
 mod find;
 mod format;
@@ -110,6 +111,7 @@ pub use document::{
     ParagraphSpacing, Statistics, TextSettings, Tracking, ViewSettings, ViewZoom,
 };
 pub use drop_cap_style::DropCapStyle;
+pub use equation::Equation;
 pub use error::ModelError;
 pub use find::{Found, Query};
 pub use format::{

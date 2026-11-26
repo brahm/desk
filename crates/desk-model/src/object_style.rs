@@ -58,7 +58,8 @@ impl ObjectStyleKind {
             ObjectKind::Media(_)
             | ObjectKind::Group(_)
             | ObjectKind::Table(_)
-            | ObjectKind::Chart(_) => None,
+            | ObjectKind::Chart(_)
+            | ObjectKind::Equation(_) => None,
         }
     }
 

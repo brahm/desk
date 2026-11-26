@@ -114,9 +114,13 @@ pub fn read_odt(bytes: &[u8]) -> Result<TextDocument, OdfError> {
             drop(file);
             if bytes.len() as u64 <= MAX_STREAM
                 && let Ok(text) = String::from_utf8(bytes)
-                && let Ok(Some(chart)) = crate::chart::read_chart(&text)
             {
-                document.charts.push((href.clone(), chart));
+                if let Ok(Some(chart)) = crate::chart::read_chart(&text) {
+                    document.charts.push((href.clone(), chart));
+                } else if let Ok(Some(mathml)) = crate::formula::read_formula(&text) {
+                    // An equation (W104).
+                    document.formulas.push((href.clone(), mathml));
+                }
             }
             continue;
         }
@@ -164,6 +168,7 @@ pub fn read_odt(bytes: &[u8]) -> Result<TextDocument, OdfError> {
         .chain(document.body.iter().flat_map(|p| p.all_objects()))
         .flat_map(|o| o.embedded())
         .filter(|href| !document.charts.iter().any(|(h, _)| h == href))
+        .filter(|href| !document.formulas.iter().any(|(h, _)| h == href))
         .count();
     if lost > 0 {
         match document.skipped.iter_mut().find(|(n, _)| n == "object") {
@@ -213,6 +218,7 @@ pub fn write_odt_with_thumbnail(
                 streams.settings.is_some(),
                 &document.pictures,
                 &document.charts,
+                &document.formulas,
                 document.captures.len(),
             ),
         ),
@@ -234,6 +240,14 @@ pub fn write_odt_with_thumbnail(
             zip.start_file(format!("{folder}/{name}"), deflated)?;
             zip.write_all(text.as_bytes())?;
         }
+    }
+    for (href, mathml) in &document.formulas {
+        let folder = href
+            .strip_prefix("./")
+            .unwrap_or(href)
+            .trim_end_matches('/');
+        zip.start_file(format!("{folder}/content.xml"), deflated)?;
+        zip.write_all(crate::formula::write_formula(mathml).as_bytes())?;
     }
     for (path, bytes) in &document.pictures {
         // Pictures are compressed already.
@@ -284,6 +298,7 @@ fn manifest(
     settings: bool,
     pictures: &[(String, Vec<u8>)],
     charts: &[(String, crate::chart::ChartDocument)],
+    formulas: &[(String, String)],
     captures: usize,
 ) -> String {
     let mut w = crate::xml::Writer::new();
@@ -324,6 +339,21 @@ fn manifest(
                 .attr("manifest:media-type", "text/xml")
                 .end();
         }
+    }
+    for (href, _) in formulas {
+        let folder = href
+            .strip_prefix("./")
+            .unwrap_or(href)
+            .trim_end_matches('/');
+        w.start("manifest:file-entry")
+            .attr("manifest:full-path", &format!("{folder}/"))
+            .attr("manifest:version", VERSION)
+            .attr("manifest:media-type", crate::formula::FORMULA_TYPE)
+            .end();
+        w.start("manifest:file-entry")
+            .attr("manifest:full-path", &format!("{folder}/content.xml"))
+            .attr("manifest:media-type", "text/xml")
+            .end();
     }
     for (path, _) in pictures {
         w.start("manifest:file-entry")

@@ -4592,6 +4592,7 @@ pub fn export(document: &Document) -> odf::TextDocument {
             markers: Vec::new(),
             fill_images: Vec::new(),
             charts: Vec::new(),
+            formulas: Vec::new(),
             text_fills: &mut fills,
             comments: &comment_marks,
             master: false,

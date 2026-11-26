@@ -46,6 +46,7 @@ mod budget;
 mod chart;
 mod draw;
 mod error;
+mod formula;
 pub mod ns;
 mod package;
 mod read;
@@ -62,6 +63,7 @@ pub use draw::{
     parse_transform,
 };
 pub use error::OdfError;
+pub use formula::{FORMULA_TYPE, MATHML, read_formula};
 pub use package::{
     MAX_STREAM, MEDIA_TYPE, THUMBNAIL, read_odt, write_odt, write_odt_with_thumbnail,
 };
