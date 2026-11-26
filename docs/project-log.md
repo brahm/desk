@@ -2950,6 +2950,25 @@ paragraph, and objects on a second page.
   programs read too.
 - W104 is done. No task moved to another phase.
 
+### 26 November: merge fields in the model and ODF (step 11 of W3, first part)
+
+- A merge field is a field of the text with the name of a datum, as
+  `First Name` or the column of a spreadsheet, of the recipient or of the
+  sender. Without data it shows its name; filled, the datum, and an
+  address can show on one line. The document keeps where its data come
+  from: the contacts of the desktop or a group of them, a vCard file, or
+  a table of a spreadsheet.
+- In ODF each field is a `text:database-display`, which LibreOffice
+  reads as a field of a column, with `desk:merge-sender`,
+  `desk:single-line` and `desk:filled`; the source is in the settings,
+  with the names LibreOffice gives it. A field LibreOffice wrote without
+  data, its column in angle brackets, opens as a field without data.
+- The merge fields of Pages '09, of the recipient and of the sender, now
+  open as merge fields, with what a template filled in from a card;
+  before, they were their text.
+- *Next:* the sources: contacts, vCard and spreadsheets, in
+  `desk-contacts`. No task moved to another phase.
+
 ## Decisions, with their reasons and consequences
 
 Ids `D-nnn` and `R-nnn` are those of [decisions.md](decisions.md).

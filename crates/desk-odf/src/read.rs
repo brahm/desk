@@ -782,6 +782,9 @@ pub(crate) fn text_settings(settings: &str) -> TextSettings {
                 Some("HeaderMargin") => out.header_margin = Some(text.trim().to_owned()),
                 Some("FooterMargin") => out.footer_margin = Some(text.trim().to_owned()),
                 Some("LinksInactive") => out.links_inactive = Some(text.trim() == "true"),
+                Some("CurrentDatabaseDataSource") => out.merge_source = Some(text.to_owned()),
+                Some("CurrentDatabaseCommand") => out.merge_table = Some(text.to_owned()),
+                Some("MergeSourceKind") => out.merge_kind = Some(text.trim().to_owned()),
                 Some("BookmarkSuggestions") => {
                     out.bookmark_suggestions = Some(
                         text.lines()
@@ -1541,6 +1544,29 @@ impl SpanBuilder {
                 "file-name" => {
                     let display = e.attr(TEXT, "display").unwrap_or("full").to_owned();
                     return self.field(style, e, Field::FileName { display });
+                }
+                "database-display" => {
+                    let get = |ns, name| e.attr(ns, name).unwrap_or_default().to_owned();
+                    let field = Field::Database {
+                        database: get(TEXT, "database-name"),
+                        table: get(TEXT, "table-name"),
+                        column: get(TEXT, "column-name"),
+                        sender: e.attr(DESK, "merge-sender") == Some("true"),
+                        single_line: e.attr(DESK, "single-line") == Some("true"),
+                        // Without the mark of Desk, the text of a field
+                        // that has no datum is its column, which
+                        // LibreOffice writes in angle brackets.
+                        filled: e.attr(DESK, "filled").map_or_else(
+                            || {
+                                let text = e.text();
+                                let column = e.attr(TEXT, "column-name").unwrap_or_default();
+                                !text.is_empty() && text != column && text != format!("<{column}>")
+                            },
+                            |f| f == "true",
+                        ),
+                        datum: e.attr(DESK, "datum").map(str::to_owned),
+                    };
+                    return self.field(style, e, field);
                 }
                 "note" => return self.note(style, e),
                 "a" => {

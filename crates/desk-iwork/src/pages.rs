@@ -122,6 +122,17 @@ pub enum Field {
         /// 1 adds the folder, 2 the extension.
         display: Option<u8>,
     },
+    /// A merge field (`sf:merge-field-ref` to an `sf:merge-field`), by the
+    /// name it shows (`sf:table-field`), of the recipient or of the
+    /// sender (`sf:category="from"`).
+    Merge {
+        /// The name of the field, as `First Name`.
+        name: String,
+        /// Whether it is a sender field.
+        sender: bool,
+        /// The text that Pages shows: the name, or what it filled in.
+        shown: String,
+    },
     /// Where the body refers to a footnote or an endnote (`sf:footnote`):
     /// the nth refers to the nth of [`PagesDocument::notes`].
     Note {
@@ -791,12 +802,40 @@ impl<'a> BodyReader<'a, '_> {
                     self.skip(child);
                     self.inline(child, style, runs);
                 }
-                // A merge field of a template holds the text that Pages
-                // shows for it, which it filled in from the contacts.
+                // A merge field holds the text that Pages shows for it,
+                // its name or what it filled in from the contacts; the
+                // field it refers to says its name and whether it is of
+                // the sender (MAL-01).
                 Node::Element(child)
                     if child.name.ns == SF && child.name.local == "merge-field-ref" =>
                 {
-                    self.inline(child, style, runs);
+                    let field = self
+                        .guard
+                        .deref(self.ids, child)
+                        .filter(|f| f.name.ns == SF && f.name.local == "merge-field");
+                    let name = field
+                        .and_then(|f| f.child(SF, "table-field"))
+                        .and_then(|t| t.attr(SFA, "string"))
+                        .map_or_else(|| child.text(), str::to_owned);
+                    // Its text is read as any other, line breaks and
+                    // all, and the field takes the style of that text.
+                    let mut held = Vec::new();
+                    self.inline(child, style, &mut held);
+                    let shown: String = held
+                        .iter()
+                        .filter(|r| r.field.is_none())
+                        .map(|r| r.text.as_str())
+                        .collect();
+                    let inner = held
+                        .first()
+                        .map_or(style, |r| r.style.as_deref())
+                        .map(str::to_owned);
+                    let field = Field::Merge {
+                        name: name.trim().to_owned(),
+                        sender: field.and_then(|f| f.attr(SF, "category")) == Some("from"),
+                        shown,
+                    };
+                    self.push_field(runs, inner.as_deref(), field);
                 }
                 Node::Element(child) if child.name.ns == SF => {
                     let Some(child) = self.guard.deref(self.ids, child) else {

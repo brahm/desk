@@ -71,6 +71,7 @@ mod bookmarks;
 mod list;
 mod media;
 mod media_trim;
+mod merge;
 mod note;
 mod object;
 mod object_edit;
@@ -122,7 +123,7 @@ pub use format::{
 };
 pub use header::{
     DateWriter, FIELD_CHARACTER, Field, HeadersFooters, MarginField, MarginKind, MarginPages,
-    MarginPlace, file_shown,
+    MarginPlace, file_shown, one_line,
 };
 pub use id::NodeId;
 pub use list::{
@@ -130,6 +131,7 @@ pub use list::{
     NumberFormat, Numbering, detect_marker,
 };
 pub use media::{Media, MediaFormat, Repeat};
+pub use merge::MergeSource;
 pub use note::{Note, NoteFormat, NoteKind, NoteNumbering, NoteSettings, Notes};
 pub use object::{
     Adjustments, AlphaOutline, AlphaSeed, Anchor, ContourParts, Fill, Frame, FrameStyle, Gradient,

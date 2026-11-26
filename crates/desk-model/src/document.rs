@@ -151,6 +151,9 @@ pub struct TextSettings {
     pub author_colors: Vec<(String, crate::AuthorColor)>,
     /// Whether the changes made to the text are tracked (W148, REV-03).
     pub tracking: Tracking,
+    /// Where the data of the merge fields come from, once a source is
+    /// chosen (W105, MAL-04).
+    pub merge_source: Option<crate::MergeSource>,
 }
 
 /// Whether the changes made to a document are tracked (W148, REV-03).
@@ -215,6 +218,7 @@ impl Default for TextSettings {
             custom_formats: Vec::new(),
             author_colors: Vec::new(),
             tracking: Tracking::Off,
+            merge_source: None,
         }
     }
 }
