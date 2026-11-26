@@ -742,6 +742,16 @@ pub(crate) fn text_settings(settings: &str) -> TextSettings {
                 Some("HeaderMargin") => out.header_margin = Some(text.trim().to_owned()),
                 Some("FooterMargin") => out.footer_margin = Some(text.trim().to_owned()),
                 Some("LinksInactive") => out.links_inactive = Some(text.trim() == "true"),
+                Some("BookmarkSuggestions") => {
+                    out.bookmark_suggestions = Some(
+                        text.lines()
+                            .map(str::trim)
+                            .filter(|s| !s.is_empty())
+                            .take(1_000)
+                            .map(str::to_owned)
+                            .collect(),
+                    );
+                }
                 Some("TrackingPaused") => out.tracking_paused = text.trim() == "true",
                 Some("PageLayoutPages") => {
                     out.layout_pages = text

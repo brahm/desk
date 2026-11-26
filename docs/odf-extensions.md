@@ -628,6 +628,16 @@ which is yellow unless someone chose it, then the others by name, an
 order that saving and opening again keeps.
 Other programs ignore the item and colour comments their own way.
 
+#### Bookmark suggestions (settings, not an attribute)
+
+The paragraph styles whose paragraphs a link to a bookmark suggests
+(W101), Manage Bookmark Suggestions of Pages 15.4, are kept in the
+`BookmarkSuggestions` item of the `DeskTextSettings` set in
+`settings.xml`, written once they are chosen: the name of each style, one
+a line, as the style is named in `styles.xml`; an empty item when none
+is. A document without the item suggests the paragraphs of Heading 2 and
+Heading 3, as a new document of Pages does. Other programs ignore it.
+
 #### Tracking paused (settings, not an attribute)
 
 Whether the tracking of changes is paused (W148), as the Pause switch of

@@ -38,6 +38,10 @@ fn icon_button(icon: &str, label: &str) -> gtk::Button {
 /// The link at the cursor, and the names of the bookmarks.
 type Shown = (Option<Arc<str>>, Vec<Arc<str>>);
 
+/// The styles that links suggest as bookmarks, and the paragraph styles
+/// of the document, as shown.
+type Suggested = (Vec<StyleId>, Vec<(StyleId, String)>);
+
 /// The Links and Bookmarks group of the Inspector.
 pub struct LinksGroup {
     group: compact::Group,
@@ -49,8 +53,18 @@ pub struct LinksGroup {
     /// The subject of the message, or the bookmark of the document.
     second: compact::EntryRow,
     choose: gtk::Button,
+    /// The bookmarks and the suggested ones that a link to a bookmark can
+    /// go to (W101).
+    pick: gtk::MenuButton,
     inactive: compact::SwitchRow,
+    /// The Bookmarks tab of the Document pane (W101).
     bookmarks: compact::Group,
+    /// The paragraph styles that links suggest as bookmarks: Manage
+    /// Bookmark Suggestions of Pages 15.4 (W101).
+    suggestions: compact::Group,
+    suggested: compact::ExpanderRow,
+    suggestion_rows: RefCell<Vec<(StyleId, compact::SwitchRow)>>,
+    suggestions_shown: RefCell<Suggested>,
     /// Whether the bookmarks are listed by name, rather than in the order
     /// of their pages (EST-26).
     by_name: gtk::DropDown,
@@ -85,6 +99,14 @@ impl LinksGroup {
             .build();
         let choose = icon_button("document-open-symbolic", &tr("Choose Document"));
         link.add_suffix(&choose);
+        let pick = gtk::MenuButton::builder()
+            .icon_name("pan-down-symbolic")
+            .valign(gtk::Align::Center)
+            .tooltip_text(tr("Choose Bookmark"))
+            .css_classes(["flat"])
+            .build();
+        labelled(&pick, &tr("Choose Bookmark"));
+        link.add_suffix(&pick);
         let second = compact::EntryRow::builder()
             .title(tr("Subject"))
             .show_apply_button(true)
@@ -108,22 +130,45 @@ impl LinksGroup {
         let bookmarks = compact::Group::builder()
             .title(tr("Bookmarks"))
             .description(tr(
-                "Insert ▸ Bookmark marks the selection. An empty name takes a bookmark away.",
+                "Add Bookmark marks the selection, or the word at the cursor. An empty name takes a bookmark away.",
             ))
             .build();
         let by_name = gtk::DropDown::from_strings(&[&tr("By Page"), &tr("By Name")]);
         by_name.set_valign(gtk::Align::Center);
         by_name.set_tooltip_text(Some(&tr("Sort Bookmarks")));
         labelled(&by_name, &tr("Sort Bookmarks"));
-        bookmarks.set_header_suffix(Some(&by_name));
+        let add = gtk::Button::builder()
+            .label(tr("Add Bookmark"))
+            .action_name("win.insert-bookmark")
+            .valign(gtk::Align::Center)
+            .build();
+        let header = gtk::Box::builder().spacing(6).build();
+        header.append(&by_name);
+        header.append(&add);
+        bookmarks.set_header_suffix(Some(&header));
+        let suggested = compact::ExpanderRow::builder()
+            .title(tr("Styles to Suggest"))
+            .build();
+        let suggestions = compact::Group::builder()
+            .title(tr("Bookmark Suggestions"))
+            .description(tr(
+                "A link to a bookmark also suggests the paragraphs of these styles.",
+            ))
+            .build();
+        suggestions.add(&suggested);
         let this = Rc::new(Self {
             group,
             kind,
             link,
             second,
             choose,
+            pick,
             inactive,
             bookmarks,
+            suggestions,
+            suggested,
+            suggestion_rows: RefCell::new(Vec::new()),
+            suggestions_shown: RefCell::new(Default::default()),
             by_name,
             rows: RefCell::new(Vec::new()),
             shown: RefCell::new(Default::default()),
@@ -138,6 +183,12 @@ impl LinksGroup {
                 }
             });
         }
+        let weak = Rc::downgrade(&this);
+        this.pick.set_create_popup_func(move |button| {
+            if let Some(this) = weak.upgrade() {
+                button.set_popover(Some(&this.bookmark_menu()));
+            }
+        });
         let weak = Rc::downgrade(&this);
         this.by_name.connect_selected_notify(move |_| {
             if let Some(this) = weak.upgrade() {
@@ -188,9 +239,158 @@ impl LinksGroup {
         this
     }
 
-    /// The groups.
-    pub fn groups(&self) -> [&compact::Group; 2] {
-        [&self.group, &self.bookmarks]
+    /// The groups: the link, the bookmarks and the styles they suggest.
+    pub fn groups(&self) -> [&compact::Group; 3] {
+        [&self.group, &self.bookmarks, &self.suggestions]
+    }
+
+    /// The list that a link to a bookmark chooses from: the bookmarks,
+    /// then the paragraphs suggested (W101).
+    fn bookmark_menu(self: &Rc<Self>) -> gtk::Popover {
+        let list = gtk::Box::builder()
+            .orientation(gtk::Orientation::Vertical)
+            .build();
+        let popover = gtk::Popover::builder()
+            .child(
+                &gtk::ScrolledWindow::builder()
+                    .hscrollbar_policy(gtk::PolicyType::Never)
+                    .propagate_natural_height(true)
+                    .max_content_height(360)
+                    .child(&list)
+                    .build(),
+            )
+            .build();
+        let (names, suggested) = (self.editor)()
+            .map(|e| e.bookmark_choices())
+            .unwrap_or_default();
+        let item = |label: &str| {
+            gtk::Button::builder()
+                .child(
+                    &gtk::Label::builder()
+                        .label(label)
+                        .xalign(0.0)
+                        .ellipsize(gtk::pango::EllipsizeMode::End)
+                        .max_width_chars(32)
+                        .build(),
+                )
+                .css_classes(["flat"])
+                .build()
+        };
+        let heading = |text: String| {
+            gtk::Label::builder()
+                .label(text)
+                .xalign(0.0)
+                .margin_start(6)
+                .margin_top(6)
+                .css_classes(["heading"])
+                .build()
+        };
+        if !names.is_empty() {
+            list.append(&heading(tr("Bookmarks")));
+        }
+        for name in names {
+            let button = item(&name);
+            let weak = Rc::downgrade(self);
+            let popover = popover.downgrade();
+            button.connect_clicked(move |_| {
+                if let Some(this) = weak.upgrade() {
+                    this.link.set_text(&name);
+                    this.apply();
+                }
+                if let Some(popover) = popover.upgrade() {
+                    popover.popdown();
+                }
+            });
+            list.append(&button);
+        }
+        if !suggested.is_empty() {
+            list.append(&heading(tr("Suggested")));
+        }
+        for (index, text) in suggested {
+            let button = item(&text);
+            let editor = self.editor.clone();
+            let popover = popover.downgrade();
+            button.connect_clicked(move |_| {
+                if let Some(editor) = editor() {
+                    editor.link_to_paragraph(index);
+                }
+                if let Some(popover) = popover.upgrade() {
+                    popover.popdown();
+                }
+            });
+            list.append(&button);
+        }
+        if list.first_child().is_none() {
+            list.append(
+                &gtk::Label::builder()
+                    .label(tr("No Bookmarks"))
+                    .margin_top(6)
+                    .margin_bottom(6)
+                    .css_classes(["dim-label"])
+                    .build(),
+            );
+        }
+        popover
+    }
+
+    /// Shows the styles that links suggest as bookmarks.
+    fn show_suggestions(self: &Rc<Self>, format: &Format) {
+        let styles = (self.editor)()
+            .map(|e| e.paragraph_styles())
+            .unwrap_or_default();
+        let chosen = format.bookmark_suggestions.clone();
+        if *self.suggestions_shown.borrow() == (chosen.clone(), styles.clone()) {
+            return;
+        }
+        if self.suggestions_shown.borrow().1 != styles {
+            for (_, row) in self.suggestion_rows.borrow_mut().drain(..) {
+                self.suggested.remove(&row);
+            }
+            for (id, name) in &styles {
+                // A style's name is text, not markup.
+                let row = compact::SwitchRow::builder()
+                    .title(gtk::glib::markup_escape_text(name))
+                    .build();
+                let weak = Rc::downgrade(self);
+                row.connect_active_notify(move |_| {
+                    if let Some(this) = weak.upgrade()
+                        && !this.updating.get()
+                    {
+                        this.suggestions_changed();
+                    }
+                });
+                self.suggested.add_row(&row);
+                self.suggestion_rows.borrow_mut().push((*id, row));
+            }
+        }
+        for (id, row) in self.suggestion_rows.borrow().iter() {
+            let on = chosen.contains(id);
+            if row.is_active() != on {
+                row.set_active(on);
+            }
+        }
+        self.suggested.set_subtitle(&if chosen.is_empty() {
+            tr("None")
+        } else {
+            tr("{n} styles").replace("{n}", &chosen.len().to_string())
+        });
+        *self.suggestions_shown.borrow_mut() = (chosen, styles);
+    }
+
+    fn suggestions_changed(&self) {
+        let Some(editor) = (self.editor)() else {
+            return;
+        };
+        let chosen: Vec<StyleId> = self
+            .suggestion_rows
+            .borrow()
+            .iter()
+            .filter(|(_, row)| row.is_active())
+            .map(|(id, _)| *id)
+            .collect();
+        if chosen != self.suggestions_shown.borrow().0 {
+            editor.set_bookmark_suggestions(chosen);
+        }
     }
 
     /// Shows the link at the cursor, and the bookmarks of the document.
@@ -235,13 +435,14 @@ impl LinksGroup {
         if format.link.is_none() {
             self.second.set_visible(false);
             self.choose.set_visible(false);
+            self.pick.set_visible(false);
         }
         let names_changed = self.shown.borrow().1 != format.bookmarks;
         *self.shown.borrow_mut() = (format.link.clone(), format.bookmarks.clone());
         if names_changed {
             self.fill_bookmarks();
         }
-        self.bookmarks.set_visible(!format.bookmarks.is_empty());
+        self.show_suggestions(format);
         self.updating.set(false);
     }
 
@@ -268,6 +469,7 @@ impl LinksGroup {
             self.link.set_title(&tr("Link of a Presentation"));
             self.second.set_visible(false);
             self.choose.set_visible(false);
+            self.pick.set_visible(false);
             return;
         }
         let (first, second) = match kind {
@@ -282,6 +484,7 @@ impl LinksGroup {
             self.second.set_title(&second);
         }
         self.choose.set_visible(kind == 2);
+        self.pick.set_visible(kind == 3);
     }
 
     /// Links the text at the cursor to what the rows say.

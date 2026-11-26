@@ -66,6 +66,7 @@ mod header;
 mod id;
 mod inline;
 pub use inline::marks_in;
+mod bookmarks;
 mod list;
 mod media;
 mod media_trim;
@@ -97,6 +98,7 @@ pub use autocorrect::{
     AutoCorrect, Correction, QuoteStyle, Quotes, Replacement, ends_word, is_quote, smart_dash,
     smart_quote,
 };
+pub use bookmarks::DEFAULT_BOOKMARK_SUGGESTIONS;
 pub use case_change::CaseChange;
 pub use change::{Change, ChangeKind, ChangeSpan, Changes, Formatting, ParaFormatting};
 pub use chart_style::ChartStyle;

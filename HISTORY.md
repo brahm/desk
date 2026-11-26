@@ -8,6 +8,10 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
 
 ## Changes since 0.7.0 (unreleased)
 
+* Added: The Bookmarks tab of the Document pane of Pages 15.4, and the
+  bookmarks that a link suggests from the paragraphs of the styles
+  chosen in it, Heading 2 and Heading 3 in a new document. (#246)
+
 * Added: Each table of contents lists the whole document, its section
   or up to the next table, chosen in Insert > Table of Contents and
   changed in the Range of the Format pane, as in Pages 15.4. (#245)

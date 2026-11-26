@@ -101,7 +101,7 @@ W097	3.7 Document structure	Master / section layout objects (watermark)	Equal (n
 W098	3.7 Document structure	Page background and border	Different	15.4	D-001	In	Done	-	W3	The background of the pages of each section, a color, gradient, advanced gradient or picture (PXV-21); 15.4 has no page border, made as a locked section layout shape (W097); the background per page of page layout comes with page templates (W095); Pages '09 files have no page background to import
 W099	3.7 Document structure	Footnotes and endnotes	Equal	Equal in both	-	In	Done	-	done	Footnotes and endnotes (EST-13 to EST-15)
 W100	3.7 Document structure	Inserted table of contents	Different	15.4	D-001	In	Done	-	W3	Each table lists the document, its section or up to the next table, chosen when inserted and in the Range of the Format pane (EST-22)
-W101	3.7 Document structure	Bookmarks	Different	15.4	D-001	In	Partial	-	W3	Bookmarks (EST-26); their own tab and the suggestions from styles are missing
+W101	3.7 Document structure	Bookmarks	Different	15.4	D-001	In	Done	-	W3	Bookmarks (EST-26) in their own tab, and links suggest the paragraphs of the styles chosen in it
 W102	3.7 Document structure	Links	Different	15.4, plus what the '09 did	D-001, D-003	In	Partial	the target changed	W3	Links of the '09, including to another document (EST-25, IOP-32); phone links and links from objects are missing
 W103	3.7 Document structure	Bibliography 🧩 (in both)	Equal	Equal in both	-	Out: AI, online or paid (D-004)	Out of scope	-	-	Bibliography requires EndNote, a paid program
 W104	3.7 Document structure	Equations 🧩 (in '09)	Different	15.4	D-001	In	Missing	-	W3	LaTeX/MathML equations

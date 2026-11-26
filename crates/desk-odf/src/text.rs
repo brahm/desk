@@ -350,6 +350,9 @@ pub struct TextSettings {
     pub note_gap: Option<String>,
     /// Whether links do nothing when clicked.
     pub links_inactive: Option<bool>,
+    /// The names of the paragraph styles whose paragraphs a link to a
+    /// bookmark suggests (W101), one a line; none until chosen.
+    pub bookmark_suggestions: Option<Vec<String>>,
     /// Whether the tracking of changes is paused (W148): changes are
     /// made as they are, while those kept stay. `text:track-changes`
     /// says false then, as other programs track none.
