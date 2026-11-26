@@ -7,8 +7,8 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 use desk_model::{
-    Document, Layout, MarginKind, MarginPlace, PageSetup, ParaBorder, ParaFormat, Paragraph,
-    ParagraphSpacing, Rgba, Section, SectionStart, Start,
+    Document, Layout, MarginField, MarginKind, MarginPlace, PageSetup, ParaBorder, ParaFormat,
+    Paragraph, ParagraphSpacing, Rgba, Section, SectionStart, Start,
 };
 use desk_text::{Column, FieldValues, Line, ParagraphText, TextSystem};
 
@@ -370,15 +370,18 @@ pub fn place_margins(document: &Document, layout: &mut DocumentLayout, system: &
                 if !shown {
                     continue;
                 }
-                let (place, section) = margin_of_page(layout, index, kind);
+                let (margin, section) = margin_of_page(layout, index, kind);
                 let margins = document.section_headers_footers(section);
-                let paragraphs = margins.get(place);
-                if paragraphs.iter().all(Paragraph::is_empty) {
-                    continue;
+                // Its three fields (W096).
+                for place in margin.fields() {
+                    let paragraphs = margins.get(place);
+                    if paragraphs.iter().all(Paragraph::is_empty) {
+                        continue;
+                    }
+                    let placed = margin_lines(document, layout, index, place, paragraphs, system);
+                    places.extend(placed.iter().map(|_| place));
+                    lines.extend(placed);
                 }
-                let placed = margin_lines(document, layout, index, kind, paragraphs, system);
-                places.extend(placed.iter().map(|_| place));
-                lines.extend(placed);
             }
         }
         let page = &mut layout.pages[index];
@@ -415,17 +418,36 @@ pub fn margin_of_page(
     )
 }
 
-/// The lines of a header or footer with these paragraphs on page `index`,
-/// where the page shows it, even when they are empty: to show the cursor
-/// in an empty header that is being edited (EST-12).
+/// The lines of a field of a header or footer with these paragraphs on
+/// page `index`, where the page shows it, even when they are empty: to
+/// show the cursor in an empty header that is being edited (EST-12).
 pub fn margin_lines(
     document: &Document,
     layout: &DocumentLayout,
     index: usize,
-    kind: MarginKind,
+    place: MarginPlace,
     paragraphs: &[Paragraph],
     system: &mut TextSystem,
 ) -> Vec<PlacedLine> {
+    let section = margin_of_page(layout, index, place.kind).1;
+    let split = document.section_headers_footers(section).is_split(place);
+    margin_lines_split(document, layout, index, place, paragraphs, split, system)
+}
+
+/// The lines of a field of a header or footer, as [`margin_lines`], with
+/// the header or footer split in thirds or not, whatever its fields hold:
+/// to lay out its left field in its third while another is being typed
+/// (W096).
+pub fn margin_lines_split(
+    document: &Document,
+    layout: &DocumentLayout,
+    index: usize,
+    place: MarginPlace,
+    paragraphs: &[Paragraph],
+    split: bool,
+    system: &mut TextSystem,
+) -> Vec<PlacedLine> {
+    let kind = place.kind;
     let setup = layout.setup;
     let height = setup.height.to_pt() as f32;
     let page = &layout.pages[index];
@@ -439,9 +461,10 @@ pub fn margin_lines(
         hidden: crate::hidden_changes(document),
     };
     let width = (setup.width.to_pt() as f32 - page.margins.0 - page.margins.1).max(1.0);
+    let (left, width) = field_span(place, split, width);
     let (mut lines, _) = margin_block(document, paragraphs, width, &values, system);
     for line in &mut lines {
-        line.origin.0 = page.margins.0;
+        line.origin.0 = page.margins.0 + left;
     }
     let shift = match kind {
         MarginKind::Header => setup.header_margin.to_pt() as f32,
@@ -456,6 +479,19 @@ pub fn margin_lines(
         line.origin.1 += shift;
     }
     lines
+}
+
+/// Where a field of a header or footer starts from the left margin, and
+/// how wide it is, in text `width` wide (W096): a third each when the
+/// header or footer is split, as its centre or right field has text or
+/// is being edited; otherwise the left field is the free header of Pages
+/// '09, as wide as the text.
+pub fn field_span(place: MarginPlace, split: bool, width: f32) -> (f32, f32) {
+    if !split && place.field == MarginField::Left {
+        return (0.0, width);
+    }
+    let third = width / 3.0;
+    (third * place.field.index() as f32, third)
 }
 
 /// The room that the headers and footers of a document take on its pages,
@@ -513,7 +549,9 @@ impl MarginRoom {
                 if !shown || paragraphs.iter().all(Paragraph::is_empty) {
                     continue;
                 }
-                let (lines, bottom) = margin_block(document, paragraphs, width, &values, system);
+                let (_, field_width) = field_span(place, margins.is_split(place), width);
+                let (lines, bottom) =
+                    margin_block(document, paragraphs, field_width, &values, system);
                 let reach = match place.kind {
                     MarginKind::Header => bottom,
                     MarginKind::Footer => {
@@ -524,7 +562,9 @@ impl MarginRoom {
                         text_bottom - top
                     }
                 };
-                heights.insert((key, place.index()), reach);
+                // The tallest of its fields.
+                let height = heights.entry((key, place.margin_index())).or_insert(0.0f32);
+                *height = height.max(reach);
             }
         }
         Self {
@@ -565,7 +605,7 @@ impl MarginRoom {
                 section.first_page_different,
                 section.left_right_different,
             );
-            self.heights.get(&(margins, place.index())).copied()
+            self.heights.get(&(margins, place.margin_index())).copied()
         };
         // Pages 15.4 puts the top of the body on the margin, unrounded,
         // and its bottom on a whole point (B-020).

@@ -116,8 +116,8 @@ pub use format::{
     TabAlignment, TabLeader, TabStop, TabStops,
 };
 pub use header::{
-    DateWriter, FIELD_CHARACTER, Field, HeadersFooters, MarginKind, MarginPages, MarginPlace,
-    file_shown,
+    DateWriter, FIELD_CHARACTER, Field, HeadersFooters, MarginField, MarginKind, MarginPages,
+    MarginPlace, file_shown,
 };
 pub use id::NodeId;
 pub use list::{

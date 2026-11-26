@@ -14,8 +14,8 @@
 
 use desk_layout::DocumentLayout;
 use desk_model::{
-    Alignment, Document, Editor, Field, MarginKind, NodeId, Object, ObjectKind, ParaAttrs,
-    Paragraph, Story, StyleFamily,
+    Alignment, Document, Editor, Field, MarginField, MarginKind, NodeId, Object, ObjectKind,
+    ParaAttrs, Paragraph, Story, StyleFamily,
 };
 
 use super::{Selection, Spot, State, TextEditor};
@@ -87,7 +87,42 @@ pub fn story_at(layout: &DocumentLayout, page: usize, x: f64, y: f64) -> Option<
     } else {
         return None;
     };
-    let (place, section) = desk_layout::margin_of_page(layout, page, kind);
+    let (margin, section) = desk_layout::margin_of_page(layout, page, kind);
+    // The field under the pointer (W096): a third of the width of the
+    // text each. The free header of Pages '09, the left field alone with
+    // text, as wide as the text, takes the clicks on the thirds that its
+    // text reaches; the others open their field.
+    let shown = |field| p.margin_places.contains(&margin.with_field(field));
+    let free =
+        shown(MarginField::Left) && !shown(MarginField::Centre) && !shown(MarginField::Right);
+    let width = layout.setup.width.to_pt() - f64::from(p.margins.0 + p.margins.1);
+    let third = (width / 3.0).max(1.0);
+    let at = ((x - f64::from(p.margins.0)) / third)
+        .floor()
+        .clamp(0.0, 2.0) as usize;
+    let (from, to) = (
+        f64::from(p.margins.0) + third * at as f64,
+        f64::from(p.margins.0) + third * (at + 1) as f64,
+    );
+    let reached = p
+        .margin_lines
+        .iter()
+        .zip(&p.margin_places)
+        .filter(|(_, place)| **place == margin)
+        .any(|(line, _)| {
+            let xs = line
+                .line
+                .carets
+                .iter()
+                .map(|(_, x)| f64::from(line.origin.0 + *x));
+            let (min, max) = xs.fold((f64::MAX, f64::MIN), |(a, b), x| (a.min(x), b.max(x)));
+            min <= to && max >= from
+        });
+    let place = if free && (at == 0 || reached) {
+        margin
+    } else {
+        margin.with_field(MarginField::ALL[at])
+    };
     Some(Story::Margin { section, place })
 }
 
@@ -122,7 +157,8 @@ pub(super) fn story_layout_everywhere(
                 };
                 shown
                     && !page.blank
-                    && desk_layout::margin_of_page(main, i, place.kind) == (place, section)
+                    && desk_layout::margin_of_page(main, i, place.kind)
+                        == (place.with_field(MarginField::Left), section)
             })
             .collect(),
     };
@@ -153,13 +189,44 @@ fn story_layout_on(
                 }
             }
         }
-        Story::Margin { place, .. } => {
+        Story::Margin { place, section } => {
             let paragraphs: Vec<Paragraph> = copy.body().iter().cloned().collect();
+            // A centre or right field typed beside a free header puts the
+            // left field in its third (W096).
+            let margins = copy.section_headers_footers(section);
+            let free = place.field != MarginField::Left && !margins.is_split(place);
+            let left = place.with_field(MarginField::Left);
             for &page in pages.iter().filter(|&&p| p < main.pages.len()) {
                 let lines = crate::with_text_system(|system| {
-                    desk_layout::margin_lines(copy, main, page, place.kind, &paragraphs, system)
+                    desk_layout::margin_lines(copy, main, page, place, &paragraphs, system)
                 });
                 layout.pages[page].lines = lines;
+                if free {
+                    let relaid = crate::with_text_system(|system| {
+                        desk_layout::margin_lines_split(
+                            copy,
+                            main,
+                            page,
+                            left,
+                            margins.get(left),
+                            true,
+                            system,
+                        )
+                    });
+                    let on = &mut layout.pages[page];
+                    let mut kept = Vec::new();
+                    let mut places = Vec::new();
+                    for (line, at) in on.margin_lines.drain(..).zip(on.margin_places.drain(..)) {
+                        if at != left {
+                            kept.push(line);
+                            places.push(at);
+                        }
+                    }
+                    places.extend(relaid.iter().map(|_| left));
+                    kept.extend(relaid);
+                    on.margin_lines = kept;
+                    on.margin_places = places;
+                }
             }
         }
         Story::TextBox(id) => {
@@ -283,12 +350,19 @@ pub fn story_pages(layout: &DocumentLayout) -> Vec<(Story, usize)> {
         }
     };
     for (index, page) in layout.pages.iter().enumerate() {
+        // Its left field, and the others that show text (W096).
         let margin = |kind| {
             let (place, section) = desk_layout::margin_of_page(layout, index, kind);
-            Story::Margin { section, place }
+            place
+                .fields()
+                .into_iter()
+                .filter(|f| f.field == MarginField::Left || page.margin_places.contains(f))
+                .map(move |place| Story::Margin { section, place })
         };
         if !page.blank && layout.setup.headers {
-            add(margin(MarginKind::Header), index);
+            for story in margin(MarginKind::Header) {
+                add(story, index);
+            }
         }
         for line in &page.note_lines {
             if let Some(&id) = layout.notes.get(line.paragraph) {
@@ -296,7 +370,9 @@ pub fn story_pages(layout: &DocumentLayout) -> Vec<(Story, usize)> {
             }
         }
         if !page.blank && layout.setup.footers {
-            add(margin(MarginKind::Footer), index);
+            for story in margin(MarginKind::Footer) {
+                add(story, index);
+            }
         }
         for object in &page.objects {
             if object.object.text_box().is_some() {
@@ -336,7 +412,23 @@ fn story_copy(document: &Document, story: Story) -> Document {
         .find_map(|name| styles.by_name(StyleFamily::Paragraph, name))
         .map_or(styles.default_paragraph(), |s| s.id());
     let id = document.new_id();
-    document.with_body(vec![Paragraph::new(id, style)])
+    // The centre and right fields of a header or footer, aligned to
+    // their side, as in Pages 15.4 (W096).
+    let alignment = match story {
+        Story::Margin { place, .. } => match place.field {
+            MarginField::Left => None,
+            MarginField::Centre => Some(Alignment::Center),
+            MarginField::Right => Some(Alignment::Right),
+        },
+        _ => None,
+    };
+    let attrs = ParaAttrs {
+        alignment,
+        ..ParaAttrs::default()
+    };
+    let paragraph =
+        Paragraph::from_runs(id, style, attrs, []).unwrap_or_else(|_| Paragraph::new(id, style));
+    document.with_body(vec![paragraph])
 }
 
 impl TextEditor {
@@ -666,6 +758,75 @@ mod tests {
         let line = &edited.pages[0].lines[0];
         assert!(line.top() < page.body.0);
         assert_eq!(line.paragraph, 0);
+    }
+
+    #[test]
+    fn w096_a_click_in_a_header_picks_one_of_its_three_fields() {
+        use desk_model::Run;
+        let mut document = Document::new_word_processing();
+        let mut setup = *document.page_setup();
+        setup.headers = true;
+        document
+            .transact("Setup", |edit| edit.set_page_setup(setup))
+            .unwrap();
+        let layout = crate::lay_out(&document);
+        let page = &layout.pages[0];
+        let header = MarginPlace::new(MarginKind::Header, MarginPages::Default);
+        let y = f64::from(page.body.0) - 5.0;
+        let (left, right) = (f64::from(page.margins.0), f64::from(page.margins.1));
+        let width = layout.setup.width.to_pt() - left - right;
+        let at = |layout: &DocumentLayout, x: f64| match story_at(layout, 0, x, y) {
+            Some(Story::Margin { place, .. }) => place.field,
+            other => panic!("{other:?}"),
+        };
+        // An empty header has its three fields, a third of the text each.
+        assert_eq!(at(&layout, left + 10.0), MarginField::Left);
+        assert_eq!(at(&layout, left + width / 2.0), MarginField::Centre);
+        assert_eq!(at(&layout, left + width - 10.0), MarginField::Right);
+        // The right one starts aligned right, in its third.
+        let story = Story::Margin {
+            section: None,
+            place: header.with_field(MarginField::Right),
+        };
+        let copy = story_copy(&document, story);
+        assert_eq!(
+            copy.body().get(0).unwrap().attrs().alignment,
+            Some(Alignment::Right)
+        );
+        let edited = story_layout(&layout, story, 0, &copy);
+        let line = &edited.pages[0].lines[0];
+        assert!(line.origin.0 >= (left + width * 2.0 / 3.0 - 0.5) as f32);
+        // A free header, the left field alone with text, takes the clicks
+        // on the thirds its text reaches; the others open their field.
+        let style = document.styles().default_paragraph();
+        document
+            .transact("Header", |edit| {
+                let paragraph = Paragraph::from_runs(
+                    edit.new_id(),
+                    style,
+                    ParaAttrs::default(),
+                    [Run::new("Title")],
+                )?;
+                edit.set_header_footer(header, vec![paragraph])
+            })
+            .unwrap();
+        let layout = crate::lay_out(&document);
+        assert_eq!(at(&layout, left + 10.0), MarginField::Left);
+        assert_eq!(at(&layout, left + width - 10.0), MarginField::Right);
+        let long = ["Title"; 30].join(" ");
+        document
+            .transact("Header", |edit| {
+                let paragraph = Paragraph::from_runs(
+                    edit.new_id(),
+                    style,
+                    ParaAttrs::default(),
+                    [Run::new(&long)],
+                )?;
+                edit.set_header_footer(header, vec![paragraph])
+            })
+            .unwrap();
+        let layout = crate::lay_out(&document);
+        assert_eq!(at(&layout, left + width - 10.0), MarginField::Left);
     }
 
     #[test]

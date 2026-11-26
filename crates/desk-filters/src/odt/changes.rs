@@ -720,7 +720,10 @@ pub(super) fn export_all(
         .into_iter()
         .flatten()
         {
+            // Its three fields (W096).
             text(&mut part.paragraphs, document, &mut regions);
+            text(&mut part.centre, document, &mut regions);
+            text(&mut part.right, document, &mut regions);
         }
     }
     // Only the regions of a change that has more than one share its name

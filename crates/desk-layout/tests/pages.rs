@@ -1724,7 +1724,10 @@ fn b_074_stories_join_their_paragraphs_without_deletions() {
         &document,
         &layout,
         0,
-        desk_model::MarginKind::Header,
+        desk_model::MarginPlace::new(
+            desk_model::MarginKind::Header,
+            desk_model::MarginPages::Default,
+        ),
         &paragraphs,
         &mut system,
     );
@@ -1766,4 +1769,59 @@ fn b_074_stories_join_their_paragraphs_without_deletions() {
         [0, 1, 2]
     );
     assert!(lines.iter().all(|l| l.top() == lines[0].top()));
+}
+
+#[test]
+fn w096_a_header_has_three_fields_side_by_side() {
+    use desk_model::{
+        Editor, MarginField, MarginKind, MarginPages, MarginPlace, ParaAttrs, Paragraph, Run,
+    };
+    let mut system = TextSystem::new();
+    // The left field alone is the free header of Pages '09, as wide as
+    // the text.
+    let document = with_headers(&["Text"], "Left", &[]);
+    let layout = paginate(&document, &mut system);
+    let free = &layout.pages[0];
+    assert_eq!(free.margin_lines.len(), 1);
+    assert_eq!(free.margin_lines[0].origin.0, 50.0);
+    let free_top = free.body.0;
+    // A centre and a tall right field split it in thirds of the 200pt of
+    // the text, and the tallest pushes the body down.
+    let mut editor = Editor::new(document);
+    let header = MarginPlace::new(MarginKind::Header, MarginPages::Default);
+    editor
+        .edit("Fields", |edit| {
+            let body = edit.document().styles().default_paragraph();
+            for (field, text) in [
+                (MarginField::Centre, "Mid".to_owned()),
+                (MarginField::Right, ["1"; 4].join(&LINE_BREAK.to_string())),
+            ] {
+                let id = edit.new_id();
+                let paragraph =
+                    Paragraph::from_runs(id, body, ParaAttrs::default(), [Run::new(&text)])?;
+                edit.set_header_footer(header.with_field(field), vec![paragraph])?;
+            }
+            Ok(())
+        })
+        .unwrap();
+    let layout = paginate(editor.document(), &mut system);
+    let page = &layout.pages[0];
+    let at = |field| {
+        page.margin_lines
+            .iter()
+            .zip(&page.margin_places)
+            .filter(|(_, p)| **p == header.with_field(field))
+            .map(|(l, _)| l.origin.0)
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(at(MarginField::Left), [50.0]);
+    let third = 200.0 / 3.0;
+    assert_eq!(at(MarginField::Centre), [50.0 + third]);
+    assert_eq!(at(MarginField::Right), [50.0 + 2.0 * third; 4]);
+    assert!(page.body.0 > free_top, "{} {free_top}", page.body.0);
+    assert_eq!(desk_layout::field_span(header, false, 200.0), (0.0, 200.0));
+    assert_eq!(
+        desk_layout::field_span(header.with_field(MarginField::Right), false, 300.0),
+        (200.0, 100.0)
+    );
 }

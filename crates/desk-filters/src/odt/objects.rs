@@ -2452,7 +2452,13 @@ fn master_paragraphs(page: &mut odf::MasterPage) -> impl Iterator<Item = &mut od
     ]
     .into_iter()
     .flatten()
-    .flat_map(|part| part.paragraphs.iter_mut())
+    // Its three fields (W096).
+    .flat_map(|part| {
+        part.paragraphs
+            .iter_mut()
+            .chain(part.centre.iter_mut())
+            .chain(part.right.iter_mut())
+    })
 }
 
 /// Writes the objects of a document: those fixed on pages before the

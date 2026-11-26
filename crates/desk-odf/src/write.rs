@@ -1066,6 +1066,12 @@ fn write_header_footer(w: &mut Writer, name: &'static str, part: &HeaderFooter) 
     for paragraph in &part.paragraphs {
         write_paragraph(w, paragraph);
     }
+    // The centre and right fields (W096).
+    for (field, paragraphs) in [("center", &part.centre), ("right", &part.right)] {
+        for paragraph in paragraphs {
+            write_paragraph_in(w, paragraph, Some(field));
+        }
+    }
     w.end();
 }
 
@@ -1179,6 +1185,12 @@ fn flush(w: &mut Writer, plain: &mut String) {
 }
 
 fn write_paragraph(w: &mut Writer, paragraph: &Paragraph) {
+    write_paragraph_in(w, paragraph, None);
+}
+
+/// Writes a paragraph, of a field of a header or footer when it is in one
+/// other than the left (W096).
+fn write_paragraph_in(w: &mut Writer, paragraph: &Paragraph, header_field: Option<&str>) {
     match paragraph.outline_level {
         Some(level) => {
             w.start("text:h")
@@ -1189,6 +1201,7 @@ fn write_paragraph(w: &mut Writer, paragraph: &Paragraph) {
         }
     }
     w.attr_opt("text:style-name", paragraph.style.as_deref());
+    w.attr_opt("desk:header-field", header_field);
     for mark in &paragraph.marks {
         w.start("text:bookmark").attr("text:name", mark).end();
     }

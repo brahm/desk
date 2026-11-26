@@ -957,9 +957,33 @@ fn read_master(master: &Element) -> MasterPage {
         master.child(STYLE, name).map(|e| {
             let mut paragraphs = Vec::new();
             collect_paragraphs(e, None, None, &mut paragraphs, &mut Vec::new());
+            // The paragraphs of the centre and right fields, last (W096).
+            let children: Vec<&Element> = e.elements().collect();
+            let fields: Vec<&str> = children
+                .into_iter()
+                .rev()
+                .map_while(|c| {
+                    let paragraph = c.name.is(TEXT, "p") || c.name.is(TEXT, "h");
+                    c.attr(DESK, "header-field").filter(|_| paragraph)
+                })
+                .collect();
+            let mut centre = Vec::new();
+            let mut right = Vec::new();
+            if fields.len() <= paragraphs.len() {
+                let tail = paragraphs.split_off(paragraphs.len() - fields.len());
+                for (paragraph, field) in tail.into_iter().zip(fields.into_iter().rev()) {
+                    match field {
+                        "center" => centre.push(paragraph),
+                        "right" => right.push(paragraph),
+                        _ => paragraphs.push(paragraph),
+                    }
+                }
+            }
             HeaderFooter {
                 display: e.attr(STYLE, "display") != Some("false"),
                 paragraphs,
+                centre,
+                right,
             }
         })
     };

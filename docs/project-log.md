@@ -2751,6 +2751,20 @@ paragraph, and objects on a second page.
   were added: `PXV-20` page templates, `PXV-21` page background and
   `PXV-22` equations. No task moved to another phase.
 
+### 26 November: the three fields of headers and footers (step 3 of W3)
+
+- Each header and footer has the three fields of Pages 15.4, left,
+  centre and right. A click above or below the body picks the third of
+  the width under the pointer; a new centre field is centred and a new
+  right one aligned right, and the tallest field pushes the body away.
+- *Kept from Pages '09 (D-003):* the left field alone, with the others
+  empty, is the free header, as wide as the text, and takes every click;
+  the row of the Inspector edits it, as before.
+- *ODF:* the paragraphs of the centre and right fields follow those of
+  the left one in `style:header` and `style:footer`, marked with
+  `desk:header-field`; another program shows them stacked, with their
+  alignment, and loses no text.
+
 ## Decisions, with their reasons and consequences
 
 Ids `D-nnn` and `R-nnn` are those of [decisions.md](decisions.md).

@@ -23,8 +23,9 @@ use desk_model::{
     TabAlignment, TabLeader, TabStop, TabStops, TextSettings,
 };
 use desk_model::{
-    FIELD_CHARACTER, Field, Layout, MarginKind, MarginPages, MarginPlace, NodeId, Note, NoteFormat,
-    NoteKind, NoteNumbering, NoteSettings, Section, Start, TocEntry, TocLevel, TocSettings,
+    FIELD_CHARACTER, Field, Layout, MarginField, MarginKind, MarginPages, MarginPlace, NodeId,
+    Note, NoteFormat, NoteKind, NoteNumbering, NoteSettings, Section, Start, TocEntry, TocLevel,
+    TocSettings,
 };
 use desk_odf as odf;
 
@@ -1748,6 +1749,9 @@ fn import_text(source: &odf::TextDocument) -> Result<Document, FilterError> {
             parts.push((Some(*id), page));
         }
     }
+    // Whether the first section is as other programs make it, before the
+    // headers and footers of first and left pages change it.
+    let default_section = setup.section == Section::default();
     for &(section, master) in &parts {
         for (place, part) in [
             (MarginPages::Default, &master.header, MarginKind::Header),
@@ -1757,15 +1761,20 @@ fn import_text(source: &odf::TextDocument) -> Result<Document, FilterError> {
             (MarginPages::First, &master.footer_first, MarginKind::Footer),
             (MarginPages::Left, &master.footer_left, MarginKind::Footer),
         ]
-        .map(|(pages, part, kind)| (MarginPlace::new(kind, pages), part))
-        {
-            let Some(part) = part else {
-                continue;
-            };
+        .into_iter()
+        .filter_map(|(pages, part, kind)| Some((MarginPlace::new(kind, pages), part.as_ref()?)))
+        // Its three fields (W096).
+        .flat_map(|(place, part)| {
+            [
+                (place, &part.paragraphs),
+                (place.with_field(MarginField::Centre), &part.centre),
+                (place.with_field(MarginField::Right), &part.right),
+            ]
+        }) {
             let mut paragraphs = Vec::new();
             // Its comments, put on its text once it is there (W149).
             let mut comments: Vec<(NodeId, usize, odf::Field)> = Vec::new();
-            for paragraph in &part.paragraphs {
+            for paragraph in part {
                 let mut found = Vec::new();
                 let built = import_paragraph(
                     &styled,
@@ -1784,7 +1793,7 @@ fn import_text(source: &odf::TextDocument) -> Result<Document, FilterError> {
             objects::import_story_inline_objects(
                 &styled,
                 &mut document,
-                &part.paragraphs,
+                part,
                 &mut paragraphs,
                 &mut |document, paragraph| {
                     import_paragraph(
@@ -1807,7 +1816,7 @@ fn import_text(source: &odf::TextDocument) -> Result<Document, FilterError> {
             }
             // Other programs show the first and left ones whenever they
             // are there; Desk, when the section asks for them.
-            if section.is_none() && setup.section == Section::default() {
+            if section.is_none() && default_section {
                 match place.pages {
                     MarginPages::First => setup.section.first_page_different = true,
                     MarginPages::Left => setup.section.left_right_different = true,
@@ -3396,110 +3405,116 @@ fn export_margins(
                     place: MarginPlace,
                     shown: bool|
      -> Option<odf::HeaderFooter> {
-        let paragraphs = margins.get(place);
-        let empty = paragraphs.iter().all(Paragraph::is_empty);
+        let empty = place.fields().iter().all(|&f| margins.is_field_empty(f));
         if empty && (place.pages != MarginPages::Default || !shown) {
             return None;
         }
-        let mut out = Vec::new();
-        // The tracked change open past a break (W148).
-        let mut tracked = Track::new(document);
-        for paragraph in paragraphs {
-            let style_name = names[&paragraph.style()].clone();
-            let own = ParaAttrs {
-                list_level: None,
-                list_start: None,
-                list_override: None,
-                list_style: None,
-                ..paragraph.attrs().without_structure()
-            };
-            let style = if own.is_empty() {
-                style_name
-            } else {
-                automatic_name(
-                    odf::Family::Paragraph,
-                    style_name,
-                    odf::Properties {
-                        paragraph: odf_paragraph_properties(
-                            &own,
-                            &styles.resolve_paragraph(paragraph.style(), &own),
-                            false,
-                        ),
-                        text: odf::TextProperties::default(),
-                        ..Default::default()
-                    },
-                )
-            };
-            let spans = export_spans(paragraph, None, comments, Some(&mut tracked), |run| {
-                let attrs = run.attrs.without_field();
-                let named = run.style.and_then(|id| names.get(&id).cloned());
-                if attrs.is_empty() {
-                    return named;
-                }
-                let properties = odf::Properties {
-                    paragraph: odf::ParagraphProperties::default(),
-                    text: text_properties(
-                        &attrs,
-                        &styles.resolve_character(paragraph.style(), run.style, &run.attrs),
-                        fills,
-                    ),
-                    ..Default::default()
+        // Its three fields (W096).
+        let mut fields: [Vec<odf::Paragraph>; 3] = Default::default();
+        for (field, out) in place.fields().into_iter().zip(&mut fields) {
+            let paragraphs = margins.get(field);
+            // The tracked change open past a break (W148).
+            let mut tracked = Track::new(document);
+            for paragraph in paragraphs {
+                let style_name = names[&paragraph.style()].clone();
+                let own = ParaAttrs {
+                    list_level: None,
+                    list_start: None,
+                    list_override: None,
+                    list_style: None,
+                    ..paragraph.attrs().without_structure()
                 };
-                // A text style without a parent names none.
-                Some(match named {
-                    Some(parent) => automatic_name(odf::Family::Text, parent, properties),
-                    None => automatic_name(odf::Family::Text, String::new(), properties),
-                })
-            });
-            let mut spans = spans;
-            paragraph_change(
-                paragraph,
-                tracked.came_deleted(document),
-                &mut spans,
-                |before| {
-                    let parent = names
-                        .get(&before.style)
-                        .cloned()
-                        .unwrap_or_else(|| names[&styles.default_paragraph()].clone());
-                    let own = ParaAttrs {
-                        list_level: None,
-                        list_start: None,
-                        list_override: None,
-                        list_style: None,
-                        ..before.attrs.without_structure()
-                    };
-                    if own.is_empty() {
-                        return parent;
-                    }
+                let style = if own.is_empty() {
+                    style_name
+                } else {
                     automatic_name(
                         odf::Family::Paragraph,
-                        parent,
+                        style_name,
                         odf::Properties {
                             paragraph: odf_paragraph_properties(
                                 &own,
-                                &styles.resolve_paragraph(before.style, &own),
+                                &styles.resolve_paragraph(paragraph.style(), &own),
                                 false,
                             ),
+                            text: odf::TextProperties::default(),
                             ..Default::default()
                         },
                     )
-                },
-            );
-            out.push(odf::Paragraph {
-                style: Some(style),
-                spans,
-                ..odf::Paragraph::default()
-            });
+                };
+                let spans = export_spans(paragraph, None, comments, Some(&mut tracked), |run| {
+                    let attrs = run.attrs.without_field();
+                    let named = run.style.and_then(|id| names.get(&id).cloned());
+                    if attrs.is_empty() {
+                        return named;
+                    }
+                    let properties = odf::Properties {
+                        paragraph: odf::ParagraphProperties::default(),
+                        text: text_properties(
+                            &attrs,
+                            &styles.resolve_character(paragraph.style(), run.style, &run.attrs),
+                            fills,
+                        ),
+                        ..Default::default()
+                    };
+                    // A text style without a parent names none.
+                    Some(match named {
+                        Some(parent) => automatic_name(odf::Family::Text, parent, properties),
+                        None => automatic_name(odf::Family::Text, String::new(), properties),
+                    })
+                });
+                let mut spans = spans;
+                paragraph_change(
+                    paragraph,
+                    tracked.came_deleted(document),
+                    &mut spans,
+                    |before| {
+                        let parent = names
+                            .get(&before.style)
+                            .cloned()
+                            .unwrap_or_else(|| names[&styles.default_paragraph()].clone());
+                        let own = ParaAttrs {
+                            list_level: None,
+                            list_start: None,
+                            list_override: None,
+                            list_style: None,
+                            ..before.attrs.without_structure()
+                        };
+                        if own.is_empty() {
+                            return parent;
+                        }
+                        automatic_name(
+                            odf::Family::Paragraph,
+                            parent,
+                            odf::Properties {
+                                paragraph: odf_paragraph_properties(
+                                    &own,
+                                    &styles.resolve_paragraph(before.style, &own),
+                                    false,
+                                ),
+                                ..Default::default()
+                            },
+                        )
+                    },
+                );
+                out.push(odf::Paragraph {
+                    style: Some(style),
+                    spans,
+                    ..odf::Paragraph::default()
+                });
+            }
         }
-        if out.is_empty() {
-            out.push(odf::Paragraph {
+        let [mut left, centre, right] = fields;
+        if left.is_empty() && centre.is_empty() && right.is_empty() {
+            left.push(odf::Paragraph {
                 style: Some(names[&styles.default_paragraph()].clone()),
                 ..odf::Paragraph::default()
             });
         }
         Some(odf::HeaderFooter {
             display: shown,
-            paragraphs: out,
+            paragraphs: left,
+            centre,
+            right,
         })
     };
     let header = |pages| MarginPlace::new(MarginKind::Header, pages);

@@ -5,7 +5,9 @@
 //! EST-27): whether pages show them, how far they are from the edges of
 //! the paper, and their text.
 //!
-//! Each header and footer is a row of text. Its fields are written as
+//! Each header and footer is a row of text: that of its left field, the
+//! free header of Pages '09; its centre and right fields are typed on
+//! the page (W096). Its fields are written as
 //! `{page}`, `{pages}`, `{date}` and `{file}`, and its paragraphs are
 //! separated by ` ¶ `. A changed text keeps the formatting of the first
 //! paragraph and of the first text of the header or footer, and its date
@@ -150,7 +152,7 @@ pub struct HeadersGroup {
     header_margin: compact::SpinRow,
     footer_margin: compact::SpinRow,
     /// The rows of the text of each header and footer, as
-    /// [`MarginPlace::ALL`] lists them.
+    /// [`MarginPlace::MARGINS`] lists them.
     texts: Vec<compact::EntryRow>,
     units: Cell<Units>,
     shown: RefCell<(PageSetup, Section, HeadersFooters)>,
@@ -190,7 +192,7 @@ impl HeadersGroup {
         group.add(&header_margin);
         group.add(&footers);
         group.add(&footer_margin);
-        let texts: Vec<compact::EntryRow> = MarginPlace::ALL
+        let texts: Vec<compact::EntryRow> = MarginPlace::MARGINS
             .iter()
             .map(|&place| {
                 let row = compact::EntryRow::builder()
@@ -239,7 +241,7 @@ impl HeadersGroup {
                 }
             });
         }
-        for (row, place) in self.texts.iter().zip(MarginPlace::ALL) {
+        for (row, place) in self.texts.iter().zip(MarginPlace::MARGINS) {
             let weak = Rc::downgrade(self);
             row.connect_apply(move |row| {
                 if let Some(this) = weak.upgrade()
@@ -295,7 +297,7 @@ impl HeadersGroup {
         }
         self.header_margin.set_sensitive(setup.headers);
         self.footer_margin.set_sensitive(setup.footers);
-        for (row, place) in self.texts.iter().zip(MarginPlace::ALL) {
+        for (row, place) in self.texts.iter().zip(MarginPlace::MARGINS) {
             let shown = match place.kind {
                 MarginKind::Header => setup.headers,
                 MarginKind::Footer => setup.footers,

@@ -415,6 +415,7 @@ fn full_document() -> TextDocument {
                         spans: vec![span(None, "Chapter header")],
                         ..Paragraph::default()
                     }],
+                    ..HeaderFooter::default()
                 }),
                 ..MasterPage::default()
             },
@@ -435,6 +436,17 @@ fn full_document() -> TextDocument {
                     ],
                     ..Paragraph::default()
                 }],
+                // The centre and right fields (W096).
+                centre: vec![Paragraph {
+                    style: Some("Body".into()),
+                    spans: vec![span(None, "Notas")],
+                    ..Paragraph::default()
+                }],
+                right: vec![Paragraph {
+                    style: Some("Body".into()),
+                    spans: vec![span(None, "2026")],
+                    ..Paragraph::default()
+                }],
             }),
             header_left: Some(HeaderFooter {
                 display: true,
@@ -448,6 +460,7 @@ fn full_document() -> TextDocument {
                     )],
                     ..Paragraph::default()
                 }],
+                ..HeaderFooter::default()
             }),
             footer: Some(HeaderFooter {
                 display: false,
@@ -466,6 +479,7 @@ fn full_document() -> TextDocument {
                     ],
                     ..Paragraph::default()
                 }],
+                ..HeaderFooter::default()
             }),
             ..MasterPage::default()
         },

@@ -4068,3 +4068,51 @@ fn tab_a_table_whose_desk_json_disagrees_with_its_size_is_read_from_odf() {
         desk_table::Content::Text("Cell".to_owned())
     );
 }
+
+#[test]
+fn w096_the_three_fields_of_a_header_round_trip() {
+    use desk_model::{Alignment, MarginField, MarginKind, MarginPages, MarginPlace};
+    let mut document = Document::new_word_processing();
+    let body = document.styles().default_paragraph();
+    let footer = MarginPlace::new(MarginKind::Footer, MarginPages::Default);
+    for (field, text, alignment) in [
+        (MarginField::Left, "Desk", None),
+        (MarginField::Centre, "Draft", Some(Alignment::Center)),
+        (MarginField::Right, "Page", Some(Alignment::Right)),
+    ] {
+        let attrs = ParaAttrs {
+            alignment,
+            ..ParaAttrs::default()
+        };
+        let paragraph =
+            Paragraph::from_runs(document.new_id(), body, attrs, vec![Run::new(text)]).unwrap();
+        document
+            .apply(Op::SetHeaderFooter {
+                section: None,
+                place: footer.with_field(field),
+                paragraphs: vec![paragraph],
+            })
+            .unwrap();
+    }
+    let bytes = write_odt(&document).unwrap();
+    let read = read_odt(&bytes).unwrap();
+    for (field, text, alignment) in [
+        (MarginField::Left, "Desk", None),
+        (MarginField::Centre, "Draft", Some(Alignment::Center)),
+        (MarginField::Right, "Page", Some(Alignment::Right)),
+    ] {
+        let paragraphs = read.headers_footers().get(footer.with_field(field));
+        assert_eq!(paragraphs.len(), 1, "{field:?}");
+        assert_eq!(paragraphs[0].text(), text);
+        assert_eq!(paragraphs[0].attrs().alignment, alignment);
+    }
+    // Other programs see the paragraphs of the centre and right fields
+    // after those of the left one, marked.
+    keep("w096-header-fields.odt", &bytes);
+    let mut archive = zip::ZipArchive::new(std::io::Cursor::new(&bytes)).unwrap();
+    let mut styles = String::new();
+    std::io::Read::read_to_string(&mut archive.by_name("styles.xml").unwrap(), &mut styles)
+        .unwrap();
+    assert!(styles.contains(r#"desk:header-field="center""#), "{styles}");
+    assert!(styles.contains(r#"desk:header-field="right""#));
+}
