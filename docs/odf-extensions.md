@@ -705,11 +705,13 @@ their own setting says.
   (W100): those of its section, or those after it up to the next table,
   To Next Occurrence, which every table of Pages '09 lists.
 - **On:** `text:table-of-content`.
-- **Value:** `section` or `next`. A table of the whole document has none.
+- **Value:** `document`, `section` or `next`.
 - **Fallback:** the entries themselves, which other programs show as
   written; when they update the table, it lists the whole document, as
-  `text:index-scope` says by default. A table of another program is read
-  as one of the whole document.
+  `text:index-scope` says by default. A table without the attribute is
+  read as one of the whole document, unless `meta:generator` says Desk
+  wrote it, before tables had a range: then it lists up to the next
+  table, as it did.
 
 ### Page backgrounds (`style:drawing-page-properties`, `style:master-page`)
 

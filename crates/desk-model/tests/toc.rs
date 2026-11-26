@@ -302,3 +302,61 @@ fn w100_a_table_lists_the_document_its_section_or_up_to_the_next_table() {
     editor.undo().unwrap();
     assert_eq!(listed(editor.document()).0, ["Two", "Three"]);
 }
+
+#[test]
+fn w100_a_table_at_the_start_of_a_section_is_in_it_and_never_joins_another() {
+    let mut editor = Editor::new(Document::new_word_processing());
+    let start = editor.document().start();
+    let two = editor
+        .edit("Setup", |edit| {
+            let at = edit.insert_text(start, "One")?;
+            let two = edit.split_paragraph(at)?;
+            edit.insert_text(two, "Two")?;
+            let heading = edit.new_paragraph_style("Heading", start, start, false)?;
+            for id in [start.paragraph, two.paragraph] {
+                edit.set_paragraph_style(Position::new(id, 0), Position::new(id, 0), heading)?;
+            }
+            edit.set_paragraph_attrs(
+                two,
+                two,
+                &ParaAttrs {
+                    start: Some(Some(Arc::new(Start::Section(
+                        Section::default(),
+                        Layout::default(),
+                    )))),
+                    ..ParaAttrs::default()
+                },
+            )?;
+            let mut settings = edit.document().text_settings().clone();
+            settings.toc = TocSettings {
+                levels: vec![TocLevel {
+                    style: heading,
+                    entry: edit.document().styles().default_paragraph(),
+                    page_number: false,
+                }],
+                page_links: false,
+            };
+            edit.set_text_settings(settings)?;
+            edit.insert_table_of_contents(1, TocScope::Section)?;
+            Ok(two.paragraph)
+        })
+        .unwrap();
+    let document = editor.document();
+    // The section starts at the table, which lists "Two" only.
+    let body: Vec<_> = document.body().iter().collect();
+    assert_eq!(tables_of_contents(&body), vec![1..2]);
+    assert!(body[1].attrs().start.is_some());
+    assert!(document.paragraph(two).unwrap().attrs().start.is_none());
+    assert_eq!(body[1].runs().map(|r| r.text()).collect::<String>(), "Two");
+    assert_eq!(document.section_ranges(), vec![0..1, 1..3]);
+
+    // A table in another, or right after one, would join it.
+    for index in [1, 2] {
+        assert!(
+            editor
+                .edit("Again", |edit| edit
+                    .insert_table_of_contents(index, TocScope::Document))
+                .is_err()
+        );
+    }
+}

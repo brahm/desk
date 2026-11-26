@@ -4615,12 +4615,15 @@ fn w100_the_range_of_each_table_of_contents_is_kept() {
     let read = read_odt(&bytes).unwrap();
     assert_eq!(scopes(&read), before);
 
-    // A table of another app lists the whole document.
+    // A table that Desk wrote before tables had a range lists up to the
+    // next table, as it did; one of another app, the whole document.
     let mut text = odf::read_odt(&bytes).unwrap();
     for paragraph in &mut text.body {
         paragraph.toc_scope = None;
     }
-    let other = odf::write_odt(&text).unwrap();
-    let read = read_odt(&other).unwrap();
-    assert!(scopes(&read).iter().all(|&s| s == TocScope::Document));
+    let old = read_odt(&odf::write_odt(&text).unwrap()).unwrap();
+    assert!(scopes(&old).iter().all(|&s| s == TocScope::NextTable));
+    text.meta.generator = Some("LibreOffice/25.8".into());
+    let other = read_odt(&odf::write_odt(&text).unwrap()).unwrap();
+    assert!(scopes(&other).iter().all(|&s| s == TocScope::Document));
 }

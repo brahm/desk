@@ -1749,7 +1749,7 @@ fn import_text(source: &odf::TextDocument) -> Result<Document, FilterError> {
                 });
                 attrs.toc_entry = Some(Some(TocEntry {
                     target,
-                    scope: toc_scope(paragraph.toc_scope.as_deref()),
+                    scope: toc_scope(source, paragraph.toc_scope.as_deref()),
                 }));
             }
             built = Paragraph::from_runs(
@@ -2560,7 +2560,7 @@ fn import_tracked(
                 });
                 attrs.toc_entry = Some(Some(TocEntry {
                     target,
-                    scope: toc_scope(paragraph.toc_scope.as_deref()),
+                    scope: toc_scope(source, paragraph.toc_scope.as_deref()),
                 }));
             }
             if let Some(name) = paragraph.section.as_deref() {
@@ -4428,15 +4428,14 @@ pub fn export(document: &Document) -> odf::TextDocument {
                 .into_iter()
                 .collect(),
             toc: paragraph.attrs().toc_entry.flatten().is_some(),
-            toc_scope: paragraph
-                .attrs()
-                .toc_entry
-                .flatten()
-                .and_then(|e| match e.scope {
-                    TocScope::Document => None,
-                    TocScope::Section => Some("section".into()),
-                    TocScope::NextTable => Some("next".into()),
-                }),
+            toc_scope: paragraph.attrs().toc_entry.flatten().map(|e| {
+                match e.scope {
+                    TocScope::Document => "document",
+                    TocScope::Section => "section",
+                    TocScope::NextTable => "next",
+                }
+                .into()
+            }),
             spans,
             frames: Vec::new(),
         });
@@ -4815,12 +4814,22 @@ fn author_color(line: &str) -> Option<(String, desk_model::AuthorColor)> {
 }
 
 /// Which paragraphs a table of contents lists, from its `desk:toc-scope`
-/// (W100): those of the whole document when it has none, as other apps
-/// list them.
-fn toc_scope(scope: Option<&str>) -> TocScope {
+/// (W100). A table without one lists the whole document, as other apps
+/// list it, unless Desk wrote it before tables had a range: those listed
+/// up to the next table.
+fn toc_scope(source: &odf::TextDocument, scope: Option<&str>) -> TocScope {
     match scope {
         Some("section") => TocScope::Section,
         Some("next") => TocScope::NextTable,
-        _ => TocScope::Document,
+        Some(_) => TocScope::Document,
+        None if source
+            .meta
+            .generator
+            .as_deref()
+            .is_some_and(|g| g.starts_with("Desk/")) =>
+        {
+            TocScope::NextTable
+        }
+        None => TocScope::Document,
     }
 }

@@ -235,13 +235,34 @@ impl Edit {
     }
 
     /// Puts an empty table of contents before a paragraph, listing what
-    /// `scope` says, and fills it.
+    /// `scope` says, and fills it. A section or a break that starts at
+    /// the paragraph starts at the table instead, which is then in that
+    /// section. Neighbouring entries are one table, so a table goes
+    /// neither in another nor right after one.
     pub fn insert_table_of_contents(
         &mut self,
         index: usize,
         scope: TocScope,
     ) -> Result<(), ModelError> {
         let document = self.document();
+        let next_to = |i: usize| document.table_of_contents_at(i).is_some();
+        if next_to(index) || (index > 0 && next_to(index - 1)) {
+            return Err(ModelError::TableOfContentsNextToAnother);
+        }
+        let moved = document.body().get(index).cloned().map(|paragraph| {
+            let attrs = paragraph.attrs();
+            let starts = ParaAttrs {
+                start: attrs.start.clone(),
+                column_break_before: attrs.column_break_before,
+                ..ParaAttrs::default()
+            };
+            let rest = ParaAttrs {
+                start: None,
+                column_break_before: None,
+                ..attrs.clone()
+            };
+            (paragraph, starts, rest)
+        });
         let settings = document.text_settings().toc.clone();
         let style = settings
             .levels
@@ -256,10 +277,22 @@ impl Edit {
                     target: None,
                     scope,
                 })),
-                ..ParaAttrs::default()
+                ..moved
+                    .as_ref()
+                    .map(|(_, starts, _)| starts.clone())
+                    .unwrap_or_default()
             },
             std::iter::empty(),
         )?;
+        if let Some((old, starts, rest)) = moved
+            && starts != ParaAttrs::default()
+        {
+            self.apply(crate::Op::SetParagraphFormat {
+                paragraph: old.id(),
+                style: old.style(),
+                attrs: rest,
+            })?;
+        }
         self.apply(crate::Op::InsertParagraph { index, paragraph })?;
         loop_tables(self, &settings)
     }

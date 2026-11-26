@@ -2828,10 +2828,13 @@ paragraph, and objects on a second page.
   A table of the document lists the paragraphs before it too; one of
   its section, those of the section it starts in. Tables of Pages '09
   keep listing up to the next table, as they did.
-- *ODF:* `desk:toc-scope` on `text:table-of-content`, `section` or
-  `next`. A table of another program lists the whole document, as
-  `text:index-scope` says; before this change Desk read every table as
-  one up to the next table.
+- *ODF:* `desk:toc-scope` on `text:table-of-content`, `document`,
+  `section` or `next`. A table of another program lists the whole
+  document, as `text:index-scope` says; one that an older Desk wrote
+  keeps listing up to the next table.
+- *From the review:* a table inserted at the start of a section takes
+  the start of the section, and so lists that section; a table is not
+  inserted inside another or right after one, which it would join.
 - *Not done:* the text of an empty table, which Pages 15.4 shows when no
   paragraph uses its styles; the empty entry stays blank (EST-22).
 

@@ -990,9 +990,9 @@ pub struct Paragraph {
     /// Whether the paragraph is an entry of a `text:table-of-content`, in
     /// its `text:index-body`. Neighbors are one table.
     pub toc: bool,
-    /// `desk:toc-scope` of that table: `section` or `next`, for the
-    /// paragraphs of its section or those up to the next table; none for
-    /// those of the whole document, as other apps list them (W100).
+    /// `desk:toc-scope` of that table: `document`, `section` or `next`,
+    /// for the paragraphs of the whole document, of its section or those
+    /// up to the next table (W100).
     pub toc_scope: Option<String>,
     /// The text, in spans of one style each.
     pub spans: Vec<Span>,
