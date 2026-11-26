@@ -40,6 +40,7 @@ mod custom_formats;
 mod equations;
 mod guides;
 mod media;
+mod merge;
 mod navigate;
 mod objects;
 mod outline;
@@ -54,6 +55,7 @@ mod table_looks;
 mod tables;
 mod threads;
 
+pub use merge::MergePreview;
 pub use navigate::Navigate;
 pub use objects::{NewShape, ObjectInfo, ObjectStylesInfo};
 pub use outline::OutlineRow;
@@ -512,12 +514,22 @@ struct State {
     screen: Option<(f64, f64)>,
     /// What the editor added to its view, taken off with it.
     attached: Attached,
+    /// The data of the record that the merge fields show, while the
+    /// preview of a mail merge is on (MAL-04).
+    merge_preview: Option<merge::MergePreview>,
 }
 
 impl State {
     /// Lays out a document as the view shows it: as pages, or in Screen
     /// View.
     fn lay_out(&self, document: &Document) -> DocumentLayout {
+        if let Some(filled) = self
+            .merge_preview
+            .as_ref()
+            .and_then(|preview| merge::filled(document, preview))
+        {
+            return lay_out_in(self.screen, &filled);
+        }
         lay_out_in(self.screen, document)
     }
 }
@@ -709,6 +721,7 @@ impl TextEditor {
                     controllers: Vec::new(),
                     handlers: Vec::new(),
                 },
+                merge_preview: None,
             })),
         };
         this.show_pages();
@@ -2698,6 +2711,9 @@ impl TextEditor {
 
     /// Lays out the document again and shows a selection.
     fn after_change(&self, selection: Selection) {
+        // An edit ends the preview of a mail merge, which shows the
+        // document as it is again (MAL-04).
+        self.state.borrow_mut().merge_preview = None;
         if !self.sync_story() {
             let mut state = self.state.borrow_mut();
             state.layout = state.lay_out(state.editor.document());
@@ -3002,7 +3018,16 @@ impl TextEditor {
     fn show_pages(&self) {
         let (pages, invisibles, text) = {
             let state = self.state.borrow();
-            let text = AccessText::new(state.editor.document(), &state.layout);
+            // A screen reader reads the fields of the preview as they show
+            // (MAL-04).
+            let filled = state
+                .merge_preview
+                .as_ref()
+                .and_then(|preview| merge::filled(state.editor.document(), preview));
+            let text = AccessText::new(
+                filled.as_ref().unwrap_or(state.editor.document()),
+                &state.layout,
+            );
             let invisibles = if state.invisibles {
                 text_nav::invisibles(state.editor.document(), &state.layout)
             } else {

@@ -57,3 +57,17 @@ fn mal_05_a_table_of_a_spreadsheet_gives_the_records() {
     assert_eq!(records.value(0, "Company"), Some("Old"));
     assert!(matches!(read(Some("2024")), Err(SourceError::NoTable(_))));
 }
+
+#[test]
+fn mal_04_a_missing_address_takes_another_of_its_kind() {
+    let records = Records::of_table(&[
+        vec!["Name".into(), "Work Address".into(), "Home Phone".into()],
+        vec!["Ana".into(), "1 Rua A".into(), String::new()],
+    ]);
+    assert_eq!(records.datum(0, "Home Address"), Some("1 Rua A"));
+    assert_eq!(records.datum(0, "Endereço residencial"), Some("1 Rua A"));
+    assert_eq!(records.datum(0, "Work Address"), Some("1 Rua A"));
+    // A phone has no other to take, and a name is no kind.
+    assert_eq!(records.datum(0, "Work Phone"), None);
+    assert_eq!(records.datum(0, "Company"), None);
+}

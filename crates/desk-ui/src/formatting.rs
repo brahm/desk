@@ -108,6 +108,8 @@ pub struct Inspector {
     notes: Rc<crate::notes_pane::NotesGroup>,
     links: Rc<crate::links_pane::LinksGroup>,
     toc: Rc<crate::links_pane::TocGroup>,
+    /// Mail Merge of the Document tab (W105).
+    mail_merge: Rc<crate::mail_merge::MailMergeGroup>,
     /// The Page Template of the Section tab and the Placeholder of the
     /// Arrange tab of a page layout document (W095).
     page_template: Rc<crate::page_templates_pane::TemplateGroup>,
@@ -246,6 +248,7 @@ impl Inspector {
         let notes = crate::notes_pane::NotesGroup::new(editor.clone(), units);
         let links = crate::links_pane::LinksGroup::new(editor.clone());
         let toc = crate::links_pane::TocGroup::new(editor.clone());
+        let mail_merge = crate::mail_merge::MailMergeGroup::new(editor.clone());
         let page_template = crate::page_templates_pane::TemplateGroup::new(editor.clone());
         let placeholder = crate::page_templates_pane::PlaceholderGroup::new(editor.clone());
         let objects = crate::objects_pane::ObjectGroups::new(editor.clone(), units);
@@ -448,6 +451,7 @@ impl Inspector {
                     headers.widget(),
                     notes.widget(),
                     toc.widget(),
+                    mail_merge.widget(),
                 ],
             ),
             Tab::new("section", n_("Section"), &[page_template.widget(), section]),
@@ -492,6 +496,7 @@ impl Inspector {
             notes,
             links,
             toc,
+            mail_merge,
             page_template,
             placeholder,
             lists,
@@ -788,6 +793,7 @@ impl Inspector {
         self.headers.show(format);
         self.notes.show(format);
         self.toc.show(format);
+        self.mail_merge.show(format);
         self.links.show(format);
         self.page_template.show(format);
         self.placeholder.show(format);

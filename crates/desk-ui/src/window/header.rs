@@ -396,6 +396,11 @@ pub(super) fn insert_menu(objects: bool) -> gio::Menu {
     fields.append(Some(&tr("Page Co_unt")), Some("win.insert-page-count"));
     fields.append(Some(&tr("_Date")), Some("win.insert-date"));
     fields.append(Some(&tr("_File Name")), Some("win.insert-file-name"));
+    // Insert ▸ Mail Merge Field of Pages 15.4 (MAL-07).
+    fields.append_submenu(
+        Some(&tr("_Mail Merge Field")),
+        &crate::mail_merge::insert_menu(),
+    );
     let inserts = gio::Menu::new();
     inserts.append_submenu(Some(&tr("_Break")), &breaks);
     inserts.append_submenu(Some(&tr("_Field")), &fields);

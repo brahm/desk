@@ -97,10 +97,9 @@ flowchart TB
         formula[desk-formula · MPL]
     end
     writer & tables & slides --> ui & filters
-    writer & tables --> contacts
     contacts --> model & odf
     slides --> anim
-    ui --> render & layout & text & model & lang
+    ui --> render & layout & text & model & lang & contacts
     convert --> filters & render & layout
     testkit --> filters & render & layout
     render --> layout --> text --> model

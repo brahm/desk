@@ -140,6 +140,26 @@ impl Records {
             .filter(|v| !v.trim().is_empty())
     }
 
+    /// The datum that a merge field of a record takes: that of its field,
+    /// or, kept from Pages '09 (MAL-04, D-003), when a work, home or
+    /// other phone, email or address is missing, another of its kind, as
+    /// the work address for the home one.
+    pub fn datum(&self, record: usize, field: &str) -> Option<&str> {
+        if let Some(value) = self.value(record, field) {
+            return Some(value);
+        }
+        let canonical = crate::canonical(field)?;
+        let kind = ["Work ", "Home ", "Other "]
+            .iter()
+            .find_map(|variant| canonical.strip_prefix(variant))?;
+        if !matches!(kind, "Phone" | "Email" | "Address") {
+            return None;
+        }
+        std::iter::once(kind.to_owned())
+            .chain(["Work ", "Home ", "Other "].map(|v| format!("{v}{kind}")))
+            .find_map(|other| self.value(record, &other))
+    }
+
     /// How many records there are.
     pub fn len(&self) -> usize {
         self.rows.len()

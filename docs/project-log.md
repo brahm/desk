@@ -2990,6 +2990,32 @@ paragraph, and objects on a second page.
   the preview and the merge in the window. No task moved to another
   phase.
 
+### 26 November: the preview and the merge (step 11 of W3, third part)
+
+- Mail Merge is a group of the Document tab, as in Pages 15.4: Populate
+  With chooses the contacts, a vCard file or a spreadsheet, a spreadsheet
+  of several tables shows its Table, Add Merge Field lists the fields of
+  the source, and Merge opens the merged document, untitled, in a new
+  window. Insert ▸ Field ▸ Mail Merge Field puts the common fields of a
+  contact, of a recipient or of the sender, and the menu of a field
+  changes it to another, makes it a sender field or writes an address on
+  one line.
+- The Preview lays out a filled copy of the document, so the document
+  itself does not change, and its arrows step through the records. A
+  screen reader reads the data as they show. Pages makes the document
+  read-only while it previews; in Desk an edit ends the Preview instead,
+  so that nothing is lost by typing.
+- The merged document has the body once for each record, each from a new
+  page. As in Pages, only the sender fields stay fields there; the
+  recipient fields become their text. It tracks no changes and has no
+  source. A work, home or other address, phone or email that a record
+  lacks takes another of its kind, as Pages '09 did.
+- A source is read only when the person asks for its data, never when
+  the document opens, since its path comes from the document.
+- *Next:* the contacts of the desktop, from Evolution Data Server, the
+  sender's own card, and a card dragged onto a field. No task moved to
+  another phase.
+
 ## Decisions, with their reasons and consequences
 
 Ids `D-nnn` and `R-nnn` are those of [decisions.md](decisions.md).

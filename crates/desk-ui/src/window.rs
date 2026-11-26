@@ -2315,6 +2315,35 @@ impl DocumentWindow {
         copy.window().present();
     }
 
+    /// Opens the merged document of the mail merge, untitled, in a new
+    /// window (MAL-04), or says why it cannot.
+    fn mail_merge(&self) {
+        let (Some(editor), Some(app)) = (
+            self.editor(),
+            self.window()
+                .application()
+                .and_then(|a| a.downcast::<adw::Application>().ok()),
+        ) else {
+            return;
+        };
+        match crate::mail_merge::merged(&editor) {
+            Ok(merged) => {
+                let window = DocumentWindow::new(&app, self.info, self.opener);
+                window.load_untitled(merged, tr("Merged Document"));
+                window.view.set_zoom(self.view.zoom());
+                window.window().present();
+            }
+            Err(error) => {
+                let dialog = adw::AlertDialog::builder()
+                    .heading(tr("Cannot Merge"))
+                    .body(error)
+                    .build();
+                dialog.add_response("close", &tr("_Close"));
+                dialog.present(Some(&self.window()));
+            }
+        }
+    }
+
     /// Shows the document as an outline, or as pages (TXT-14).
     fn show_outline(&self, on: bool) {
         if self.editor().is_none() {
@@ -3511,6 +3540,30 @@ impl DocumentWindow {
             self.actions.add_action(&action);
         }
 
+        // Merge fields of a recipient or of the sender (MAL-07).
+        for (name, sender) in [("insert-merge-field", false), ("insert-sender-field", true)] {
+            let action = gio::SimpleAction::new(name, Some(glib::VariantTy::STRING));
+            let weak = Rc::downgrade(self);
+            action.connect_activate(move |_, field| {
+                if let Some(editor) = weak.upgrade().and_then(|this| this.editor())
+                    && let Some(field) = field.and_then(|f| f.str())
+                {
+                    editor.insert_merge_field(field, sender);
+                }
+            });
+            self.actions.add_action(&action);
+        }
+        // Merge, which opens a new document with a copy for each record
+        // (MAL-04).
+        let merge = gio::SimpleAction::new("mail-merge", None);
+        let weak = Rc::downgrade(self);
+        merge.connect_activate(move |_, _| {
+            if let Some(this) = weak.upgrade() {
+                this.mail_merge();
+            }
+        });
+        self.actions.add_action(&merge);
+
         // The number of columns of the layout at the cursor, which keep
         // their gap (EST-07).
         let columns = gio::SimpleAction::new_stateful(
@@ -4089,8 +4142,62 @@ impl DocumentWindow {
             });
         });
         self.actions.add_action(&date);
+        let name = gio::SimpleAction::new("field-merge-name", Some(glib::VariantTy::STRING));
+        let weak = Rc::downgrade(self);
+        name.connect_activate(move |_, value| {
+            let (Some(this), Some(new)) = (weak.upgrade(), value.and_then(|v| v.str())) else {
+                return;
+            };
+            change(&this, &|field| match field {
+                Field::Merge {
+                    sender,
+                    single_line,
+                    ..
+                } => Field::Merge {
+                    name: new.into(),
+                    sender,
+                    single_line,
+                    shown: None,
+                    origin: None,
+                },
+                other => other,
+            });
+        });
+        self.actions.add_action(&name);
         type Toggle = fn(Field) -> Field;
-        let toggles: [(&str, Toggle); 3] = [
+        let toggles: [(&str, Toggle); 5] = [
+            ("field-merge-sender", |field| match field {
+                Field::Merge {
+                    name,
+                    sender,
+                    single_line,
+                    shown,
+                    origin,
+                } => Field::Merge {
+                    name,
+                    sender: !sender,
+                    single_line,
+                    shown,
+                    origin,
+                },
+                other => other,
+            }),
+            ("field-merge-single-line", |field| match field {
+                Field::Merge {
+                    name,
+                    sender,
+                    single_line,
+                    shown,
+                    origin,
+                } => Field::Merge {
+                    name,
+                    sender,
+                    single_line: !single_line,
+                    shown,
+                    origin,
+                },
+                other => other,
+            }),
             ("field-date-update", |field| match field {
                 Field::DateTime {
                     pattern,
@@ -4687,11 +4794,38 @@ fn fill_field(menu: &gio::Menu, window: &adw::ApplicationWindow, editor: Option<
                 Some("win.field-file-extension"),
             );
         }
-        // The menu of a merge field comes with the mail merge (W105).
-        Field::NoteMark { .. }
-        | Field::PageOf { .. }
-        | Field::ObjectMark { .. }
-        | Field::Merge { .. } => {}
+        // The menu of a merge field of Pages 15.4 (MAL-08): another field,
+        // Use as Sender Field, and an address on one line.
+        Field::Merge {
+            name,
+            sender,
+            single_line,
+            ..
+        } => {
+            state("field-merge-sender", sender.to_variant());
+            state("field-merge-single-line", single_line.to_variant());
+            let names = gio::Menu::new();
+            for field in desk_contacts::CONTACT_FIELDS {
+                let item = gio::MenuItem::new(Some(&field.replace('_', "__")), None);
+                item.set_action_and_target_value(
+                    Some("win.field-merge-name"),
+                    Some(&field.to_variant()),
+                );
+                names.append_item(&item);
+            }
+            menu.append_submenu(Some(&tr("Change _Field")), &names);
+            menu.append(
+                Some(&tr("Use as _Sender Field")),
+                Some("win.field-merge-sender"),
+            );
+            if desk_contacts::canonical(name).is_some_and(|n| n.ends_with("Address")) {
+                menu.append(
+                    Some(&tr("Single _Line Address")),
+                    Some("win.field-merge-single-line"),
+                );
+            }
+        }
+        Field::NoteMark { .. } | Field::PageOf { .. } | Field::ObjectMark { .. } => {}
     }
 }
 
