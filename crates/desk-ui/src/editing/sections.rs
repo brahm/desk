@@ -277,7 +277,7 @@ impl TextEditor {
 
     /// Adds or takes out pages of a page layout document, leaving no
     /// object selected.
-    fn layout_page_edit(
+    pub(super) fn layout_page_edit(
         &self,
         name: &str,
         change: impl FnOnce(&mut desk_model::Edit) -> Result<(), ModelError>,

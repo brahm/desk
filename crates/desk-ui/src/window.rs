@@ -247,7 +247,7 @@ thread_local! {
 }
 
 /// The actions that need a document.
-const DOCUMENT_ACTIONS: [&str; 96] = [
+const DOCUMENT_ACTIONS: [&str; 98] = [
     "outline",
     "screen-view",
     "text-size",
@@ -296,6 +296,8 @@ const DOCUMENT_ACTIONS: [&str; 96] = [
     "insert-layout-break",
     "insert-section-break",
     "captured-pages",
+    "page-templates",
+    "reapply-page-template",
     "insert-page-number",
     "insert-auto-page-numbers",
     "columns",
@@ -3553,6 +3555,26 @@ impl DocumentWindow {
         });
         self.actions.add_action(&captured);
 
+        // Page templates of Pages 15.4 (W095).
+        let templates = gio::SimpleAction::new("page-templates", None);
+        let weak = Rc::downgrade(self);
+        templates.connect_activate(move |_, _| {
+            if let Some(this) = weak.upgrade()
+                && let Some(editor) = this.editor()
+            {
+                crate::page_templates::present(&this.window(), &editor);
+            }
+        });
+        self.actions.add_action(&templates);
+        let reapply = gio::SimpleAction::new("reapply-page-template", None);
+        let weak = Rc::downgrade(self);
+        reapply.connect_activate(move |_, _| {
+            if let Some(editor) = weak.upgrade().and_then(|this| this.editor()) {
+                editor.reapply_page_template();
+            }
+        });
+        self.actions.add_action(&reapply);
+
         let linked = gio::SimpleAction::new("open-linked", Some(glib::VariantTy::STRING));
         let weak = Rc::downgrade(self);
         linked.connect_activate(move |_, link| {
@@ -4765,8 +4787,8 @@ fn comments_page() -> adw::StatusPage {
 
 /// The menu of the Add button of the navigation sidebar (GNM-12): a blank
 /// page, which in a page layout document is a page of its own, and a
-/// section break. The pages of the template join them with the templates
-/// of the gallery (INT-06).
+/// section break, then the page templates of a page layout document
+/// (W095).
 fn add_page_menu() -> gio::Menu {
     let menu = gio::Menu::new();
     menu.append(Some(&tr("_Blank Page")), Some("win.insert-page-break"));
@@ -4775,6 +4797,14 @@ fn add_page_menu() -> gio::Menu {
         Some("win.insert-section-break"),
     );
     menu.append(Some(&tr("_Captured Pages…")), Some("win.captured-pages"));
+    // The page templates of a page layout document (W095).
+    let templates = gio::Menu::new();
+    templates.append(Some(&tr("Page _Templates…")), Some("win.page-templates"));
+    templates.append(
+        Some(&tr("_Reapply Page Template")),
+        Some("win.reapply-page-template"),
+    );
+    menu.append_section(None, &templates);
     menu
 }
 

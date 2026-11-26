@@ -42,6 +42,7 @@ mod media;
 mod navigate;
 mod objects;
 mod outline;
+mod page_templates;
 mod pen;
 mod points;
 mod screen;
@@ -581,6 +582,19 @@ pub struct Format {
     /// Whether the selected objects hold text, which the Text tab of the
     /// Inspector formats (OBJ-13).
     pub object_text: bool,
+    /// The page templates of a page layout document, in order, and the
+    /// template of the page of the selection or in sight (W095).
+    pub page_templates: Option<PageTemplatesAt>,
+}
+
+/// The page templates of a page layout document, and the template of the
+/// page of the selection or in sight (W095).
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct PageTemplatesAt {
+    /// The names of the templates, in order.
+    pub names: Vec<Arc<str>>,
+    /// The template of the page.
+    pub current: Option<Arc<str>>,
 }
 
 /// A drag of a list item by its label (LST-02, PXV-11).
@@ -3042,6 +3056,10 @@ impl TextEditor {
     /// The formatting at the selection: that of its first character, or
     /// that which text typed at the cursor takes.
     pub fn format(&self) -> Format {
+        let page_templates = self.is_page_layout().then(|| PageTemplatesAt {
+            names: self.page_template_names(),
+            current: self.current_page_template(),
+        });
         let state = self.state.borrow();
         let document = state.editor.document();
         let (start, end) = state.selection.ordered();
@@ -3107,6 +3125,7 @@ impl TextEditor {
                 .map(|e| e.scope),
             object: self.object_info(),
             object_text: self.selected_objects_have_text(),
+            page_templates,
         }
     }
 
