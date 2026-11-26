@@ -569,6 +569,9 @@ pub struct Format {
     pub link: Option<Arc<str>>,
     /// The names of the bookmarks of the document, in order (EST-26).
     pub bookmarks: Vec<Arc<str>>,
+    /// Which paragraphs the table of contents at the cursor lists, when
+    /// the cursor is in one (W100).
+    pub toc_scope: Option<desk_model::TocScope>,
     /// The selected objects, when objects are selected (OBJ-21).
     pub object: Option<ObjectInfo>,
     /// Whether the selected objects hold text, which the Text tab of the
@@ -2167,10 +2170,17 @@ impl TextEditor {
         });
     }
 
-    /// Puts a table of contents before the paragraph of the cursor
-    /// (EST-22). A document whose tables list nothing yet lists its
-    /// headings, by the styles whose names start with "Heading".
+    /// Puts a table of contents of the whole document before the
+    /// paragraph of the cursor (EST-22).
     pub fn insert_table_of_contents(&self) {
+        self.insert_table_of_contents_in(desk_model::TocScope::Document);
+    }
+
+    /// Puts a table of contents before the paragraph of the cursor that
+    /// lists what `scope` says (EST-22, W100). A document whose tables
+    /// list nothing yet lists its headings, by the styles whose names
+    /// start with "Heading".
+    pub fn insert_table_of_contents_in(&self, scope: desk_model::TocScope) {
         if self.story().is_some() {
             // Not in headers, footers and notes, as in Pages.
             return;
@@ -2186,7 +2196,7 @@ impl TextEditor {
                     edit.set_text_settings(settings)?;
                 }
                 edit.add_toc_entry_styles()?;
-                edit.insert_table_of_contents(start.paragraph)?;
+                edit.insert_table_of_contents(start.paragraph, scope)?;
                 Ok(Some(Spot::new(start.paragraph, 0)))
             })
         };
@@ -2197,6 +2207,18 @@ impl TextEditor {
     pub fn update_tables_of_contents(&self) {
         self.format_edit("Update Table of Contents", |edit| {
             edit.update_tables_of_contents()
+        });
+    }
+
+    /// Changes which paragraphs the table of contents at the cursor lists,
+    /// and updates it: the Range of the Format pane (W100).
+    pub fn set_toc_scope(&self, scope: desk_model::TocScope) {
+        if self.story().is_some() {
+            return;
+        }
+        let (start, _) = self.selection().ordered();
+        self.format_edit("Table of Contents Range", move |edit| {
+            edit.set_toc_scope(start.paragraph, scope)
         });
     }
 
@@ -2926,6 +2948,12 @@ impl TextEditor {
                 .into_iter()
                 .map(|(name, _, _)| name)
                 .collect(),
+            toc_scope: object_text
+                .is_none()
+                .then(|| body_paragraph.attrs().toc_entry.flatten())
+                .flatten()
+                .filter(|_| state.story.is_none())
+                .map(|e| e.scope),
             object: self.object_info(),
             object_text: self.selected_objects_have_text(),
         }

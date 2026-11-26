@@ -562,9 +562,10 @@ fn write_section_style(w: &mut Writer, style: &SectionStyle) {
 }
 
 /// Opens a table of contents, with what it lists.
-fn start_toc(w: &mut Writer, number: usize, levels: &[TocLevel]) {
+fn start_toc(w: &mut Writer, number: usize, levels: &[TocLevel], scope: Option<&str>) {
     w.start("text:table-of-content")
-        .attr("text:name", &format!("Table of Contents{number}"));
+        .attr("text:name", &format!("Table of Contents{number}"))
+        .attr_opt("desk:toc-scope", scope);
     w.start("text:table-of-content-source")
         .attr("text:outline-level", &levels.len().clamp(1, 10).to_string())
         .attr("text:use-outline-level", "false")
@@ -647,7 +648,7 @@ fn write_body(w: &mut Writer, body: &[Paragraph], toc_levels: &[TocLevel], names
             close_to(w, &mut open, 0);
             if !in_toc {
                 names.tocs += 1;
-                start_toc(w, names.tocs, toc_levels);
+                start_toc(w, names.tocs, toc_levels, paragraph.toc_scope.as_deref());
                 in_toc = true;
             }
             write_paragraph(w, paragraph);

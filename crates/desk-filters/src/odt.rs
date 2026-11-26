@@ -25,7 +25,7 @@ use desk_model::{
 use desk_model::{
     FIELD_CHARACTER, Field, Layout, MarginField, MarginKind, MarginPages, MarginPlace, NodeId,
     Note, NoteFormat, NoteKind, NoteNumbering, NoteSettings, Section, Start, TocEntry, TocLevel,
-    TocSettings,
+    TocScope, TocSettings,
 };
 use desk_odf as odf;
 
@@ -1747,7 +1747,10 @@ fn import_text(source: &odf::TextDocument) -> Result<Document, FilterError> {
                     Some(Some(Field::PageOf { paragraph })) => Some(*paragraph),
                     _ => None,
                 });
-                attrs.toc_entry = Some(Some(TocEntry { target }));
+                attrs.toc_entry = Some(Some(TocEntry {
+                    target,
+                    scope: toc_scope(paragraph.toc_scope.as_deref()),
+                }));
             }
             built = Paragraph::from_runs(
                 body_ids[index],
@@ -2555,7 +2558,10 @@ fn import_tracked(
                     Some(Some(Field::PageOf { paragraph })) => Some(*paragraph),
                     _ => None,
                 });
-                attrs.toc_entry = Some(Some(TocEntry { target }));
+                attrs.toc_entry = Some(Some(TocEntry {
+                    target,
+                    scope: toc_scope(paragraph.toc_scope.as_deref()),
+                }));
             }
             if let Some(name) = paragraph.section.as_deref() {
                 // The number its pages start at, from its own style, as in
@@ -4422,6 +4428,15 @@ pub fn export(document: &Document) -> odf::TextDocument {
                 .into_iter()
                 .collect(),
             toc: paragraph.attrs().toc_entry.flatten().is_some(),
+            toc_scope: paragraph
+                .attrs()
+                .toc_entry
+                .flatten()
+                .and_then(|e| match e.scope {
+                    TocScope::Document => None,
+                    TocScope::Section => Some("section".into()),
+                    TocScope::NextTable => Some("next".into()),
+                }),
             spans,
             frames: Vec::new(),
         });
@@ -4797,4 +4812,15 @@ fn author_color(line: &str) -> Option<(String, desk_model::AuthorColor)> {
     let author = value.get("author")?.as_str()?;
     let color = desk_model::AuthorColor::from_key(value.get("color")?.as_str()?)?;
     (!author.is_empty()).then(|| (author.to_owned(), color))
+}
+
+/// Which paragraphs a table of contents lists, from its `desk:toc-scope`
+/// (W100): those of the whole document when it has none, as other apps
+/// list them.
+fn toc_scope(scope: Option<&str>) -> TocScope {
+    match scope {
+        Some("section") => TocScope::Section,
+        Some("next") => TocScope::NextTable,
+        _ => TocScope::Document,
+    }
 }

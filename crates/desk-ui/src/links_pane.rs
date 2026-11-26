@@ -16,11 +16,11 @@ use std::rc::Rc;
 use std::sync::Arc;
 
 use adw::prelude::*;
-use desk_model::{StyleId, TocLevel, TocSettings};
+use desk_model::{StyleId, TocLevel, TocScope, TocSettings};
 
 use crate::editing::Format;
 use crate::formatting::{EditorOf, labelled};
-use crate::i18n::tr;
+use crate::i18n::{n_, tr};
 use crate::links::Target;
 
 /// An icon button for the end of a row.
@@ -368,9 +368,19 @@ impl LinksGroup {
     }
 }
 
+/// The ranges of a table of contents, as Insert > Table of Contents and
+/// the Range of the Format pane name them in Pages 15.4 (W100).
+pub const TOC_SCOPES: [(TocScope, &str); 3] = [
+    (TocScope::Document, n_("Document")),
+    (TocScope::Section, n_("Section")),
+    (TocScope::NextTable, n_("To Next Occurrence")),
+];
+
 /// The Table of Contents group of the Inspector.
 pub struct TocGroup {
     group: compact::Group,
+    /// Which paragraphs the table at the cursor lists (W100).
+    range: compact::ComboRow,
     page_links: compact::SwitchRow,
     styles: compact::ExpanderRow,
     /// For each paragraph style, whether it is listed, and whether its
@@ -391,6 +401,14 @@ impl TocGroup {
         let styles = compact::ExpanderRow::builder()
             .title(tr("Styles to Include"))
             .build();
+        let range = compact::ComboRow::builder()
+            .title(tr("Range"))
+            .subtitle(tr("The paragraphs that the table at the cursor lists"))
+            .model(&crate::tab_stops::string_list(
+                TOC_SCOPES.iter().map(|(_, name)| tr(name)),
+            ))
+            .visible(false)
+            .build();
         let update = gtk::Button::builder()
             .label(tr("Update Now"))
             .valign(gtk::Align::Center)
@@ -402,10 +420,12 @@ impl TocGroup {
             ))
             .header_suffix(&update)
             .build();
+        group.add(&range);
         group.add(&styles);
         group.add(&page_links);
         let this = Rc::new(Self {
             group,
+            range,
             page_links,
             styles,
             rows: RefCell::new(Vec::new()),
@@ -419,6 +439,16 @@ impl TocGroup {
                 && let Some(editor) = (this.editor)()
             {
                 editor.update_tables_of_contents();
+            }
+        });
+        let weak = Rc::downgrade(&this);
+        this.range.connect_selected_notify(move |row| {
+            if let Some(this) = weak.upgrade()
+                && !this.updating.get()
+                && let Some((scope, _)) = TOC_SCOPES.get(row.selected() as usize)
+                && let Some(editor) = (this.editor)()
+            {
+                editor.set_toc_scope(*scope);
             }
         });
         let weak = Rc::downgrade(&this);
@@ -444,6 +474,13 @@ impl TocGroup {
             .unwrap_or_default();
         let toc = format.text_settings.toc.clone();
         self.updating.set(true);
+        self.range.set_visible(format.toc_scope.is_some());
+        if let Some(scope) = format.toc_scope
+            && let Some(at) = TOC_SCOPES.iter().position(|(s, _)| *s == scope)
+            && self.range.selected() != at as u32
+        {
+            self.range.set_selected(at as u32);
+        }
         if self.shown.borrow().1 != styles {
             for (_, row, _) in self.rows.borrow_mut().drain(..) {
                 self.styles.remove(&row);

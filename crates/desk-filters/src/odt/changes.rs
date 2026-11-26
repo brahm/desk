@@ -686,6 +686,7 @@ fn taken(paragraph: &odf::Paragraph) -> odf::Paragraph {
         list: paragraph.list.clone(),
         section: paragraph.section.clone(),
         toc: paragraph.toc,
+        toc_scope: paragraph.toc_scope.clone(),
         marks: paragraph.marks.clone(),
         ..odf::Paragraph::default()
     }

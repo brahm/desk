@@ -154,7 +154,7 @@ mod tests {
                     page_links: false,
                 };
                 edit.set_text_settings(settings)?;
-                edit.insert_table_of_contents(0)
+                edit.insert_table_of_contents(0, desk_model::TocScope::Document)
             })
             .unwrap();
         editor

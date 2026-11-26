@@ -1660,7 +1660,7 @@ fn est_22_to_est_26_tables_of_contents_links_and_bookmarks_are_kept() {
             };
             settings.links_inactive = true;
             edit.set_text_settings(settings)?;
-            edit.insert_table_of_contents(0)
+            edit.insert_table_of_contents(0, desk_model::TocScope::Document)
         })
         .unwrap();
     let document = editor.document();
@@ -4568,4 +4568,59 @@ fn est_20_captured_pages_keep_their_headers_and_the_styles_they_lose() {
     let body = editor.document().styles().default_paragraph();
     let captured = &editor.document().captured_pages()[0];
     assert!(captured.pages.first_paragraphs().all(|p| p.style() == body));
+}
+
+#[test]
+fn w100_the_range_of_each_table_of_contents_is_kept() {
+    use desk_model::{Editor, Position, TocLevel, TocScope, TocSettings};
+    let mut editor = Editor::new(Document::new_word_processing());
+    let start = editor.document().start();
+    editor
+        .edit("Setup", |edit| {
+            let at = edit.insert_text(start, "One")?;
+            let at = edit.split_paragraph(at)?;
+            edit.insert_text(at, "Two")?;
+            let heading = edit.new_paragraph_style("Heading", start, start, false)?;
+            edit.set_paragraph_style(
+                Position::new(at.paragraph, 0),
+                Position::new(at.paragraph, 0),
+                heading,
+            )?;
+            let mut settings = edit.document().text_settings().clone();
+            settings.toc = TocSettings {
+                levels: vec![TocLevel {
+                    style: heading,
+                    entry: edit.document().styles().default_paragraph(),
+                    page_number: false,
+                }],
+                page_links: false,
+            };
+            edit.set_text_settings(settings)?;
+            edit.insert_table_of_contents(1, TocScope::NextTable)?;
+            edit.insert_table_of_contents(0, TocScope::Section)
+        })
+        .unwrap();
+    let scopes = |document: &Document| -> Vec<TocScope> {
+        document
+            .body()
+            .iter()
+            .filter_map(|p| p.attrs().toc_entry.flatten().map(|e| e.scope))
+            .collect()
+    };
+    // Each range in its own table, through `desk:toc-scope`.
+    let before = scopes(editor.document());
+    assert!(before.contains(&TocScope::Section) && before.contains(&TocScope::NextTable));
+    let bytes = write_odt(editor.document()).unwrap();
+    keep("filters-toc-range.odt", &bytes);
+    let read = read_odt(&bytes).unwrap();
+    assert_eq!(scopes(&read), before);
+
+    // A table of another app lists the whole document.
+    let mut text = odf::read_odt(&bytes).unwrap();
+    for paragraph in &mut text.body {
+        paragraph.toc_scope = None;
+    }
+    let other = odf::write_odt(&text).unwrap();
+    let read = read_odt(&other).unwrap();
+    assert!(scopes(&read).iter().all(|&s| s == TocScope::Document));
 }

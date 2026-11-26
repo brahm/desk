@@ -1187,7 +1187,10 @@ fn b_068_a_paragraph_joined_by_a_deletion_keeps_its_structure_in_odt() {
                 edit,
                 ids[2],
                 &ParaAttrs {
-                    toc_entry: Some(Some(TocEntry { target: None })),
+                    toc_entry: Some(Some(TocEntry {
+                        target: None,
+                        scope: Default::default(),
+                    })),
                     ..ParaAttrs::default()
                 },
             )?;

@@ -1278,7 +1278,11 @@ impl<'a> Importer<'a> {
                     Some(Some(Field::PageOf { paragraph })) => Some(*paragraph),
                     _ => None,
                 });
-                attrs.toc_entry = Some(Some(desk_model::TocEntry { target }));
+                // Each table of Pages '09 lists up to the next one (EST-22).
+                attrs.toc_entry = Some(Some(desk_model::TocEntry {
+                    target,
+                    scope: desk_model::TocScope::NextTable,
+                }));
             }
             let id = match next_id {
                 Some(id) if i == 0 => id,

@@ -412,7 +412,16 @@ pub(super) fn insert_menu(objects: bool) -> gio::Menu {
     comments.append(Some(&tr("Previous Comment")), Some("win.previous-comment"));
     menu.append_section(None, &comments);
     let structure = gio::Menu::new();
-    structure.append(Some(&tr("_Table of Contents")), Some("win.insert-toc"));
+    // What the table lists, as in Pages 15.4 (W100).
+    let tocs = gio::Menu::new();
+    for (scope, name) in [
+        ("document", tr("_Document")),
+        ("section", tr("_Section")),
+        ("next", tr("To _Next Occurrence")),
+    ] {
+        tocs.append(Some(&name), Some(&format!("win.insert-toc-in::{scope}")));
+    }
+    structure.append_submenu(Some(&tr("_Table of Contents")), &tocs);
     structure.append(
         Some(&tr("Update Table of C_ontents")),
         Some("win.update-toc"),
