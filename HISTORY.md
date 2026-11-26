@@ -8,6 +8,11 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
 
 ## Changes since 0.7.0 (unreleased)
 
+* Added: Equations are drawn on the page and in PDF, from their MathML,
+  and LaTeX turns into MathML: fractions, roots, scripts, sums and
+  integrals with their limits, fences, accents, matrices and cases.
+  (#PR)
+
 * Added: Equations are kept in documents as MathML, the formula objects
   that LibreOffice Math reads and writes, with the LaTeX they were
   written in. (#250)

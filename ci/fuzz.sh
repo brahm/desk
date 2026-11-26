@@ -37,6 +37,7 @@ dict_of() {
         html_*) echo html.dict ;;
         formula_*) echo formula.dict ;;
         picture) echo picture.dict ;;
+        equation) echo equation.dict ;;
         *) echo odf.dict ;;
     esac
 }

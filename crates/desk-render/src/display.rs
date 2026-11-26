@@ -964,6 +964,18 @@ fn object_item(placed: &PlacedObject) -> Item {
                 list.items.extend(chart_items(laid, x, y));
             }
         }
+        ObjectKind::Equation(_) => {
+            if fill.is_some() || stroke.is_some() {
+                list.items.push(Item::Path {
+                    path: shape_path(&Shape::Rectangle, x, y, w, h),
+                    fill: fill.clone(),
+                    stroke: stroke.clone(),
+                });
+            }
+            if let Some(laid) = &placed.equation {
+                list.items.extend(equation_items(laid, x, y, w, h));
+            }
+        }
         ObjectKind::Media(media) => {
             match &media.poster {
                 Some(poster) if !media.is_sound() => list.items.push(Item::Image {
@@ -1647,6 +1659,46 @@ fn chart_paint(paint: &desk_model::chart::Paint, bounds: (f32, f32, f32, f32)) -
 }
 
 /// What a chart draws, at a place on the page (GRF-01).
+/// What an equation draws, scaled into its frame at a place on the page
+/// (W104).
+fn equation_items(laid: &desk_layout::EquationLayout, x: f32, y: f32, w: f32, h: f32) -> Vec<Item> {
+    let (scale, dx, dy) = laid.fit(w, h);
+    let mut items = Vec::new();
+    let mut labels = laid.labels.iter();
+    for mark in &laid.drawing.marks {
+        match mark {
+            desk_math::Mark::Text { .. } => {
+                let Some(label) = labels.next() else { continue };
+                let mut list = DisplayList::default();
+                list.lines(moved_lines(&label.lines, label.at.0, label.at.1).iter());
+                items.extend(list.items);
+            }
+            desk_math::Mark::Rule {
+                x,
+                y,
+                width,
+                height,
+            } => items.push(Item::Path {
+                path: shape_path(&Shape::Rectangle, *x, *y, *width, *height),
+                fill: Some(Paint::Color(Rgba::BLACK)),
+                stroke: None,
+            }),
+            desk_math::Mark::Stroke { points, width } => items.push(Item::Stroke {
+                points: points.clone(),
+                closed: false,
+                width: *width,
+                color: Rgba::BLACK,
+                dashes: Vec::new(),
+            }),
+        }
+    }
+    vec![Item::Group {
+        transform: [scale, 0.0, 0.0, scale, x + dx, y + dy],
+        opacity: 1.0,
+        items,
+    }]
+}
+
 fn chart_items(laid: &desk_layout::ChartLayout, x: f32, y: f32) -> Vec<Item> {
     use desk_model::chart::{Mark, PathOp as ChartOp};
     let mut items = Vec::new();

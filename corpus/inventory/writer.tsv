@@ -104,7 +104,7 @@ W100	3.7 Document structure	Inserted table of contents	Different	15.4	D-001	In	D
 W101	3.7 Document structure	Bookmarks	Different	15.4	D-001	In	Done	-	W3	Bookmarks (EST-26) in their own tab, and links suggest the paragraphs of the styles chosen in it
 W102	3.7 Document structure	Links	Different	15.4, plus what the '09 did	D-001, D-003	In	Done	-	W3	Links to web pages, emails, phone numbers, documents and bookmarks (EST-25), on text and on objects; links to a page of a page layout document are in W5 (B-079)
 W103	3.7 Document structure	Bibliography 🧩 (in both)	Equal	Equal in both	-	Out: AI, online or paid (D-004)	Out of scope	-	-	Bibliography requires EndNote, a paid program
-W104	3.7 Document structure	Equations 🧩 (in '09)	Different	15.4	D-001	In	Partial	-	W3	LaTeX/MathML equations in the model and ODF, as the MathML objects of LibreOffice Math with the LaTeX beside it (PXV-22); drawing them and the editor are missing
+W104	3.7 Document structure	Equations 🧩 (in '09)	Different	15.4	D-001	In	Partial	-	W3	LaTeX/MathML equations in the model and ODF, as the MathML objects of LibreOffice Math with the LaTeX beside it, and drawn from their MathML (PXV-22); the editor in the window is missing
 W105	3.7 Document structure	Mail merge	Different	15.4	D-001	In	Missing	-	W3	Mail merge with preview (MAL-01 to MAL-09, phase 9)
 W106	3.8 Objects: images, shapes, media	Floating and inline objects	Different	15.4	D-001	In	Partial	-	W4	Floating and inline (OBJ-01); nesting objects inside boxes and shapes is missing
 W107	3.8 Objects: images, shapes, media	Text wrap	Different	15.4, plus what the '09 did	D-001, D-003	In	Done	the target changed	W4	Wrap with a choice of side (OBJ-17)

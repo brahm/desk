@@ -71,6 +71,7 @@ desk-filters = { path = "crates/desk-filters" }
 desk-formula = { path = "crates/desk-formula" }
 desk-iwork = { path = "crates/desk-iwork" }
 desk-lang = { path = "crates/desk-lang" }
+desk-math = { path = "crates/desk-math" }
 desk-layout = { path = "crates/desk-layout" }
 desk-model = { path = "crates/desk-model" }
 desk-odf = { path = "crates/desk-odf" }

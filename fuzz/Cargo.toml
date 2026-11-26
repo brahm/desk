@@ -19,6 +19,7 @@ desk-odf = { path = "../crates/desk-odf" }
 desk-model = { path = "../crates/desk-model" }
 desk-formula = { path = "../crates/desk-formula" }
 desk-table = { path = "../crates/desk-table" }
+desk-math = { path = "../crates/desk-math" }
 
 # Not part of the main workspace.
 [workspace]
@@ -71,6 +72,13 @@ bench = false
 [[bin]]
 name = "picture"
 path = "fuzz_targets/picture.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "equation"
+path = "fuzz_targets/equation.rs"
 test = false
 doc = false
 bench = false

@@ -231,14 +231,14 @@ fn lines_height(lines: &[PlacedLine]) -> f32 {
     lines.iter().map(PlacedLine::bottom).fold(0.0, f32::max)
 }
 
-fn lines_width(lines: &[PlacedLine]) -> f32 {
+pub(crate) fn lines_width(lines: &[PlacedLine]) -> f32 {
     lines
         .iter()
         .map(|l| l.line.x + l.line.advance)
         .fold(0.0, f32::max)
 }
 
-fn shift(lines: &mut [PlacedLine], dx: f32, dy: f32) {
+pub(crate) fn shift(lines: &mut [PlacedLine], dx: f32, dy: f32) {
     for l in lines {
         l.origin.0 += dx;
         l.origin.1 += dy;

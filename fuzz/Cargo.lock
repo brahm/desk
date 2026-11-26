@@ -146,6 +146,7 @@ version = "0.0.0"
 dependencies = [
  "desk-filters",
  "desk-formula",
+ "desk-math",
  "desk-model",
  "desk-odf",
  "desk-table",
@@ -160,6 +161,10 @@ dependencies = [
  "quick-xml",
  "zip",
 ]
+
+[[package]]
+name = "desk-math"
+version = "0.1.0"
 
 [[package]]
 name = "desk-model"

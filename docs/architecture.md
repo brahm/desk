@@ -84,6 +84,7 @@ flowchart TB
         text[desk-text<br>shaping, line breaking]
         model[desk-model<br>document, edits, undo]
         chart[desk-chart]
+        math[desk-math]
         table[desk-table]
         anim[desk-anim]
         lang[desk-lang<br>spelling, hyphenation]
@@ -102,6 +103,7 @@ flowchart TB
     convert --> filters & render & layout
     testkit --> filters & render & layout
     render --> layout --> text --> model
+    render & layout --> math
     text --> lang
     model --> chart & table
     chart --> table --> formula
