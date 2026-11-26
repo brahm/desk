@@ -1232,6 +1232,7 @@ impl DocumentWindow {
                 this.schedule_autosave();
                 this.refresh();
                 this.search_sidebar.document_changed();
+                this.find.document_changed();
                 this.thumbnails.refresh();
                 this.contents.refresh();
                 this.comments.refresh();

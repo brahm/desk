@@ -391,6 +391,7 @@ impl FindWindow {
             check.connect_toggled(move |_| {
                 if let Some(this) = weak.upgrade() {
                     this.store();
+                    this.count();
                 }
             });
         }
@@ -399,6 +400,7 @@ impl FindWindow {
             entry.connect_changed(move |_| {
                 if let Some(this) = weak.upgrade() {
                     this.store();
+                    this.count();
                 }
             });
         }
@@ -466,7 +468,14 @@ impl FindWindow {
         }
         *self.search.query.borrow_mut() = self.query();
         *self.search.replacement.borrow_mut() = from_field(&self.replace.text());
-        self.count();
+    }
+
+    /// Counts the matches again, as the document changed, while the bar
+    /// shows: a replacement, an edit or Undo changes how many there are.
+    pub fn document_changed(&self) {
+        if self.window.is_search_mode() {
+            self.count();
+        }
     }
 
     /// Shows how many matches the document has at the end of the field,
@@ -554,13 +563,15 @@ pub fn found_label(count: usize) -> String {
     if count == 0 {
         tr("Not Found")
     } else {
-        trn("{n} found", "{n} found", count as u64).replace("{n}", &count.to_string())
+        trn("{n} found", "{n} found", count as u64)
+            .replace("{n}", &crate::document_controls::grouped(count))
     }
 }
 
 /// How many matches Replace All replaced, as Pages 15.4 says it.
 pub fn replaced_label(count: usize) -> String {
-    trn("{n} replaced", "{n} replaced", count as u64).replace("{n}", &count.to_string())
+    trn("{n} replaced", "{n} replaced", count as u64)
+        .replace("{n}", &crate::document_controls::grouped(count))
 }
 
 /// The Search sidebar (TXT-13).
@@ -856,6 +867,7 @@ mod tests {
         assert_eq!(found_label(1), "1 found");
         assert_eq!(found_label(11), "11 found");
         assert_eq!(replaced_label(10), "10 replaced");
+        assert_eq!(found_label(12345), "12,345 found");
     }
 
     #[test]
