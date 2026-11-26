@@ -375,6 +375,9 @@ pub struct PagedFlow {
     /// What fills the pages of each section that has a background, by
     /// the paragraph that starts it, or none for the first (W098).
     pub backgrounds: imbl::OrdMap<Option<NodeId>, crate::object::Fill>,
+    /// The pages captured to insert again, in the order they were first
+    /// captured (EST-20).
+    pub captures: imbl::Vector<crate::CapturedPages>,
     /// The footnotes or endnotes (EST-13).
     pub notes: Notes,
     /// The comments on the text (W149).
@@ -503,6 +506,7 @@ impl Document {
                 margins: HeadersFooters::default(),
                 section_margins: imbl::OrdMap::new(),
                 backgrounds: imbl::OrdMap::new(),
+                captures: imbl::Vector::new(),
                 notes: Notes::default(),
                 comments: Comments::default(),
                 changes: crate::Changes::default(),
@@ -675,6 +679,13 @@ impl Document {
     pub fn section_background(&self, section: Option<NodeId>) -> Option<&crate::object::Fill> {
         let Container::Pages(flow) = &self.container;
         flow.backgrounds.get(&section)
+    }
+
+    /// The pages captured to insert again, in the order they were first
+    /// captured (EST-20).
+    pub fn captured_pages(&self) -> &imbl::Vector<crate::CapturedPages> {
+        let Container::Pages(flow) = &self.container;
+        &flow.captures
     }
 
     /// Every section that has a background, the first one as none, with
@@ -1291,6 +1302,11 @@ impl Document {
                     place,
                     paragraphs: old,
                 })
+            }
+            Op::SetCapturedPages { captures } => {
+                let Container::Pages(flow) = &mut self.container;
+                let old = std::mem::replace(&mut flow.captures, captures);
+                Ok(Op::SetCapturedPages { captures: old })
             }
             Op::SetSectionBackground { section, fill } => {
                 if let Some(id) = section

@@ -90,7 +90,7 @@ mod transaction;
 mod units;
 pub mod workbook;
 
-pub use arrange::SectionsClip;
+pub use arrange::{CapturedPages, SectionsClip};
 pub use author::{AuthorColor, AuthorPalette};
 pub use auto_numbers::{AutoPageNumbers, NumberAlignment};
 pub use autocorrect::{

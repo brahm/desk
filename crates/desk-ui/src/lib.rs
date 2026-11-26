@@ -18,6 +18,7 @@ mod access;
 mod area;
 mod auto_numbers;
 mod bullet_pictures;
+mod captured_pages;
 mod change_bubble;
 mod chart_data;
 mod chart_pane;

@@ -879,6 +879,59 @@ impl Edit {
         Ok(())
     }
 
+    /// Captures sections by index under a name, to insert them again
+    /// (EST-20): pages of that name already captured give way to them,
+    /// where they were.
+    pub fn capture_pages(&mut self, name: &str, sections: &[usize]) -> Result<(), ModelError> {
+        let pages = self.doc.copy_sections(sections);
+        if pages.is_empty() {
+            return Ok(());
+        }
+        let mut captures = self.doc.captured_pages().clone();
+        let captured = crate::CapturedPages {
+            name: name.into(),
+            pages,
+        };
+        match captures.iter().position(|c| &*c.name == name) {
+            Some(at) => {
+                captures.set(at, captured);
+            }
+            None => captures.push_back(captured),
+        }
+        self.apply(Op::SetCapturedPages { captures })
+    }
+
+    /// Takes out the pages captured under a name (EST-20).
+    pub fn remove_captured_pages(&mut self, name: &str) -> Result<(), ModelError> {
+        let mut captures = self.doc.captured_pages().clone();
+        let before = captures.len();
+        captures.retain(|c| &*c.name != name);
+        if captures.len() != before {
+            self.apply(Op::SetCapturedPages { captures })?;
+        }
+        Ok(())
+    }
+
+    /// Inserts the pages captured under a name before section `before`,
+    /// or after the last when it is their count, and gives the indices of
+    /// their sections (EST-20).
+    pub fn insert_captured_pages(
+        &mut self,
+        name: &str,
+        before: usize,
+    ) -> Result<std::ops::Range<usize>, ModelError> {
+        let Some(captured) = self
+            .doc
+            .captured_pages()
+            .iter()
+            .find(|c| &*c.name == name)
+            .cloned()
+        else {
+            return Ok(before..before);
+        };
+        self.paste_sections(before, &captured.pages)
+    }
+
     /// Sets or removes the background of the pages of a section, by the
     /// paragraph that starts it, or of the first section with none
     /// (W098).

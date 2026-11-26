@@ -303,3 +303,66 @@ impl TextEditor {
         }
     }
 }
+
+impl TextEditor {
+    /// The index of the section of the body that the cursor is in.
+    fn section_at_cursor(&self) -> usize {
+        let state = self.state.borrow();
+        let document = Self::main_document(&state);
+        let paragraph = if state.story.is_some() {
+            0
+        } else {
+            state.selection.ordered().0.paragraph
+        };
+        document
+            .section_ranges()
+            .iter()
+            .position(|r| r.contains(&paragraph))
+            .unwrap_or(0)
+    }
+
+    /// The names of the pages captured to insert again, in order (EST-20).
+    pub fn captured_page_names(&self) -> Vec<String> {
+        Self::main_document(&self.state.borrow())
+            .captured_pages()
+            .iter()
+            .map(|c| c.name.to_string())
+            .collect()
+    }
+
+    /// Captures the section at the cursor under a name, to insert it
+    /// again: Capture Pages of Pages '09 (EST-20). Pages of that name
+    /// already captured give way to it.
+    pub fn capture_pages(&self, name: &str) {
+        let name = name.trim();
+        if name.is_empty() || self.is_page_layout() {
+            return;
+        }
+        let section = self.section_at_cursor();
+        let name = name.to_owned();
+        self.format_edit("Capture Pages", move |edit| {
+            edit.capture_pages(&name, &[section])
+        });
+    }
+
+    /// Inserts the pages captured under a name after the section at the
+    /// cursor, and puts the cursor at their start (EST-20).
+    pub fn insert_captured_pages(&self, name: &str) {
+        if self.is_page_layout() {
+            return;
+        }
+        let before = self.section_at_cursor() + 1;
+        let name = name.to_owned();
+        self.section_edit("Insert Pages", move |edit| {
+            Ok(edit.insert_captured_pages(&name, before)?.start)
+        });
+    }
+
+    /// Takes out the pages captured under a name (EST-20).
+    pub fn remove_captured_pages(&self, name: &str) {
+        let name = name.to_owned();
+        self.format_edit("Delete Captured Pages", move |edit| {
+            edit.remove_captured_pages(&name)
+        });
+    }
+}

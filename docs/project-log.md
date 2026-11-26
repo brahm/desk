@@ -2805,6 +2805,21 @@ paragraph, and objects on a second page.
 - *Left for the next pull request of the step:* the captured pages of
   Pages '09 (EST-20).
 
+### 26 November: captured pages (step 5 of W3, second part)
+
+- *Kept from Pages '09 (D-003):* Capture Pages, which Pages 15.4
+  replaced with page templates. Insert > Break > Captured Pages, also in
+  the Add Page menu of the thumbnails, captures the section at the
+  cursor under a name; the same dialog lists the pages captured, to
+  insert them after the section at the cursor or delete them. They are
+  part of the document and of its undo history.
+- *ODF:* each capture is a text document of its own in the package, at
+  `Desk/Captures/n.odt`, titled with its name and holding the styles of
+  the document; on reading, its styles are those of the document by
+  name. Other programs leave them out.
+- *Not done:* captures in page layout documents, whose pages come with
+  page templates (W095).
+
 ## Decisions, with their reasons and consequences
 
 Ids `D-nnn` and `R-nnn` are those of [decisions.md](decisions.md).

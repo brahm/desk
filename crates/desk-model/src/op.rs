@@ -97,6 +97,11 @@ pub enum Op {
         /// Its paragraphs; none to empty it.
         paragraphs: Vec<Paragraph>,
     },
+    /// Sets the pages captured to insert again (EST-20).
+    SetCapturedPages {
+        /// All of them, in order.
+        captures: imbl::Vector<crate::CapturedPages>,
+    },
     /// Sets or removes the background of the pages of a section (W098).
     SetSectionBackground {
         /// The section, by the paragraph that starts it; none for the

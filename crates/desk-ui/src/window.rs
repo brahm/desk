@@ -247,7 +247,7 @@ thread_local! {
 }
 
 /// The actions that need a document.
-const DOCUMENT_ACTIONS: [&str; 94] = [
+const DOCUMENT_ACTIONS: [&str; 95] = [
     "outline",
     "screen-view",
     "text-size",
@@ -295,6 +295,7 @@ const DOCUMENT_ACTIONS: [&str; 94] = [
     "insert-column-break",
     "insert-layout-break",
     "insert-section-break",
+    "captured-pages",
     "insert-page-number",
     "insert-auto-page-numbers",
     "columns",
@@ -3539,6 +3540,18 @@ impl DocumentWindow {
         });
         self.actions.add_action(&auto);
 
+        // Captured pages of Pages '09 (EST-20).
+        let captured = gio::SimpleAction::new("captured-pages", None);
+        let weak = Rc::downgrade(self);
+        captured.connect_activate(move |_, _| {
+            if let Some(this) = weak.upgrade()
+                && let Some(editor) = this.editor()
+            {
+                crate::captured_pages::present(&this.window(), &editor);
+            }
+        });
+        self.actions.add_action(&captured);
+
         let linked = gio::SimpleAction::new("open-linked", Some(glib::VariantTy::STRING));
         let weak = Rc::downgrade(self);
         linked.connect_activate(move |_, link| {
@@ -4744,6 +4757,7 @@ fn add_page_menu() -> gio::Menu {
         Some(&tr("_Section Break")),
         Some("win.insert-section-break"),
     );
+    menu.append(Some(&tr("_Captured Pages…")), Some("win.captured-pages"));
     menu
 }
 

@@ -339,6 +339,13 @@ impl HeadersFooters {
         self.texts.iter().all(|t| t.iter().all(|p| p.is_empty()))
     }
 
+    /// The same headers and footers with each paragraph as `f` makes it.
+    pub(crate) fn map_paragraphs(&self, f: &dyn Fn(&Paragraph) -> Paragraph) -> Self {
+        Self {
+            texts: std::array::from_fn(|i| self.texts[i].iter().map(f).collect()),
+        }
+    }
+
     /// Every paragraph of every header and footer.
     pub fn paragraphs(&self) -> impl Iterator<Item = &Paragraph> {
         self.texts.iter().flat_map(|t| t.iter())
