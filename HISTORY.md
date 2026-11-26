@@ -11,10 +11,10 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
 * Added: The plan of phase W3 of Desk Writer, which brings page
   templates, the background and border of pages, tables of contents
   per section, bookmarks and links of Pages 15.4, equations and mail
-  merge (#PR).
+  merge (#239).
 * Changed: Writer review (W2) is done, checked on the Mac with Pages
   15.4; Writer structure and templates (W3) is the phase in progress
-  (#PR).
+  (#239).
 * Changed: in Desk Writer, the bar of comments and changes, Undo, the
   count of Find & Replace and the word count of a selection say what
   Pages 15.4 says, as the validation of W2 on the Mac found (#238).
