@@ -133,6 +133,49 @@ fn fill(object: &mut Object, content: Content) {
     }
 }
 
+/// The text of an object as it shows with its tracked changes accepted,
+/// and out of them, as a template holds no changes: the text deleted
+/// goes, and the rest stays as it is; paragraphs stay apart.
+fn shown_text(document: &Document, object: &mut Object) -> Result<(), ModelError> {
+    let deleted = |id: Option<NodeId>| {
+        id.and_then(|id| document.changes().get(id))
+            .is_some_and(|c| c.kind == crate::ChangeKind::Deletion)
+    };
+    if let Some(text) = object.text_box_mut() {
+        let paragraphs = text
+            .paragraphs
+            .iter()
+            .map(|p| {
+                let mut attrs = p.attrs().clone();
+                attrs.break_change = None;
+                attrs.break_former = None;
+                attrs.format_change = None;
+                attrs.formatted = None;
+                let runs = p
+                    .runs()
+                    .filter(|r| !deleted(r.attrs.change.flatten()))
+                    .map(|r| {
+                        let mut run = r.clone();
+                        run.attrs.change = None;
+                        run.attrs.formatted = None;
+                        run.attrs.former = None;
+                        run
+                    });
+                crate::Paragraph::from_runs(p.id(), p.style(), attrs, runs)
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        text.paragraphs = paragraphs.into();
+    }
+    if let ObjectKind::Group(members) = &object.kind {
+        let mut members = members.to_vec();
+        for member in &mut members {
+            shown_text(document, member)?;
+        }
+        object.kind = ObjectKind::Group(members.into());
+    }
+    Ok(())
+}
+
 impl Edit {
     /// Sets the page templates and the template of each page.
     pub fn set_page_templates(&mut self, templates: PageTemplates) -> Result<(), ModelError> {
@@ -183,6 +226,7 @@ impl Edit {
             // New ids for it, its paragraphs and the objects of a group,
             // out of its comments and tracked changes.
             let mut object = self.renumbered_object(source)?;
+            shown_text(self.document(), &mut object)?;
             if let Some(id) = source.template_object.filter(|id| old.contains(id))
                 && !objects.iter().any(|o: &Object| o.id == id)
             {
@@ -234,8 +278,9 @@ impl Edit {
         self.set_page_templates(templates)
     }
 
-    /// Takes a page template away; its pages keep their objects and have
-    /// no template.
+    /// Takes a page template away; its pages keep their objects, which
+    /// copy no object of a template any more but stay placeholders, and
+    /// have no template.
     pub fn remove_page_template(&mut self, name: &str) -> Result<(), ModelError> {
         let mut templates = self.document().page_templates().clone();
         let Some(removed) = templates.get(name).cloned() else {
@@ -276,7 +321,8 @@ impl Edit {
         }
         let after = after.min(count.saturating_sub(1));
         self.add_layout_page(after)?;
-        let page = after + 1;
+        // The page added: the first of a document that had none.
+        let page = if count == 0 { 0 } else { after + 1 };
         self.apply_page_template(page, name)?;
         Ok(page)
     }

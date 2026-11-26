@@ -998,13 +998,29 @@ impl Edit {
             }
         })?;
         self.set_page_setup(setup)?;
+        // The objects keep the template objects they copy only where
+        // their page has that template here: pages from another document
+        // name objects of its own (W095).
+        let templates = self.document().page_templates().clone();
         let objects: Vec<Object> = clip
             .pages
             .iter()
             .zip(before..)
-            .flat_map(|(objects, page)| {
+            .enumerate()
+            .flat_map(|(i, (objects, page))| {
+                let template = clip
+                    .templates
+                    .get(i)
+                    .cloned()
+                    .flatten()
+                    .and_then(|name| templates.get(&name).cloned());
                 objects.iter().map(move |o| Object {
                     anchor: Anchor::Page(page),
+                    template_object: o.template_object.filter(|id| {
+                        template
+                            .as_ref()
+                            .is_some_and(|t| t.objects.iter().any(|t| t.id == *id))
+                    }),
                     ..o.clone()
                 })
             })

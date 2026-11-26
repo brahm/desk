@@ -4770,3 +4770,51 @@ fn w095_page_templates_and_their_placeholders_are_kept_in_odt() {
             .all(|o| o.template_object.is_none())
     );
 }
+
+#[test]
+fn w095_the_connectors_of_a_template_stay_joined_in_odt() {
+    use desk_model::{Anchor, Connection, Frame, Object, ObjectKind, Shape};
+    let mut document = Document::new_page_layout();
+    let a = document.new_id();
+    let b = document.new_id();
+    let mut objects = Vec::new();
+    for (id, y) in [(a, 72.0), (b, 272.0)] {
+        let mut shape = Object::new(
+            id,
+            ObjectKind::Shape(Shape::Rectangle),
+            Frame::from_pt(72.0, y, 50.0, 50.0),
+        );
+        shape.anchor = Anchor::Page(0);
+        objects.push(shape);
+    }
+    let mut line = Object::new(
+        document.new_id(),
+        ObjectKind::Shape(Shape::Connection(Connection {
+            start: Some(a),
+            end: Some(b),
+            from: (5_000, 10_000),
+            to: (5_000, 0),
+            bend: desk_model::Length::ZERO,
+        })),
+        Frame::from_pt(72.0, 122.0, 50.0, 150.0),
+    );
+    line.anchor = Anchor::Page(0);
+    objects.push(line);
+    for (index, object) in objects.into_iter().enumerate() {
+        document.apply(Op::InsertObject { index, object }).unwrap();
+    }
+    let mut editor = desk_model::Editor::new(document);
+    editor
+        .edit("Template", |edit| {
+            edit.add_page_template_from_page(0, "Joined")
+        })
+        .unwrap();
+    let read = read_odt(&write_odt(editor.document()).unwrap()).unwrap();
+    let template = read.page_templates().get("Joined").unwrap();
+    let ids: Vec<_> = template.objects.iter().map(|o| o.id).collect();
+    let joined = template.objects.iter().find_map(|o| match &o.kind {
+        ObjectKind::Shape(Shape::Connection(c)) => Some((c.start, c.end)),
+        _ => None,
+    });
+    assert_eq!(joined, Some((Some(ids[0]), Some(ids[1]))));
+}

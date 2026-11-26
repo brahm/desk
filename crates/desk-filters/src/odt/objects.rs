@@ -1773,6 +1773,20 @@ pub(super) fn import_objects<'a>(
     Ok(moved)
 }
 
+/// Whether an object or an object in it has comments.
+fn has_annotations(object: &odf::DrawObject) -> bool {
+    !object.annotations.is_empty()
+        || matches!(&object.kind, odf::DrawKind::Group(members) if members.iter().any(has_annotations))
+}
+
+/// Takes the comments off an object and the objects in it.
+fn drop_annotations(object: &mut odf::DrawObject) {
+    object.annotations.clear();
+    if let odf::DrawKind::Group(members) = &mut object.kind {
+        members.iter_mut().for_each(drop_annotations);
+    }
+}
+
 /// Reads the page templates of a page layout document and the template
 /// of each page (W095, odf-extensions.md), giving back the objects of the
 /// templates by their `xml:id`, which the objects copied from them name.
@@ -1800,14 +1814,13 @@ fn import_page_templates<'a>(
             // A template has no comments: those of its objects would be
             // on no object of the document, and are left out.
             let without_comments;
-            let read = if object.annotations.is_empty() {
-                object
-            } else {
-                without_comments = odf::DrawObject {
-                    annotations: Vec::new(),
-                    ..object.clone()
-                };
+            let read = if has_annotations(object) {
+                let mut copy = object.clone();
+                drop_annotations(&mut copy);
+                without_comments = copy;
                 &without_comments
+            } else {
+                object
             };
             if let Some(mut built) = import_one(source, document, read, None, setup, paragraph, 0)?
             {
@@ -1854,7 +1867,10 @@ fn import_page_templates<'a>(
             }
         }
         for &page in &template.pages {
-            if let Some(slot) = pages.get_mut(page as usize - 1) {
+            if let Some(slot) = (page as usize)
+                .checked_sub(1)
+                .and_then(|i| pages.get_mut(i))
+            {
                 *slot = Some(name.clone());
             }
         }
@@ -2731,6 +2747,24 @@ fn export_page_templates(exporter: &mut Exporter<'_>, out: &mut odf::TextDocumen
                 let mut drawn = exporter.object(object, "page", Some(0), 0.0);
                 drawn.z_index = Some(z as u32);
                 drawn.id = Some(shape_id(object.id));
+                // A connector joins shapes of the template, which are not
+                // among the objects of the document.
+                if let (
+                    ObjectKind::Shape(Shape::Connection(line)),
+                    odf::DrawKind::Connector {
+                        start_shape,
+                        end_shape,
+                        ..
+                    },
+                ) = (&object.kind, &mut drawn.kind)
+                {
+                    let joined = |end: Option<NodeId>| {
+                        end.filter(|id| template.objects.iter().any(|o| o.id == *id))
+                            .map(shape_id)
+                    };
+                    *start_shape = joined(line.start);
+                    *end_shape = joined(line.end);
+                }
                 drawn
             })
             .collect();
