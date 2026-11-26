@@ -10,7 +10,7 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
 
 * Added: The records of a mail merge are read from vCard files and from
   the tables of spreadsheets, ODS or CSV, whose columns fill the merge
-  fields of the same name, in English or Portuguese. (#PR)
+  fields of the same name, in English or Portuguese. (#254)
 
 * Added: Merge fields of a mail merge, for the recipient and the sender,
   are kept in documents as fields of a column of data, which LibreOffice
