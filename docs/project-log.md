@@ -2691,6 +2691,45 @@ paragraph, and objects on a second page.
   with its paragraph while tracking, and Reject does not bring it back;
   Desk tracks the object, as Pages '09 did (D-003).
 
+### 26 November: W2 closed, W3 next
+
+- Phase W2 ended with its 9 rows done: comments with replies on text,
+  objects and cells, the review highlight, the author name and colour,
+  and the tracking of changes of text, formatting, objects and cells
+  with its bar, markup views, accept and reject and a copy as final,
+  keeping what Pages '09 tracked (D-003). The validation on the Mac of
+  26 November checked every row against Pages 15.4.
+- It took five days, 22 to 26 November, against the three estimated,
+  with the pause for RV on 24 November between them: the tracking of
+  changes needed 13 pull requests in step 13 alone, for changes inside
+  other changes, deleted breaks and the structures they carry, which
+  the estimate did not count.
+- *Moved on:* comments and markup in print and PDF to W5 (B-077),
+  with printing; the breaks of the dictionary of macOS to W6 (B-045);
+  lists in notes in ODT and the headers and footers of a section
+  started by a deleted paragraph to W5 (B-075, B-076).
+- *Next:* the owner asked to start W3, Writer structure and templates.
+
+### 26 November: phase W3 starts, with its plan
+
+- The first pull request of W3 is its plan,
+  [docs/phases/W3.md](phases/W3.md): 9 rows (sections, page templates,
+  headers and footers, the background and border of pages, the table
+  of contents, bookmarks, links, equations and mail merge) and one
+  backlog item, the artistic lines (B-044) from W1, with the parity
+  rows that test each one, what is missing, the ODF each needs and the
+  order of 13 steps.
+- *What reading the rows showed:* five rows exist as Pages '09 had them
+  and need what Pages 15.4 adds; page templates, page backgrounds and
+  borders, equations and mail merge are missing, and only mail merge
+  has parity rows, of Pages '09. The roadmap named equations in W4 as
+  well; the inventory gives them to W3, as the count of the roadmap
+  does, and the text of W4 was corrected.
+- *Decided in the plan:* printing a merge waits for printing in W5
+  (W034), as comments in print did; W3 makes the merged document.
+- *How the Mac is used:* one session at the start, now done with control
+  of the screen of the Mac from this thread, and one at the end.
+
 ## Decisions, with their reasons and consequences
 
 Ids `D-nnn` and `R-nnn` are those of [decisions.md](decisions.md).
@@ -3119,7 +3158,8 @@ from 17 to 22 November and brought Writer to the behaviour of Pages
 15.4, checked on the Mac; the owner closed it and chose W2, Writer
 review, as the next phase. On 24 November, after pull request 200, he
 paused W2 for RV, a review of all the code (D-027); RV ended the same
-day after six batches, and W2 resumed. The three
+day after six batches, and W2 resumed. W2 ended on 26 November, and
+the owner started W3, Writer structure and templates, the same day. The three
 apps can advance side by side: six phases of Writer, five of Tables, five
 of Slides, and a last phase across the apps before version 1.0.
 
