@@ -2746,7 +2746,7 @@ paragraph, and objects on a second page.
 - *What it changed:* Pages 15.4 has no page border; it makes one from a
   locked shape without fill, a section layout object, which Desk has had
   since W1 (W097). W098 is the page background.
-- *The matrix:* `EST-12` and `EST-16` to `EST-26` and `MAL-01` to
+- *The matrix:* the rows of W3 among `EST-12` to `EST-26` (12, 16, 18 to 20, 22, 23, 25, 26) and `MAL-01` to
   `MAL-09` were written again for 15.4, with phase W3, and three rows
   were added: `PXV-20` page templates, `PXV-21` page background and
   `PXV-22` equations. No task moved to another phase.
