@@ -431,6 +431,8 @@ impl MailMergeGroup {
     fn fields_menu(&self) -> gio::Menu {
         let spreadsheet = matches!(&*self.shown.borrow(), Some(MergeSource::Spreadsheet { .. }));
         let names: Vec<String> = if spreadsheet {
+            // The columns as the file has them now.
+            *self.records.borrow_mut() = None;
             self.current().map(|r| r.fields.clone()).unwrap_or_default()
         } else {
             desk_contacts::CONTACT_FIELDS
@@ -459,6 +461,11 @@ impl MailMergeGroup {
             return;
         };
         let on = self.preview.is_active();
+        // Turned on, the preview reads the source again, which may have
+        // changed since (MAL-04).
+        if on && !editor.merge_previewing() {
+            *self.records.borrow_mut() = None;
+        }
         let records = on.then(|| self.current()).flatten();
         if records.as_ref().is_some_and(|r| r.is_empty()) {
             self.group

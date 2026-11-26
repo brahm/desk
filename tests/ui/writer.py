@@ -3648,10 +3648,6 @@ def automatic_saving(work):
         writer.terminate()
         writer.wait(timeout=10)
 
-if __name__ == "__main__":
-    main()
-
-
 def with_merge_source(letter, kind, source):
     """Makes a file the source of the mail merge of a saved document, as
     Populate With does (MAL-04)."""
@@ -3753,3 +3749,8 @@ def mail_merge(work):
     finally:
         writer.terminate()
         writer.wait(timeout=10)
+
+
+if __name__ == "__main__":
+    main()
+

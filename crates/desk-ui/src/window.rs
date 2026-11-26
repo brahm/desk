@@ -4171,13 +4171,14 @@ impl DocumentWindow {
                     name,
                     sender,
                     single_line,
-                    shown,
                     origin,
+                    ..
                 } => Field::Merge {
                     name,
                     sender: !sender,
                     single_line,
-                    shown,
+                    // The datum of the other kind of field goes.
+                    shown: None,
                     origin,
                 },
                 other => other,

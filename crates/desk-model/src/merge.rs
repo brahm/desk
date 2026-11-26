@@ -83,12 +83,62 @@ impl Edit {
     }
 }
 
+/// Fills the merge field of a run of a merged document: a sender field
+/// stays a field, filled; a recipient field becomes its text, which is
+/// given back.
+fn merged_run(
+    field: &Field,
+    value: MergeValue<'_>,
+    attrs: &mut crate::CharAttrs,
+) -> Option<String> {
+    let field = filled(field, value).unwrap_or_else(|| field.clone());
+    if let Field::Merge { sender: false, .. } = field {
+        attrs.field = None;
+        Some(field.text(1, 1))
+    } else {
+        attrs.field = Some(Some(field));
+        None
+    }
+}
+
+/// A paragraph of a note or an object of a merged document, its merge
+/// fields filled.
+fn merged_paragraph(paragraph: &crate::Paragraph, value: MergeValue<'_>) -> crate::Paragraph {
+    let mut changed = false;
+    let runs: Vec<crate::Run> = paragraph
+        .runs()
+        .map(|run| {
+            let mut attrs = run.attrs.clone();
+            let Some(Some(field)) = &run.attrs.field else {
+                return run.clone();
+            };
+            if !matches!(field, Field::Merge { .. }) {
+                return run.clone();
+            }
+            changed = true;
+            let text = merged_run(field, value, &mut attrs);
+            crate::Run::with_attrs(text.as_deref().unwrap_or(run.text()), run.style, attrs)
+        })
+        .collect();
+    if !changed {
+        return paragraph.clone();
+    }
+    crate::Paragraph::from_runs(
+        paragraph.id(),
+        paragraph.style(),
+        paragraph.attrs().clone(),
+        runs,
+    )
+    .unwrap_or_else(|_| paragraph.clone())
+}
+
 /// The merged document of a mail merge (MAL-04): the body of `document`
 /// once for each of `records` records, each from a new page, with the
 /// data that `value` gives for the record. As in Pages 15.4 only the
 /// sender fields stay fields there (MAL-01): the recipient fields of the
-/// body become their text. The headers, footers and objects take the data
-/// of the first record. The merged document tracks no changes and has no
+/// body, its notes and the objects in its text become their text. The
+/// headers, footers and objects fixed on the pages take the data of the
+/// first record. The merged document tracks no changes and has no
 /// source of its own.
 pub fn merge_document(
     document: &Document,
@@ -112,20 +162,32 @@ pub fn merge_document(
         let (start, end) = (edit.document().start(), edit.document().end());
         let mut at = edit.delete(start, end)?;
         for record in 0..records.max(1) {
+            let value = |name: &str, sender: bool| value(record, name, sender);
             let mut copy = body.clone();
             for paragraph in &mut copy.paragraphs {
                 for (text, _, attrs) in &mut paragraph.runs {
-                    let Some(Some(field)) = &attrs.field else {
-                        continue;
-                    };
-                    let field = filled(field, &|name, sender| value(record, name, sender))
-                        .unwrap_or_else(|| field.clone());
-                    if let Field::Merge { sender: false, .. } = field {
-                        *text = field.text(1, 1);
-                        attrs.field = None;
-                    } else {
-                        attrs.field = Some(Some(field));
+                    if let Some(Some(field)) = attrs.field.clone()
+                        && let Some(shown) = merged_run(&field, &value, attrs)
+                    {
+                        *text = shown;
                     }
+                }
+            }
+            // The notes and the objects in the text of each copy, too.
+            for note in &mut copy.notes {
+                note.paragraphs = note
+                    .paragraphs
+                    .iter()
+                    .map(|p| merged_paragraph(p, &value))
+                    .collect();
+            }
+            for object in &mut copy.objects {
+                if let Some(text) = object.text_box_mut() {
+                    text.paragraphs = text
+                        .paragraphs
+                        .iter()
+                        .map(|p| merged_paragraph(p, &value))
+                        .collect();
                 }
             }
             let first = edit.document().body().len();

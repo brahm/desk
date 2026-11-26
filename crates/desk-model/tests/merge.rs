@@ -137,3 +137,54 @@ fn mal_04_mal_01_the_merged_document_has_the_body_once_for_each_record() {
     let none = merge_document(&letter, 1, &|_, _, _| None).unwrap();
     assert_eq!(texts(&none), ["Dear First Name, from Company", "Yours."]);
 }
+
+#[test]
+fn mal_04_the_notes_of_each_letter_have_its_data() {
+    use desk_model::{Note, ParaAttrs, Paragraph, Run};
+    let mut editor = Editor::new(Document::new_word_processing());
+    editor
+        .edit("Note", |edit| {
+            let at = edit.insert_text(edit.document().start(), "Letter")?;
+            let note = edit.new_id();
+            let after = edit.insert_text(at, &FIELD_CHARACTER.to_string())?;
+            let mark = CharAttrs {
+                field: Some(Some(Field::NoteMark { note })),
+                ..CharAttrs::default()
+            };
+            edit.set_character_attrs(at, after, &mark)?;
+            let style = edit.document().styles().default_paragraph();
+            let text = Paragraph::from_runs(
+                edit.new_id(),
+                style,
+                ParaAttrs::default(),
+                [
+                    Run::new("To "),
+                    Run::with_attrs(
+                        &FIELD_CHARACTER.to_string(),
+                        None,
+                        CharAttrs {
+                            field: Some(Some(Field::merge("First Name"))),
+                            ..CharAttrs::default()
+                        },
+                    ),
+                ],
+            )?;
+            edit.set_note(
+                note,
+                Some(Note {
+                    id: note,
+                    mark: None,
+                    paragraphs: vec![text].into(),
+                }),
+            )
+        })
+        .unwrap();
+    let merged = merge_document(editor.document(), 2, &value).unwrap();
+    let mut notes: Vec<String> = merged
+        .notes()
+        .iter()
+        .map(|n| n.paragraphs.iter().map(|p| p.text()).collect())
+        .collect();
+    notes.sort();
+    assert_eq!(notes, ["To Ana", "To Bruno"]);
+}

@@ -16,8 +16,8 @@ use super::TextEditor;
 /// its field and whether it is a sender field.
 pub type MergePreview = Rc<dyn Fn(&str, bool) -> Option<String>>;
 
-/// A copy of the document with its merge fields filled by the preview,
-/// when it has any to fill.
+/// A copy of the document with its merge fields filled by the preview;
+/// none when the fields cannot be filled.
 pub(super) fn filled(document: &Document, preview: &MergePreview) -> Option<Document> {
     let mut editor = Editor::new(document.clone());
     editor
@@ -57,6 +57,11 @@ impl TextEditor {
         let was = self.state.borrow().merge_preview.is_some();
         if !was && preview.is_none() {
             return;
+        }
+        // The preview fills the document, not a header or note being
+        // edited on its own.
+        if self.story().is_some() {
+            self.leave_story(None);
         }
         self.state.borrow_mut().merge_preview = preview;
         self.lay_out_again();

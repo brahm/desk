@@ -67,6 +67,7 @@ fn mal_04_a_missing_address_takes_another_of_its_kind() {
     assert_eq!(records.datum(0, "Home Address"), Some("1 Rua A"));
     assert_eq!(records.datum(0, "Endereço residencial"), Some("1 Rua A"));
     assert_eq!(records.datum(0, "Work Address"), Some("1 Rua A"));
+    assert_eq!(records.datum(0, "Address"), Some("1 Rua A"));
     // A phone has no other to take, and a name is no kind.
     assert_eq!(records.datum(0, "Work Phone"), None);
     assert_eq!(records.datum(0, "Company"), None);

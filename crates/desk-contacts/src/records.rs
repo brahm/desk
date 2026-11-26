@@ -141,9 +141,9 @@ impl Records {
     }
 
     /// The datum that a merge field of a record takes: that of its field,
-    /// or, kept from Pages '09 (MAL-04, D-003), when a work, home or
-    /// other phone, email or address is missing, another of its kind, as
-    /// the work address for the home one.
+    /// or, kept from Pages '09 (MAL-04, D-003), when a phone, email or
+    /// address, of work, home or other, is missing, another of its kind,
+    /// as the work address for the home one or for an address alone.
     pub fn datum(&self, record: usize, field: &str) -> Option<&str> {
         if let Some(value) = self.value(record, field) {
             return Some(value);
@@ -151,7 +151,8 @@ impl Records {
         let canonical = crate::canonical(field)?;
         let kind = ["Work ", "Home ", "Other "]
             .iter()
-            .find_map(|variant| canonical.strip_prefix(variant))?;
+            .find_map(|variant| canonical.strip_prefix(variant))
+            .unwrap_or(canonical);
         if !matches!(kind, "Phone" | "Email" | "Address") {
             return None;
         }
