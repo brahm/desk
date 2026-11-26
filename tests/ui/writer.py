@@ -1423,7 +1423,8 @@ SWITCHES = {Atspi.Role.CHECK_BOX, getattr(Atspi.Role, "SWITCH", Atspi.Role.CHECK
 # their toggles (INT-13).
 LEVELS = ("Format", "Document")
 TABS = ("Style", "Layout", "More", "Image", "Text", "Media", "Arrange", "Document",
-        "Section", "Info", "Table", "Cell", "Chart", "Axis", "Series")
+        "Section", "Info", "Table", "Cell", "Chart", "Axis", "Series",
+        "Equation")
 
 
 def toggles_named(app, names, role=Atspi.Role.RADIO_BUTTON):
