@@ -162,8 +162,8 @@ impl Parser {
                     let name = self.command();
                     match name.as_str() {
                         "\\" if stop == Stop::Environment => {
-                            // The space after a row, as \\[4pt], is not kept.
-                            self.skip_spaces();
+                            // The space after a row, as \\[4pt], is not kept;
+                            // a bracket after a space starts the next row.
                             if self.peek() == Some('[') {
                                 let close = self.chars[self.at..]
                                     .iter()
@@ -1139,6 +1139,8 @@ mod tests {
         );
         let aligned = mathml("\\begin{aligned} a &= b \\\\[2pt] c &= d \\end{aligned}");
         assert!(!aligned.contains("<mi>p</mi>"), "{aligned}");
+        let bracket = mathml("\\begin{matrix} a \\\\ [x] \\end{matrix}");
+        assert!(bracket.contains("<mi>x</mi>"), "{bracket}");
         assert_eq!(aligned.matches("<mtr>").count(), 2);
         let cases =
             mathml("f(x) = \\begin{cases} 1 & x > 0 \\\\ 0 & \\text{otherwise} \\\\ \\end{cases}");

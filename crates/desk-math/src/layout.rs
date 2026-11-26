@@ -118,6 +118,9 @@ pub fn draw(mathml: &str, size: f32, measure: Measure<'_>) -> Drawing {
 enum Class {
     Ordinary,
     LargeOperator,
+    /// The name of a function, as sin, spaced as a large operator but
+    /// for the parenthesis right after it.
+    Function,
     Binary,
     Relation,
     Open,
@@ -251,7 +254,7 @@ impl Layout<'_> {
                 // A name of a function, as sin or log, keeps a thin space
                 // from what it applies to, as in TeX.
                 if !single && text.chars().all(char::is_alphabetic) {
-                    laid.class = Class::LargeOperator;
+                    laid.class = Class::Function;
                 }
                 laid
             }
@@ -472,6 +475,7 @@ impl Layout<'_> {
                                 | Class::Open
                                 | Class::Punctuation
                                 | Class::LargeOperator
+                                | Class::Function
                         )
                     ))
             {
@@ -479,9 +483,9 @@ impl Layout<'_> {
             }
             let (before, after) = item.space.unwrap_or_else(|| spacing(class, c));
             if let Some(previous) = previous {
-                // An operator takes no space before a fence or a comma, as
+                // A function takes no space before a fence or a comma, as
                 // the sin of sin(x).
-                let tight = previous == Class::LargeOperator
+                let tight = previous == Class::Function
                     && matches!(class, Class::Open | Class::Close | Class::Punctuation);
                 row.width += before + if tight { 0.0 } else { pending };
             }
@@ -793,8 +797,8 @@ impl Layout<'_> {
             .get("columnspacing")
             .unwrap_or("0.8em")
             .split_whitespace()
-            .filter_map(|v| length(v, c.size))
-            .map(|v| v.max(0.0))
+            // A value that cannot be read is the default gap.
+            .map(|v| length(v, c.size).unwrap_or(c.size * 0.8).max(0.0))
             .collect();
         let column_gap = |i: usize| {
             spacing
@@ -921,7 +925,7 @@ fn spacing(class: Class, c: &Context) -> (f32, f32) {
     match class {
         Class::Relation if !scripted => (em * 0.2778, em * 0.2778),
         Class::Binary if !scripted => (em * 0.2222, em * 0.2222),
-        Class::LargeOperator => (em * 0.1667, em * 0.1667),
+        Class::LargeOperator | Class::Function => (em * 0.1667, em * 0.1667),
         Class::Punctuation => (0.0, em * 0.1667),
         _ => (0.0, 0.0),
     }
@@ -1260,6 +1264,13 @@ mod tests {
             &measure,
         );
         assert!((x_of(&paren, "(").unwrap() - x_of(&paren, "sin").unwrap() - 15.0).abs() < 0.01);
+        // A sum keeps its space before a parenthesis.
+        let sum = draw(
+            &format!("<math {NS}><mo>∑</mo><mo>(</mo></math>"),
+            10.0,
+            &measure,
+        );
+        assert!(x_of(&sum, "(").unwrap() - x_of(&sum, "∑").unwrap() > 5.0 + 1.0);
         // A rule of no number, and a bare number times the rule.
         let bar = |thickness: &str| {
             let drawing = draw(
