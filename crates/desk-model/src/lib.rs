@@ -76,6 +76,7 @@ mod object_edit;
 mod object_style;
 mod op;
 mod outline;
+mod page_templates;
 mod picture;
 mod pixel_outline;
 mod presentation;
@@ -143,6 +144,7 @@ pub use object_style::{
 };
 pub use op::Op;
 pub use outline::{MAX_OUTLINE_LEVEL, heading_level};
+pub use page_templates::{PageTemplate, PageTemplates, Placeholder, PlaceholderKind};
 pub use picture::{Picture, PictureFormat};
 pub use pixel_outline::{pixel_outline, pixel_outlines};
 pub use presentation::{SLIDE_SIZE, Slide, Topics};

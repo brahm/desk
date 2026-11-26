@@ -77,7 +77,7 @@ pub use text::{
     Annotation, Background, Border, BorderLine, Break, ChangeKind, ChangedRegion, Column, Columns,
     DropCap, DropCapBackground, Family, Field, HeaderFooter, HeaderFooterStyle, LINE_BREAK,
     LeaderStyle, Line, LineColor, LineHeight, ListLabel, ListLevelStyle, ListMember, ListStyle,
-    MasterPage, Meta, Note, NotesConfiguration, PageFill, PageLayout, Paragraph,
+    MasterPage, Meta, Note, NotesConfiguration, PageFill, PageLayout, PageTemplate, Paragraph,
     ParagraphProperties, Properties, SectionStart, SectionStyle, Span, Style, StyleShortcut,
     TabStop, TabType, TextAlign, TextDocument, TextPosition, TextProperties, TextSettings,
     TextShadow, TextTransform, TocLevel, ViewSettings,

@@ -85,6 +85,7 @@ pub fn write_streams(document: &TextDocument) -> Streams {
     for object in &document.page_objects {
         crate::draw::write_draw_object(&mut w, object, &write_paragraph);
     }
+    write_page_templates(&mut w, &document.page_templates);
     write_body(&mut w, &document.body, &document.toc_levels, &mut names);
     w.end().end().end();
     let content = w.finish();
@@ -1346,6 +1347,28 @@ fn write_paragraph_in(w: &mut Writer, paragraph: &Paragraph, header_field: Optio
     }
     if let Some(name) = bookmark {
         w.start("text:bookmark-end").attr("text:name", name).end();
+    }
+    w.end();
+}
+
+/// The page templates of a page layout document, which other programs
+/// leave out (W095, odf-extensions.md).
+fn write_page_templates(w: &mut Writer, templates: &[crate::PageTemplate]) {
+    if templates.is_empty() {
+        return;
+    }
+    w.start("desk:page-templates");
+    for template in templates {
+        w.start("desk:page-template")
+            .attr("desk:name", &template.name);
+        if !template.pages.is_empty() {
+            let pages: Vec<String> = template.pages.iter().map(u32::to_string).collect();
+            w.attr("desk:pages", &pages.join(" "));
+        }
+        for object in &template.objects {
+            crate::draw::write_draw_object(w, object, &write_paragraph);
+        }
+        w.end();
     }
     w.end();
 }

@@ -147,7 +147,7 @@ pub fn union(frames: impl IntoIterator<Item = Frame>) -> Option<Frame> {
 }
 
 impl Edit {
-    fn object(&self, id: NodeId) -> Result<&Object, ModelError> {
+    pub(crate) fn object(&self, id: NodeId) -> Result<&Object, ModelError> {
         self.document()
             .objects()
             .get(id)
@@ -277,7 +277,7 @@ impl Edit {
     }
 
     /// Takes a text box out of the boxes it is linked with.
-    fn unlink_text_box(
+    pub(crate) fn unlink_text_box(
         &mut self,
         id: NodeId,
         text: &crate::object::TextBox,
@@ -800,6 +800,11 @@ impl Edit {
             }
             self.replace_object(object)?;
         }
+        // The new page has no template (W095).
+        self.change_page_template_pages(|templates| {
+            let at = (after as usize + 1).min(templates.len());
+            templates.insert(at, None);
+        })?;
         setup.layout_pages = Some(pages.saturating_add(1));
         self.change_slides(|slides| {
             let at = (after as usize + 1).min(slides.len());
@@ -842,6 +847,11 @@ impl Edit {
                 _ => {}
             }
         }
+        self.change_page_template_pages(|templates| {
+            if (page as usize) < templates.len() {
+                templates.remove(page as usize);
+            }
+        })?;
         setup.layout_pages = Some(pages - 1);
         self.change_slides(|slides| {
             if (page as usize) < slides.len() {
@@ -905,6 +915,16 @@ impl Edit {
                 }
             }
         })?;
+        self.change_page_template_pages(|templates| {
+            let old = templates.clone();
+            for (new, &from) in order.iter().enumerate() {
+                if let (Some(slot), Some(template)) =
+                    (templates.get_mut(new), old.get(from as usize))
+                {
+                    slot.clone_from(template);
+                }
+            }
+        })?;
         Ok(at as u32)
     }
 
@@ -938,6 +958,13 @@ impl Edit {
             }
             self.replace_object(object)?;
         }
+        self.change_page_template_pages(|templates| {
+            let at = (before as usize).min(templates.len());
+            for i in 0..clip.pages.len() {
+                let template = clip.templates.get(i).cloned().flatten();
+                templates.insert(at + i, template);
+            }
+        })?;
         setup.layout_pages = Some(count.saturating_add(added));
         self.change_slides(|slides| {
             let at = (before as usize).min(slides.len());
@@ -1055,6 +1082,8 @@ pub struct LayoutPagesClip {
     pages: Vec<Vec<Object>>,
     /// The slides of the pages, when they come from a presentation.
     slides: Vec<crate::Slide>,
+    /// The page template of each page (W095).
+    templates: Vec<Option<Arc<str>>>,
 }
 
 impl crate::Document {
@@ -1081,9 +1110,14 @@ impl crate::Document {
                     .collect()
             })
             .unwrap_or_default();
+        let templates = (0..count)
+            .filter(|p| pages.contains(p))
+            .map(|p| self.page_templates().of_page(p).cloned())
+            .collect();
         LayoutPagesClip {
             pages: copied,
             slides,
+            templates,
         }
     }
 }

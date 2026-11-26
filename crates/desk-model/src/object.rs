@@ -88,6 +88,12 @@ pub struct Object {
     /// Format > Add Link on a shape, a picture or a text box of Pages
     /// 15.4 (W102).
     pub link: Option<Arc<str>>,
+    /// That it is a placeholder of a page template, for text or media
+    /// (W095).
+    pub placeholder: Option<crate::Placeholder>,
+    /// The object of a page template that it is a copy of, which Reapply
+    /// Page Template puts back (W095).
+    pub template_object: Option<NodeId>,
 }
 
 impl Object {
@@ -297,6 +303,8 @@ impl Object {
             comments: crate::CommentIds::none(),
             moved: None,
             link: None,
+            placeholder: None,
+            template_object: None,
         }
     }
 

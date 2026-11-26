@@ -383,6 +383,9 @@ pub struct PagedFlow {
     /// The pages captured to insert again, in the order they were first
     /// captured (EST-20).
     pub captures: imbl::Vector<crate::CapturedPages>,
+    /// The page templates of a page layout document, and the template
+    /// of each page (W095).
+    pub page_templates: crate::PageTemplates,
     /// The footnotes or endnotes (EST-13).
     pub notes: Notes,
     /// The comments on the text (W149).
@@ -512,6 +515,7 @@ impl Document {
                 section_margins: imbl::OrdMap::new(),
                 backgrounds: imbl::OrdMap::new(),
                 captures: imbl::Vector::new(),
+                page_templates: crate::PageTemplates::default(),
                 notes: Notes::default(),
                 comments: Comments::default(),
                 changes: crate::Changes::default(),
@@ -1311,6 +1315,11 @@ impl Document {
                     place,
                     paragraphs: old,
                 })
+            }
+            Op::SetPageTemplates { templates } => {
+                let Container::Pages(flow) = &mut self.container;
+                let old = std::mem::replace(&mut flow.page_templates, templates);
+                Ok(Op::SetPageTemplates { templates: old })
             }
             Op::SetCapturedPages { captures } => {
                 let Container::Pages(flow) = &mut self.container;

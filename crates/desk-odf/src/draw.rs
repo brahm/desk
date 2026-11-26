@@ -399,6 +399,14 @@ pub struct DrawObject {
     /// `xlink:href` of the `draw:a` around the object: where a click on
     /// it goes (W102).
     pub link: Option<String>,
+    /// `desk:placeholder`: `text` or `media` for a placeholder of a page
+    /// template (W095, odf-extensions.md).
+    pub placeholder: Option<String>,
+    /// `desk:placeholder-tag`: the tag of a placeholder (W095).
+    pub placeholder_tag: Option<String>,
+    /// `desk:template-object`: the `xml:id` of the object of the page
+    /// template that this object of a page copies (W095).
+    pub template_object: Option<String>,
 }
 
 /// The `svg:viewBox` side that Desk writes a `draw:contour-polygon` in.
@@ -430,6 +438,9 @@ impl DrawObject {
             moved_from: None,
             annotations: Vec::new(),
             link: None,
+            placeholder: None,
+            placeholder_tag: None,
+            template_object: None,
         }
     }
 
@@ -827,6 +838,10 @@ fn numbers(value: &str) -> Vec<f64> {
 /// How many objects a group may hold, deep, against hostile files.
 const MAX_DEPTH: usize = 16;
 
+/// The longest name of a page template or tag of a placeholder that is
+/// read, in characters, against hostile files (W095).
+pub(crate) const MAX_NAME: usize = 256;
+
 /// A drawing object, if the element is one Desk reads. `paragraph` reads
 /// the paragraphs of a text box.
 pub(crate) fn draw_object(
@@ -1041,6 +1056,16 @@ fn draw_object_at(
             .map(crate::read::read_annotation)
             .collect(),
         link: None,
+        // A placeholder of a page template (W095).
+        placeholder: e
+            .attr(DESK, "placeholder")
+            .filter(|k| matches!(*k, "text" | "media"))
+            .map(str::to_owned),
+        placeholder_tag: e
+            .attr(DESK, "placeholder-tag")
+            .filter(|t| !t.is_empty())
+            .map(|t| t.chars().take(MAX_NAME).collect()),
+        template_object: e.attr(DESK, "template-object").map(str::to_owned),
     })
 }
 
@@ -1201,6 +1226,9 @@ fn write_shape(w: &mut Writer, object: &DrawObject, paragraph: &dyn Fn(&mut Writ
     }
     w.attr_opt("desk:origin", object.origin.as_deref());
     w.attr_opt("desk:moved-from", object.moved_from.as_deref());
+    w.attr_opt("desk:placeholder", object.placeholder.as_deref());
+    w.attr_opt("desk:placeholder-tag", object.placeholder_tag.as_deref());
+    w.attr_opt("desk:template-object", object.template_object.as_deref());
     if !matches!(
         object.kind,
         DrawKind::Line { .. } | DrawKind::Connector { .. } | DrawKind::Group(_)

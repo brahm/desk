@@ -81,6 +81,9 @@ pub struct TextDocument {
     /// The drawing objects outside any paragraph, as those anchored to
     /// pages, written before the first paragraph.
     pub page_objects: Vec<crate::draw::DrawObject>,
+    /// The page templates of a page layout document, in
+    /// `desk:page-templates` (W095, odf-extensions.md).
+    pub page_templates: Vec<PageTemplate>,
     /// The gradients that graphic styles fill with, by name.
     pub gradients: Vec<crate::draw::Gradient>,
     /// The markers at the ends of lines, by name.
@@ -1238,4 +1241,17 @@ pub struct Note {
     pub label: Option<String>,
     /// The paragraphs of `text:note-body`.
     pub body: Vec<Paragraph>,
+}
+
+/// A page template of a page layout document (`desk:page-template`,
+/// W095): its name, the pages that come from it and its objects, on
+/// page 1.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct PageTemplate {
+    /// `desk:name`.
+    pub name: String,
+    /// `desk:pages`: the pages from 1 whose template it is.
+    pub pages: Vec<u32>,
+    /// Its objects, the drawing objects in it.
+    pub objects: Vec<crate::draw::DrawObject>,
 }
