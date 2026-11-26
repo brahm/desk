@@ -1715,7 +1715,7 @@ pub(crate) fn read_annotation(e: &Element) -> Annotation {
     }
 }
 
-fn paragraph(e: &Element) -> Paragraph {
+pub(crate) fn paragraph(e: &Element) -> Paragraph {
     let mut builder = SpanBuilder {
         spans: Vec::new(),
         collapse: true,

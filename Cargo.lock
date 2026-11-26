@@ -222,6 +222,12 @@ dependencies = [
 [[package]]
 name = "desk-contacts"
 version = "0.1.0"
+dependencies = [
+ "desk-model",
+ "desk-odf",
+ "encoding_rs",
+ "zip",
+]
 
 [[package]]
 name = "desk-convert"

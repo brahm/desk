@@ -50,6 +50,7 @@ mod formula;
 pub mod ns;
 mod package;
 mod read;
+mod sheet;
 mod table;
 mod text;
 mod units;
@@ -68,6 +69,7 @@ pub use package::{
     MAX_STREAM, MEDIA_TYPE, THUMBNAIL, read_odt, write_odt, write_odt_with_thumbnail,
 };
 pub use read::read_streams;
+pub use sheet::{MAX_SHEET_ROWS, SPREADSHEET_TYPE, Sheet, read_ods, read_sheets};
 
 /// The date written for a tracked change whose date is not known, as
 /// ODF needs one: the epoch, which readers take as unknown.
