@@ -11,7 +11,7 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
 * Added: Page templates of page layout documents, as in Pages 15.4: a
   page added from a template copies its objects, its text and media
   placeholders keep their content when the template is applied again or
-  changed, by tag, and all of it is saved in the document. (#PR)
+  changed, by tag, and all of it is saved in the document. (#248)
 
 * Added: Links to a phone number, and links on shapes, pictures, text
   boxes and groups, as in Pages 15.4. (#247)
