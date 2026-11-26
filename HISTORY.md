@@ -11,7 +11,7 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
 * Changed: The parity rows of sections, headers and footers, tables of
   contents, bookmarks, links and mail merge now describe Pages 15.4, and
   new rows test page templates, page backgrounds and equations, from a
-  session with Pages 15.4 on the Mac. (#PR)
+  session with Pages 15.4 on the Mac. (#240)
 
 * Added: The plan of phase W3 of Desk Writer, which brings page
   templates, the background and border of pages, tables of contents
