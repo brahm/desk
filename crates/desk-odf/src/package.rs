@@ -142,11 +142,16 @@ pub fn read_odt(bytes: &[u8]) -> Result<TextDocument, OdfError> {
         })
         .collect();
     captures.sort();
-    for (_, name) in captures {
-        let file = archive.by_name(&name)?;
+    // One that cannot be read is left out, and so are those past the
+    // most a document keeps.
+    for (_, name) in captures.into_iter().take(MAX_CAPTURES) {
+        let Ok(file) = archive.by_name(&name) else {
+            continue;
+        };
         let mut bytes = Vec::new();
-        file.take(MAX_STREAM + 1).read_to_end(&mut bytes)?;
-        if bytes.len() as u64 <= MAX_STREAM {
+        if file.take(MAX_STREAM + 1).read_to_end(&mut bytes).is_ok()
+            && bytes.len() as u64 <= MAX_STREAM
+        {
             document.captures.push(bytes);
         }
     }
@@ -174,6 +179,9 @@ pub fn write_odt(document: &TextDocument) -> Result<Vec<u8>, OdfError> {
 
 /// The folder of the pages captured to insert again (EST-20).
 const CAPTURES: &str = "Desk/Captures/";
+
+/// The most pages captured that a document keeps (EST-20).
+pub const MAX_CAPTURES: usize = 64;
 
 /// The path of the preview of a package, which file managers show.
 pub const THUMBNAIL: &str = "Thumbnails/thumbnail.png";

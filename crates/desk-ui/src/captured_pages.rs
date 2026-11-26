@@ -23,9 +23,13 @@ pub fn present(parent: &impl IsA<gtk::Widget>, editor: &TextEditor) {
         )),
     );
     let content = gtk::Box::new(gtk::Orientation::Vertical, 12);
+    // The pages of a page layout document come with page templates
+    // (W095): it captures none.
+    let layout = editor.is_page_layout();
     let name = adw::EntryRow::builder()
         .title(tr("_Name"))
         .use_underline(true)
+        .sensitive(!layout)
         .build();
     let new = adw::PreferencesGroup::new();
     new.add(&name);
@@ -40,6 +44,7 @@ pub fn present(parent: &impl IsA<gtk::Widget>, editor: &TextEditor) {
             let insert = gtk::Button::builder()
                 .label(tr("Insert"))
                 .valign(gtk::Align::Center)
+                .sensitive(!layout)
                 .build();
             let delete = gtk::Button::builder()
                 .icon_name("user-trash-symbolic")

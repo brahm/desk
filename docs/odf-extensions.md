@@ -898,8 +898,9 @@ The pages captured to insert again (EST-20), Capture Pages of Pages '09
 kept by D-003, are each a text document of their own in the package, at
 `Desk/Captures/1.odt`, `Desk/Captures/2.odt` and on, listed in the
 manifest with the media type of a text document. Each holds the styles
-of the document and the sections captured, and its `dc:title` is the
-name they go by. Desk reads them in the order of their numbers, with the
+of the document, an empty first section and the sections captured after
+it, which keep their headers and footers as sections of their own, and
+its `dc:title` is the name they go by. A package keeps at most 64. Desk reads them in the order of their numbers, with the
 styles of the document of the same names; other programs leave them
 out, and a package whose captured pages are lost still opens.
 

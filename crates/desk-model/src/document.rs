@@ -1257,6 +1257,10 @@ impl Document {
                     || self.notes().paragraphs().any(|p| p.uses_style(style))
                     || self.objects().paragraphs().any(|p| p.uses_style(style))
                     || self.text_settings().toc.uses(style)
+                    || self
+                        .captured_pages()
+                        .iter()
+                        .any(|c| c.pages.uses_style(style))
                 {
                     return Err(ModelError::StyleInUse(style));
                 }

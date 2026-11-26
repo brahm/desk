@@ -63,7 +63,31 @@ impl SectionsClip {
     /// as when they come from another document with styles of the same
     /// names (EST-20).
     pub fn restyled(&self, style: &dyn Fn(StyleId) -> StyleId) -> Self {
-        let paragraph = |p: &Paragraph| restyled(p, style);
+        self.map_styles(&|id| Some(style(id)), None)
+    }
+
+    /// Whether any of its text uses a style.
+    pub fn uses_style(&self, id: StyleId) -> bool {
+        self.sections.iter().any(|s| {
+            s.paragraphs.iter().any(|p| p.uses_style(id))
+                || s.margins
+                    .as_ref()
+                    .is_some_and(|m| m.paragraphs().any(|p| p.uses_style(id)))
+                || s.notes
+                    .iter()
+                    .any(|n| n.paragraphs.iter().any(|p| p.uses_style(id)))
+        })
+    }
+
+    /// The same sections with the styles that `style` gives for theirs:
+    /// a paragraph whose style it takes away takes `paragraph`, or keeps
+    /// its own without one, and a run or a list loses its style.
+    pub(crate) fn map_styles(
+        &self,
+        style: &dyn Fn(StyleId) -> Option<StyleId>,
+        paragraph: Option<StyleId>,
+    ) -> Self {
+        let restyle = |p: &Paragraph| restyled(p, style, paragraph);
         Self {
             sections: self
                 .sections
@@ -71,13 +95,13 @@ impl SectionsClip {
                 .map(|s| ClipSection {
                     section: s.section,
                     layout: s.layout,
-                    paragraphs: s.paragraphs.iter().map(paragraph).collect(),
-                    margins: s.margins.as_ref().map(|m| m.map_paragraphs(&paragraph)),
+                    paragraphs: s.paragraphs.iter().map(restyle).collect(),
+                    margins: s.margins.as_ref().map(|m| m.map_paragraphs(&restyle)),
                     notes: s
                         .notes
                         .iter()
                         .map(|n| Note {
-                            paragraphs: n.paragraphs.iter().map(paragraph).collect(),
+                            paragraphs: n.paragraphs.iter().map(restyle).collect(),
                             ..n.clone()
                         })
                         .collect(),
@@ -87,19 +111,26 @@ impl SectionsClip {
     }
 }
 
-/// A paragraph with the styles that `style` gives for its own.
-fn restyled(paragraph: &Paragraph, style: &dyn Fn(StyleId) -> StyleId) -> Paragraph {
+/// A paragraph with the styles that `style` gives for its own: one it
+/// takes away from the paragraph gives way to `paragraph`.
+fn restyled(
+    paragraph: &Paragraph,
+    style: &dyn Fn(StyleId) -> Option<StyleId>,
+    default: Option<StyleId>,
+) -> Paragraph {
     let mut attrs = paragraph.attrs().clone();
     if let Some(Some(list)) = attrs.list_style {
-        attrs.list_style = Some(Some(style(list)));
+        attrs.list_style = Some(style(list));
     }
     let runs = paragraph.runs().map(|run| {
         let mut run = run.clone();
-        run.style = run.style.map(style);
+        run.style = run.style.and_then(style);
         run
     });
-    Paragraph::from_runs(paragraph.id(), style(paragraph.style()), attrs, runs)
-        .unwrap_or_else(|_| paragraph.clone())
+    let own = style(paragraph.style())
+        .or(default)
+        .unwrap_or(paragraph.style());
+    Paragraph::from_runs(paragraph.id(), own, attrs, runs).unwrap_or_else(|_| paragraph.clone())
 }
 
 /// Pages captured by name, to insert again: Capture Pages of Pages '09,

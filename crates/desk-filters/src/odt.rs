@@ -1320,15 +1320,24 @@ fn import_captures(
         }
     }
     let mut editor = desk_model::Editor::new(document);
-    editor.edit("Capture Pages", |edit| {
-        let mut captures = Vec::new();
-        for captured in &read {
-            let name = captured.metadata().title.clone();
-            let count = captured.section_ranges().len();
-            let pages = captured.copy_sections(&(0..count).collect::<Vec<_>>());
-            if name.is_empty() || pages.is_empty() {
-                continue;
-            }
+    for captured in &read {
+        let name = captured.metadata().title.clone();
+        // The first section holds no captured page: it keeps those after
+        // it as they were, with headers and footers of their own.
+        let count = captured.section_ranges().len();
+        let pages = captured.copy_sections(&(1..count).collect::<Vec<_>>());
+        if name.is_empty()
+            || pages.is_empty()
+            || editor
+                .document()
+                .captured_pages()
+                .iter()
+                .any(|c| *c.name == *name)
+        {
+            continue;
+        }
+        // Each on its own: one whose styles cannot come along is left out.
+        let _ = editor.edit("Capture Pages", |edit| {
             // The styles of the document of the same names, and those it
             // has not.
             let mut map: HashMap<StyleId, StyleId> = HashMap::new();
@@ -1348,15 +1357,14 @@ fn import_captures(
             let added = edit.import_styles(captured, &missing, false)?;
             map.extend(missing.into_iter().zip(added));
             let pages = pages.restyled(&|id| map.get(&id).copied().unwrap_or(id));
-            captures.push(desk_model::CapturedPages {
-                name: name.into(),
+            let mut captures = edit.document().captured_pages().clone();
+            captures.push_back(desk_model::CapturedPages {
+                name: name.as_str().into(),
                 pages,
             });
-        }
-        edit.apply(Op::SetCapturedPages {
-            captures: captures.into_iter().collect(),
-        })
-    })?;
+            edit.apply(Op::SetCapturedPages { captures })
+        });
+    }
     Ok(editor.into_document())
 }
 
@@ -1376,9 +1384,20 @@ fn export_captures(document: &Document) -> Vec<Vec<u8>> {
             for object in objects {
                 edit.apply(Op::RemoveObject { object })?;
             }
+            // An empty first section, then the pages captured, which keep
+            // their headers and footers as sections after the first.
             let count = edit.document().section_ranges().len();
             edit.paste_sections(count, &captured.pages)?;
-            edit.delete_sections(&(0..count).collect::<Vec<_>>())?;
+            edit.delete_sections(&(1..count).collect::<Vec<_>>())?;
+            let first = edit.document().section_ranges()[0].clone();
+            let body = edit.document().body();
+            if let (Some(start), Some(end)) = (body.get(first.start), body.get(first.end - 1)) {
+                let (start, end) = (
+                    desk_model::Position::new(start.id(), 0),
+                    desk_model::Position::new(end.id(), end.len()),
+                );
+                edit.delete(start, end)?;
+            }
             let mut metadata = edit.document().metadata().clone();
             metadata.title = captured.name.to_string();
             edit.set_metadata(metadata)

@@ -305,15 +305,13 @@ impl TextEditor {
 }
 
 impl TextEditor {
-    /// The index of the section of the body that the cursor is in.
+    /// The index of the section of the body that the cursor is in, back
+    /// in the body from a header, a footer or a note.
     fn section_at_cursor(&self) -> usize {
+        self.leave_story(None);
         let state = self.state.borrow();
         let document = Self::main_document(&state);
-        let paragraph = if state.story.is_some() {
-            0
-        } else {
-            state.selection.ordered().0.paragraph
-        };
+        let paragraph = state.selection.ordered().0.paragraph;
         document
             .section_ranges()
             .iter()
@@ -360,6 +358,7 @@ impl TextEditor {
 
     /// Takes out the pages captured under a name (EST-20).
     pub fn remove_captured_pages(&self, name: &str) {
+        self.leave_story(None);
         let name = name.to_owned();
         self.format_edit("Delete Captured Pages", move |edit| {
             edit.remove_captured_pages(&name)
