@@ -3,8 +3,9 @@
 
 //! The dialog of the page templates of a page layout document (W095,
 //! PXV-20), from the Add Page menu: a page added from a template after
-//! the page in sight, the template of that page changed, a template
-//! deleted, and the page in sight made a template, as Create Page
+//! the current page, that of the selected object or else the page in
+//! sight, the template of that page changed, a template deleted, and
+//! that page made a template, as Create Page
 //! Template From This Page of Pages 15.4 does. A template made again
 //! under its own name takes the objects of the page, which is how it is
 //! edited.
@@ -17,16 +18,16 @@ use crate::formatting::labelled;
 use crate::i18n::tr;
 
 /// Shows the page templates of the document, to add a page from or
-/// apply, and makes the page in sight a template under a name.
+/// apply, and makes the current page a template under a name.
 pub fn present(parent: &impl IsA<gtk::Widget>, editor: &TextEditor) {
     let dialog = adw::AlertDialog::new(
         Some(&tr("Page Templates")),
         Some(&tr(
-            "Add a page from a template after the page in sight, or make that page a template.",
+            "Add a page from a template after the current page, the page of the selection or in sight, or make that page a template.",
         )),
     );
     let content = gtk::Box::new(gtk::Orientation::Vertical, 12);
-    let layout = editor.is_page_layout();
+    let layout = editor.has_page_templates();
     let name = adw::EntryRow::builder()
         .title(tr("_Name"))
         .use_underline(true)
@@ -34,7 +35,7 @@ pub fn present(parent: &impl IsA<gtk::Widget>, editor: &TextEditor) {
         .build();
     let new = adw::PreferencesGroup::builder()
         .description(tr(
-            "A template of the same name takes the objects of the page in sight.",
+            "A template of the same name takes the objects of the current page.",
         ))
         .build();
     new.add(&name);
@@ -50,7 +51,7 @@ pub fn present(parent: &impl IsA<gtk::Widget>, editor: &TextEditor) {
                 .title(gtk::glib::markup_escape_text(&template))
                 .build();
             if current.as_deref() == Some(&*template) {
-                row.set_subtitle(&tr("Template of the page in sight"));
+                row.set_subtitle(&tr("Template of the current page"));
             }
             let add = gtk::Button::builder()
                 .label(tr("Add Page"))
@@ -58,11 +59,11 @@ pub fn present(parent: &impl IsA<gtk::Widget>, editor: &TextEditor) {
                 .build();
             let apply = gtk::Button::builder()
                 .icon_name("object-select-symbolic")
-                .tooltip_text(tr("Apply to the Page in Sight"))
+                .tooltip_text(tr("Apply to the Current Page"))
                 .valign(gtk::Align::Center)
                 .css_classes(["flat"])
                 .build();
-            labelled(&apply, &tr("Apply to the Page in Sight"));
+            labelled(&apply, &tr("Apply to the Current Page"));
             let delete = gtk::Button::builder()
                 .icon_name("user-trash-symbolic")
                 .tooltip_text(tr("Delete"))
@@ -88,12 +89,14 @@ pub fn present(parent: &impl IsA<gtk::Widget>, editor: &TextEditor) {
                     }
                 });
             }
-            let (editor_del, group, row_del) =
-                (editor.clone(), templates.downgrade(), row.downgrade());
+            let editor_del = editor.clone();
+            let dialog_del = dialog.downgrade();
             delete.connect_clicked(move |_| {
                 editor_del.delete_page_template(&template);
-                if let (Some(group), Some(row)) = (group.upgrade(), row_del.upgrade()) {
-                    group.remove(&row);
+                // What the others apply to may have changed with the
+                // selection: the dialog closes, as after the others.
+                if let Some(dialog) = dialog_del.upgrade() {
+                    dialog.close();
                 }
             });
         }

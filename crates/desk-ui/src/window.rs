@@ -1568,6 +1568,12 @@ impl DocumentWindow {
             .as_ref()
             .is_some_and(|e| !e.is_page_layout() && !e.is_presentation());
         self.enable("screen-view", has_document && words);
+        // Page templates are for page layout documents (W095).
+        let layout = editor
+            .as_ref()
+            .is_some_and(|e| e.is_page_layout() && !e.is_presentation());
+        self.enable("page-templates", has_document && layout);
+        self.enable("reapply-page-template", has_document && layout);
         self.enable("text-size", has_document && screen);
         // Screen View has no pages to go to, and shows no page count, as
         // in Pages 15.4 (PXV-01).

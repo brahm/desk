@@ -37,6 +37,8 @@ pub struct TemplateGroup {
     reapply: gtk::Button,
     /// The names in the list, after None.
     names: RefCell<Vec<Arc<str>>>,
+    /// The row of the template of the page shown.
+    shown: Cell<u32>,
     updating: Cell<bool>,
     editor: EditorOf,
 }
@@ -77,6 +79,7 @@ impl TemplateGroup {
             template,
             reapply,
             names: RefCell::new(Vec::new()),
+            shown: Cell::new(0),
             updating: Cell::new(false),
             editor,
         });
@@ -89,8 +92,15 @@ impl TemplateGroup {
             let chosen = (row.selected() as usize)
                 .checked_sub(1)
                 .and_then(|i| this.names.borrow().get(i).cloned());
-            if let (Some(name), Some(editor)) = (chosen, (this.editor)()) {
-                editor.apply_page_template(&name);
+            match (chosen, (this.editor)()) {
+                (Some(name), Some(editor)) => editor.apply_page_template(&name),
+                // A page keeps its template until it takes another, as
+                // in Pages 15.4: None shows a page without one.
+                _ => {
+                    this.updating.set(true);
+                    row.set_selected(this.shown.get());
+                    this.updating.set(false);
+                }
             }
         });
         let weak = Rc::downgrade(&this);
@@ -128,6 +138,7 @@ impl TemplateGroup {
             .as_ref()
             .and_then(|c| names.iter().position(|n| n == c))
             .map_or(0, |i| i as u32 + 1);
+        self.shown.set(at);
         if self.template.selected() != at {
             self.template.set_selected(at);
         }
@@ -142,6 +153,8 @@ pub struct PlaceholderGroup {
     group: compact::Group,
     kind: compact::ComboRow,
     tag: compact::EntryRow,
+    /// The row of the kind shown.
+    shown: Cell<u32>,
     updating: Cell<bool>,
     editor: EditorOf,
 }
@@ -168,36 +181,38 @@ impl PlaceholderGroup {
             group,
             kind,
             tag,
+            shown: Cell::new(0),
             updating: Cell::new(false),
             editor,
         });
         let weak = Rc::downgrade(&this);
-        this.kind.connect_selected_notify(move |_| {
+        this.kind.connect_selected_notify(move |row| {
             if let Some(this) = weak.upgrade()
                 && !this.updating.get()
+                && let Some(editor) = (this.editor)()
             {
-                this.changed();
+                // Each object keeps its own tag.
+                let kind = PLACEHOLDERS
+                    .get(row.selected() as usize)
+                    .and_then(|(kind, _)| *kind);
+                if !editor.set_placeholder_kind(kind) {
+                    // No selected object can take it.
+                    this.updating.set(true);
+                    row.set_selected(this.shown.get());
+                    this.updating.set(false);
+                }
             }
         });
         let weak = Rc::downgrade(&this);
-        this.tag.connect_apply(move |_| {
+        this.tag.connect_apply(move |row| {
             if let Some(this) = weak.upgrade()
                 && !this.updating.get()
+                && let Some(editor) = (this.editor)()
             {
-                this.changed();
+                editor.set_placeholder_tag(&row.text());
             }
         });
         this
-    }
-
-    fn changed(&self) {
-        let kind = PLACEHOLDERS
-            .get(self.kind.selected() as usize)
-            .and_then(|(kind, _)| *kind);
-        self.tag.set_sensitive(kind.is_some());
-        if let Some(editor) = (self.editor)() {
-            editor.set_placeholder(kind, &self.tag.text());
-        }
     }
 
     /// The group.
@@ -223,6 +238,7 @@ impl PlaceholderGroup {
             .iter()
             .position(|(kind, _)| *kind == placeholder.map(|p| p.kind))
             .unwrap_or(0) as u32;
+        self.shown.set(at);
         if self.kind.selected() != at {
             self.kind.set_selected(at);
         }

@@ -6,13 +6,20 @@
 //! changed or applied again, a template made from a page, and the
 //! placeholders of the selected objects with their tags.
 
+use std::cell::Cell;
 use std::sync::Arc;
 
-use desk_model::{Placeholder, PlaceholderKind};
+use desk_model::{ObjectKind, Placeholder, PlaceholderKind};
 
 use super::TextEditor;
 
 impl TextEditor {
+    /// Whether the document has page templates: a page layout document,
+    /// not a presentation.
+    pub fn has_page_templates(&self) -> bool {
+        self.is_page_layout() && !self.is_presentation()
+    }
+
     /// The names of the page templates of the document, in order.
     pub fn page_template_names(&self) -> Vec<Arc<str>> {
         let state = self.state.borrow();
@@ -41,16 +48,22 @@ impl TextEditor {
             .unwrap_or(0)
     }
 
-    /// Adds a page from a template after the page in sight, and shows it:
+    /// Adds a page from a template after the current page, and shows it:
     /// Add Page of Pages 15.4.
     pub fn add_page_from_template(&self, name: &str) {
         self.leave_story(None);
         let after = self.template_page();
         let name = name.to_owned();
+        let added = Cell::new(None);
         self.layout_page_edit("Add Page", |edit| {
-            edit.add_page_from_template(after, &name).map(drop)
+            if edit.document().page_templates().get(&name).is_some() {
+                added.set(Some(edit.add_page_from_template(after, &name)?));
+            }
+            Ok(())
         });
-        self.view.scroll_to_page(after as usize + 1);
+        if let Some(page) = added.get() {
+            self.view.scroll_to_page(page as usize);
+        }
     }
 
     /// Gives the page in sight a template, or the same one again: the
@@ -91,27 +104,89 @@ impl TextEditor {
 
     /// Takes a page template away; its pages keep their objects.
     pub fn delete_page_template(&self, name: &str) {
+        self.leave_story(None);
         let name = name.to_owned();
         self.layout_page_edit("Delete Page Template", |edit| {
             edit.remove_page_template(&name)
         });
     }
 
-    /// Makes the selected objects placeholders of a kind with a tag, or
-    /// plain objects: Define as Placeholder Text and Define as Media
-    /// Placeholder, and the Tag.
-    pub fn set_placeholder(&self, kind: Option<PlaceholderKind>, tag: &str) {
-        let ids = self.selected_objects();
-        if ids.is_empty() {
+    /// Makes the selected objects that can hold it placeholders of a
+    /// kind, each keeping its tag, or plain objects: Define as
+    /// Placeholder Text and Define as Media Placeholder. Text goes in
+    /// objects with text, media in pictures, movies and sounds. Whether
+    /// any selected object took it.
+    pub fn set_placeholder_kind(&self, kind: Option<PlaceholderKind>) -> bool {
+        let changes: Vec<_> = {
+            let state = self.state.borrow();
+            let objects = state.editor.document().objects();
+            self.selected_objects()
+                .into_iter()
+                .filter_map(|id| objects.get(id))
+                .filter(|o| match kind {
+                    None => o.placeholder.is_some(),
+                    Some(PlaceholderKind::Text) => {
+                        matches!(o.kind, ObjectKind::TextBox(_)) || o.holds_text()
+                    }
+                    Some(PlaceholderKind::Media) => {
+                        matches!(o.kind, ObjectKind::Image(_) | ObjectKind::Media(_))
+                    }
+                })
+                .map(|o| {
+                    let tag = o.placeholder.as_ref().and_then(|p| p.tag.clone());
+                    (o.id, kind.map(|kind| Placeholder { kind, tag }))
+                })
+                .collect()
+        };
+        if changes.is_empty() {
+            return false;
+        }
+        let name = if kind.is_some() {
+            "Define as Placeholder"
+        } else {
+            "Remove Placeholder"
+        };
+        self.format_edit(name, move |edit| {
+            for (id, placeholder) in changes {
+                edit.set_placeholders(&[id], placeholder)?;
+            }
+            Ok(())
+        });
+        true
+    }
+
+    /// Gives the selected placeholders a tag, or none when it is empty.
+    pub fn set_placeholder_tag(&self, tag: &str) {
+        let tag = tag.trim();
+        let tag: Option<Arc<str>> = (!tag.is_empty()).then(|| Arc::from(tag));
+        let changes: Vec<_> = {
+            let state = self.state.borrow();
+            let objects = state.editor.document().objects();
+            self.selected_objects()
+                .into_iter()
+                .filter_map(|id| objects.get(id))
+                .filter_map(|o| {
+                    let placeholder = o.placeholder.as_ref()?;
+                    (placeholder.tag != tag).then(|| {
+                        (
+                            o.id,
+                            Placeholder {
+                                kind: placeholder.kind,
+                                tag: tag.clone(),
+                            },
+                        )
+                    })
+                })
+                .collect()
+        };
+        if changes.is_empty() {
             return;
         }
-        let tag = tag.trim();
-        let placeholder = kind.map(|kind| Placeholder {
-            kind,
-            tag: (!tag.is_empty()).then(|| Arc::from(tag)),
-        });
-        self.format_edit("Define as Placeholder", move |edit| {
-            edit.set_placeholders(&ids, placeholder)
+        self.format_edit("Placeholder Tag", move |edit| {
+            for (id, placeholder) in changes {
+                edit.set_placeholders(&[id], Some(placeholder))?;
+            }
+            Ok(())
         });
     }
 }
@@ -142,7 +217,19 @@ mod tests {
             let view = crate::view::DocumentView::new();
             let editor = TextEditor::new(&view, document);
             editor.select_objects(vec![id]);
-            editor.set_placeholder(Some(PlaceholderKind::Media), " picture ");
+            // A shape holds no media, and text only with text in it.
+            assert!(!editor.set_placeholder_kind(Some(PlaceholderKind::Media)));
+            assert!(
+                editor
+                    .document()
+                    .objects()
+                    .get(id)
+                    .unwrap()
+                    .placeholder
+                    .is_none()
+            );
+            assert!(editor.set_placeholder_kind(Some(PlaceholderKind::Text)));
+            editor.set_placeholder_tag(" picture ");
             let placeholder = editor
                 .document()
                 .objects()
@@ -152,7 +239,7 @@ mod tests {
                 .clone();
             assert_eq!(
                 placeholder.map(|p| (p.kind, p.tag.as_deref().map(str::to_owned))),
-                Some((PlaceholderKind::Media, Some("picture".to_owned())))
+                Some((PlaceholderKind::Text, Some("picture".to_owned())))
             );
 
             editor.create_page_template("  Photo  ");

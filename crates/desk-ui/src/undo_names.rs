@@ -61,6 +61,8 @@ const NAMES: &[&str] = &[
     n_("Create Page Template"),
     n_("Delete Page Template"),
     n_("Define as Placeholder"),
+    n_("Remove Placeholder"),
+    n_("Placeholder Tag"),
     n_("Edit Chart Data"),
     n_("Edit Note"),
     n_("Edit Presenter Notes"),
