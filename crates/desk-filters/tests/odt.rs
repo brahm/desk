@@ -4668,3 +4668,38 @@ fn w101_the_styles_that_links_suggest_as_bookmarks_are_kept() {
     let fresh = read_odt(&write_odt(&Document::new_word_processing()).unwrap()).unwrap();
     assert_eq!(fresh.text_settings().bookmark_suggestions, None);
 }
+
+#[test]
+fn w102_the_link_of_an_object_is_kept_in_a_draw_a() {
+    use desk_model::{Anchor, Frame, Object, ObjectKind, Shape};
+    let mut document = Document::new_word_processing();
+    let ids = [document.new_id(), document.new_id()];
+    for (i, id) in ids.into_iter().enumerate() {
+        let mut shape = Object::new(
+            id,
+            ObjectKind::Shape(Shape::Rectangle),
+            Frame::from_pt(72.0, 72.0 + 100.0 * i as f64, 50.0, 50.0),
+        );
+        shape.anchor = Anchor::Page(0);
+        document
+            .apply(Op::InsertObject {
+                index: i,
+                object: shape,
+            })
+            .unwrap();
+    }
+    let mut editor = desk_model::Editor::new(document);
+    editor
+        .edit("Link", |edit| {
+            edit.set_object_links(&ids[..1], Some("tel:+55113456-7890".into()))
+        })
+        .unwrap();
+    let bytes = write_odt(editor.document()).unwrap();
+    keep("filters-object-link.odt", &bytes);
+    let read = read_odt(&bytes).unwrap();
+    let links: Vec<Option<&str>> = read.objects().iter().map(|o| o.link.as_deref()).collect();
+    assert_eq!(links, [Some("tel:+55113456-7890"), None]);
+    // Undo takes the link away.
+    editor.undo().unwrap();
+    assert!(editor.document().objects().iter().all(|o| o.link.is_none()));
+}

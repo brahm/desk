@@ -81,6 +81,7 @@ impl LinksGroup {
         let kinds = [
             tr("Webpage"),
             tr("Email Message"),
+            tr("Phone Number"),
             tr("Document"),
             tr("Bookmark"),
         ];
@@ -414,6 +415,7 @@ impl LinksGroup {
             let (first, second) = match &target {
                 Target::Web(address) => (address.as_str(), ""),
                 Target::Email { to, subject } => (to.as_str(), subject.as_str()),
+                Target::Phone(number) => (number.as_str(), ""),
                 Target::Document { file, bookmark } => (file.as_str(), bookmark.as_str()),
                 Target::Bookmark(name) => (name.as_str(), ""),
                 Target::Slide(_) => ("", ""),
@@ -474,8 +476,9 @@ impl LinksGroup {
         }
         let (first, second) = match kind {
             1 => (tr("To"), Some(tr("Subject"))),
-            2 => (tr("File"), Some(tr("Bookmark in the Document"))),
-            3 => (tr("Bookmark"), None),
+            2 => (tr("Phone Number"), None),
+            3 => (tr("File"), Some(tr("Bookmark in the Document"))),
+            4 => (tr("Bookmark"), None),
             _ => (tr("Address"), None),
         };
         self.link.set_title(&first);
@@ -483,8 +486,8 @@ impl LinksGroup {
         if let Some(second) = second {
             self.second.set_title(&second);
         }
-        self.choose.set_visible(kind == 2);
-        self.pick.set_visible(kind == 3);
+        self.choose.set_visible(kind == 3);
+        self.pick.set_visible(kind == 4);
     }
 
     /// Links the text at the cursor to what the rows say.
@@ -502,14 +505,16 @@ impl LinksGroup {
                 to: first,
                 subject: second,
             },
-            2 => Target::Document {
+            2 => Target::Phone(first),
+            3 => Target::Document {
                 file: first,
                 bookmark: second,
             },
-            3 => Target::Bookmark(first),
+            4 => Target::Bookmark(first),
             _ => Target::Web(first),
         };
         let empty = matches!(&target, Target::Web(a) | Target::Bookmark(a) if a.is_empty())
+            || matches!(&target, Target::Phone(n) if !n.chars().any(|c| c.is_ascii_digit()))
             || matches!(&target, Target::Email { to, .. } if to.is_empty())
             || matches!(&target, Target::Document { file, .. } if file.is_empty());
         editor.set_link(&if empty { String::new() } else { target.link() });

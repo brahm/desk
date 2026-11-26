@@ -180,7 +180,7 @@ impl TextFormat {
 
     /// Gives the Link button the popover of the hyperlink.
     pub fn set_link_popover(&self, popover: &gtk::Popover) {
-        self.link.set_popover(Some(popover));
+        crate::formatting::share_popover(&self.link, popover);
     }
 
     /// The menus that the format bar of interface B had, with the names

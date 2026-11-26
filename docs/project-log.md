@@ -2854,6 +2854,26 @@ paragraph, and objects on a second page.
   a table of contents inserted after a page break takes the break; and
   Insert > Table of Contents rings the bell inside a table or right after
   one.
+
+### 26 November: phone links and links from objects (step 8 of W3)
+
+- A link goes to a Phone Number too, as in Pages 15.4: a `tel:` link of
+  its digits, its "+" and its separators, which asks before the app that
+  takes such links calls it, as any link outside the web does.
+- Shapes, pictures, text boxes and groups have a link of their own,
+  from the Link group of their Arrange tab, Insert > Hyperlink or the
+  popover of the link of the text, which they share. A click on an
+  object selects it, as in Pages while editing; the popover follows the
+  link.
+- *ODF:* the standard `draw:a` around the object, which other programs
+  follow.
+- *Not done:* links to a page of a page layout document, which wait for
+  page templates (W095).
+- *From the review:* a `tel:` link keeps its parameters, as `;ext=`;
+  Insert > Hyperlink on objects leaves the links they have; a suggested
+  bookmark links the selected objects too; a `draw:a` around several
+  objects reads the first and counts the others as left out; and a style
+  deleted for another passes its place in the bookmark suggestions to it.
 - *Not done:* the text of an empty table, which Pages 15.4 shows when no
   paragraph uses its styles; the empty entry stays blank (EST-22).
 

@@ -338,6 +338,7 @@ pub fn link_target(text: &str) -> String {
         || text.starts_with('#')
         || text.contains("://")
         || text.starts_with("mailto:")
+        || text.starts_with("tel:")
     {
         text.to_owned()
     } else if text.contains('@') && !text.contains(char::is_whitespace) {
@@ -1807,6 +1808,25 @@ impl TextEditor {
     /// link at the cursor, selected, to name its place in the Inspector
     /// (EST-25).
     pub fn insert_link(&self) {
+        // Selected objects get a link to a web page, which the popover
+        // of the link then changes (W102).
+        if self.has_selected_objects() {
+            // Those without a link; the others keep theirs.
+            let ids: Vec<_> = {
+                let state = self.state.borrow();
+                let objects = state.editor.document().objects();
+                self.selected_objects()
+                    .into_iter()
+                    .filter(|id| objects.get(*id).is_some_and(|o| o.link.is_none()))
+                    .collect()
+            };
+            if !ids.is_empty() {
+                self.format_edit("Insert Link", move |edit| {
+                    edit.set_object_links(&ids, Some("https://".into()))
+                });
+            }
+            return;
+        }
         let selection = self.selection();
         let (start, end) = selection.ordered();
         if start != end {
@@ -1858,6 +1878,17 @@ impl TextEditor {
     pub fn set_link(&self, place: &str) {
         let place = link_target(place);
         let link = (!place.is_empty()).then(|| Arc::<str>::from(place));
+        // The selected objects link where a click on them goes (W102).
+        if self.has_selected_objects() {
+            let ids = self.selected_objects();
+            let name = if link.is_some() {
+                "Link"
+            } else {
+                "Remove Link"
+            };
+            self.format_edit(name, move |edit| edit.set_object_links(&ids, link));
+            return;
+        }
         let Some((from, to)) = self.link_range() else {
             return;
         };
@@ -1903,9 +1934,17 @@ impl TextEditor {
     /// link to a bookmark suggests, by index with their text (W101).
     pub fn bookmark_choices(&self) -> (Vec<Arc<str>>, Vec<(usize, String)>) {
         let state = self.state.borrow();
-        let document = state.editor.document();
+        // The bookmarks are those of the body, also while a header, a
+        // note or a text box is edited; its paragraphs are suggested
+        // only from the body.
+        let document = Self::main_document(&state);
         let names = bookmarks(document).into_iter().map(|(n, _, _)| n).collect();
-        (names, document.suggested_bookmarks())
+        let suggested = if state.story.is_none() {
+            document.suggested_bookmarks()
+        } else {
+            Vec::new()
+        };
+        (names, suggested)
     }
 
     /// Links the text at the cursor to paragraph `index` of the body,
@@ -1913,8 +1952,18 @@ impl TextEditor {
     /// already, which the link then goes to: choosing a suggested
     /// bookmark (W101).
     pub fn link_to_paragraph(&self, index: usize) {
-        let Some((from, to)) = self.link_range() else {
+        if self.story().is_some() {
             return;
+        }
+        // The selected objects, or the text.
+        let objects = self.has_selected_objects().then(|| self.selected_objects());
+        let range = if objects.is_some() {
+            None
+        } else {
+            let Some(range) = self.link_range() else {
+                return;
+            };
+            Some(range)
         };
         let (text, length, existing) = {
             let state = self.state.borrow();
@@ -1941,6 +1990,12 @@ impl TextEditor {
                 let end = at_spot(document, Spot::new(index, length))?;
                 edit.set_bookmark(start, end, Some(name))?;
             }
+            if let Some(ids) = &objects {
+                return edit.set_object_links(ids, Some(link));
+            }
+            let Some((from, to)) = range else {
+                return Ok(());
+            };
             let document = edit.document();
             let from = at_spot(document, from)?;
             let to = at_spot(document, to)?;
@@ -3032,7 +3087,13 @@ impl TextEditor {
                 .section_headers_footers(document.headers_section(start.paragraph))
                 .clone(),
             note: note_at(document, start),
-            link: link_at(document, start).map(|(link, _)| link),
+            // The link of the selected objects, or of the text (W102).
+            link: match state.objects.first() {
+                Some(id) if state.story.is_none() => {
+                    document.objects().get(*id).and_then(|o| o.link.clone())
+                }
+                _ => link_at(document, start).map(|(link, _)| link),
+            },
             bookmarks: bookmarks(document)
                 .into_iter()
                 .map(|(name, _, _)| name)

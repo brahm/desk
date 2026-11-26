@@ -396,6 +396,9 @@ pub struct DrawObject {
     /// The `desk:annotation`s in it: the comments on the object itself,
     /// each with its replies after it (W149, odf-extensions.md).
     pub annotations: Vec<crate::Annotation>,
+    /// `xlink:href` of the `draw:a` around the object: where a click on
+    /// it goes (W102).
+    pub link: Option<String>,
 }
 
 /// The `svg:viewBox` side that Desk writes a `draw:contour-polygon` in.
@@ -426,6 +429,7 @@ impl DrawObject {
             origin: None,
             moved_from: None,
             annotations: Vec::new(),
+            link: None,
         }
     }
 
@@ -840,6 +844,15 @@ fn draw_object_at(
     if e.name.ns != DRAW || depth > MAX_DEPTH {
         return None;
     }
+    if e.name.local == "a" {
+        // A linked object: the first object in the link (W102).
+        let link = e.attr(XLINK, "href").map(str::to_owned);
+        let mut object = e
+            .elements()
+            .find_map(|child| draw_object_at(child, paragraph, depth + 1))?;
+        object.link = link;
+        return Some(object);
+    }
     let kind = match e.name.local.as_str() {
         "rect" => DrawKind::Rect {
             corner_radius: e.attr(DRAW, "corner-radius").and_then(Length::parse),
@@ -1027,6 +1040,7 @@ fn draw_object_at(
             .filter(|c| c.name.is(DESK, "annotation"))
             .map(crate::read::read_annotation)
             .collect(),
+        link: None,
     })
 }
 
@@ -1144,6 +1158,19 @@ pub(crate) fn write_draw_object(
     object: &DrawObject,
     paragraph: &dyn Fn(&mut Writer, &Paragraph),
 ) {
+    // A linked object goes in a `draw:a` (W102).
+    if let Some(link) = &object.link {
+        w.start("draw:a")
+            .attr("xlink:type", "simple")
+            .attr("xlink:href", link);
+        write_shape(w, object, paragraph);
+        w.end();
+    } else {
+        write_shape(w, object, paragraph);
+    }
+}
+
+fn write_shape(w: &mut Writer, object: &DrawObject, paragraph: &dyn Fn(&mut Writer, &Paragraph)) {
     let name = match &object.kind {
         DrawKind::Rect { .. } => "draw:rect",
         DrawKind::Ellipse => "draw:ellipse",

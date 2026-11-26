@@ -820,7 +820,12 @@ impl Edit {
         if let Some(styles) = &mut settings.bookmark_suggestions
             && styles.contains(&id)
         {
-            styles.retain(|&s| s != id);
+            // Its paragraphs take the replacement, which they stay
+            // suggested by.
+            match replacement.filter(|r| !styles.contains(r)) {
+                Some(r) => styles.iter_mut().filter(|s| **s == id).for_each(|s| *s = r),
+                None => styles.retain(|&s| s != id),
+            }
             self.set_text_settings(settings.clone())?;
         }
         if settings.toc.uses(id) {

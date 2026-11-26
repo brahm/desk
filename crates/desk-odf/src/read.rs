@@ -914,6 +914,20 @@ pub(crate) fn style_shortcuts(settings: &str) -> Vec<StyleShortcut> {
 fn left_out(e: &Element, body: bool, out: &mut Vec<(String, usize)>) {
     for child in e.elements() {
         let name = &child.name;
+        if name.is(DRAW, "a") {
+            // A link reads its first object only (W102).
+            let extra = child
+                .elements()
+                .filter(|c| crate::draw::draw_object(c, &|_| Paragraph::default()).is_some())
+                .count()
+                .saturating_sub(1);
+            if extra > 0 {
+                match out.iter_mut().find(|(n, _)| n == "object") {
+                    Some((_, count)) => *count += extra,
+                    None => out.push(("object".to_owned(), extra)),
+                }
+            }
+        }
         let skipped = if name.is(OFFICE, "annotation") {
             if body {
                 continue;

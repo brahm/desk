@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Desk\n"
 "Report-Msgid-Bugs-To: https://github.com/brahm/desk/issues\n"
-"POT-Creation-Date: 2026-11-26 18:02+0000\n"
+"POT-Creation-Date: 2026-11-26 18:20+0000\n"
 "PO-Revision-Date: 2026-11-02 00:54+0000\n"
 "Last-Translator: Desk contributors\n"
 "Language-Team: Brazilian Portuguese\n"
@@ -18,8 +18,8 @@ msgstr ""
 "Plural-Forms: nplurals=2; plural=(n > 1);\n"
 
 #: crates/desk-ui/src/area.rs:43 crates/desk-ui/src/formatting.rs:291
-#: crates/desk-ui/src/formatting.rs:401 crates/desk-ui/src/inspector.rs:260
-#: crates/desk-ui/src/links_pane.rs:84 crates/desk-ui/src/links_pane.rs:577
+#: crates/desk-ui/src/formatting.rs:411 crates/desk-ui/src/inspector.rs:260
+#: crates/desk-ui/src/links_pane.rs:85 crates/desk-ui/src/links_pane.rs:581
 #: crates/desk-ui/src/tables/inspector.rs:143
 #: crates/desk-ui/src/tables/inspector.rs:260
 #: crates/desk-ui/src/writing_tools.rs:116
@@ -107,7 +107,7 @@ msgstr "Documento inteiro"
 #: crates/desk-ui/src/auto_numbers.rs:91
 #: crates/desk-ui/src/comments_page.rs:606
 #: crates/desk-ui/src/custom_format.rs:270
-#: crates/desk-ui/src/custom_format.rs:304 crates/desk-ui/src/editing.rs:4449
+#: crates/desk-ui/src/custom_format.rs:304 crates/desk-ui/src/editing.rs:4501
 #: crates/desk-ui/src/language_region.rs:215
 #: crates/desk-ui/src/styles_drawer.rs:625
 #: crates/desk-ui/src/styles_drawer.rs:687
@@ -269,7 +269,7 @@ msgid_plural "{n} Paragraphs"
 msgstr[0] "{n} parágrafo"
 msgstr[1] "{n} parágrafos"
 
-#: crates/desk-ui/src/change_bubble.rs:193 crates/desk-ui/src/formatting.rs:375
+#: crates/desk-ui/src/change_bubble.rs:193 crates/desk-ui/src/formatting.rs:385
 #: crates/desk-ui/src/table_pane.rs:326
 #: crates/desk-ui/src/tables/inspector.rs:195
 msgid "Cell"
@@ -397,7 +397,7 @@ msgstr "Texturas"
 #: crates/desk-ui/src/format_pane.rs:111 crates/desk-ui/src/format_pane.rs:224
 #: crates/desk-ui/src/format_pane.rs:272 crates/desk-ui/src/graphic_pane.rs:81
 #: crates/desk-ui/src/graphic_pane.rs:109
-#: crates/desk-ui/src/graphic_pane.rs:114 crates/desk-ui/src/links_pane.rs:373
+#: crates/desk-ui/src/graphic_pane.rs:114 crates/desk-ui/src/links_pane.rs:374
 #: crates/desk-ui/src/lists_pane.rs:59 crates/desk-ui/src/media_pane.rs:87
 #: crates/desk-ui/src/styles_drawer.rs:871
 #: crates/desk-ui/src/styles_drawer.rs:1029
@@ -501,7 +501,7 @@ msgstr "Editar dados"
 
 #: crates/desk-ui/src/chart_pane.rs:199
 #: crates/desk-ui/src/editing/tables.rs:680
-#: crates/desk-ui/src/formatting.rs:391 crates/desk-ui/src/inspector.rs:68
+#: crates/desk-ui/src/formatting.rs:401 crates/desk-ui/src/inspector.rs:68
 #: crates/desk-ui/src/tables/header.rs:54
 #: crates/desk-ui/src/tables/inspector.rs:401
 #: crates/desk-ui/src/window/header.rs:84
@@ -599,7 +599,7 @@ msgid "Category Axis"
 msgstr "Eixo de categorias"
 
 #: crates/desk-ui/src/chart_pane.rs:254 crates/desk-ui/src/chart_pane.rs:289
-#: crates/desk-ui/src/formatting.rs:393
+#: crates/desk-ui/src/formatting.rs:403
 msgid "Series"
 msgstr "Séries"
 
@@ -916,7 +916,7 @@ msgstr "Segundos"
 msgid "s"
 msgstr "s"
 
-#: crates/desk-ui/src/contents_page.rs:100 crates/desk-ui/src/links_pane.rs:620
+#: crates/desk-ui/src/contents_page.rs:100 crates/desk-ui/src/links_pane.rs:624
 #: crates/desk-ui/src/window.rs:586
 msgid "Table of Contents"
 msgstr "Sumário"
@@ -957,7 +957,7 @@ msgstr "Número"
 #: crates/desk-ui/src/custom_format.rs:46
 #: crates/desk-ui/src/custom_format.rs:95
 #: crates/desk-ui/src/editing/objects.rs:1757 crates/desk-ui/src/fonts.rs:367
-#: crates/desk-ui/src/formatting.rs:343 crates/desk-ui/src/formatting.rs:376
+#: crates/desk-ui/src/formatting.rs:353 crates/desk-ui/src/formatting.rs:386
 #: crates/desk-ui/src/function_browser.rs:23 crates/desk-ui/src/inspector.rs:59
 #: crates/desk-ui/src/outline_view.rs:361 crates/desk-ui/src/table_pane.rs:35
 #: crates/desk-ui/src/tables/inspector.rs:196
@@ -1196,8 +1196,8 @@ msgid "Page"
 msgstr "Página"
 
 #: crates/desk-ui/src/document_controls.rs:135
-#: crates/desk-ui/src/formatting.rs:410 crates/desk-ui/src/layout_pane.rs:349
-#: crates/desk-ui/src/links_pane.rs:578
+#: crates/desk-ui/src/formatting.rs:420 crates/desk-ui/src/layout_pane.rs:349
+#: crates/desk-ui/src/links_pane.rs:582
 msgid "Section"
 msgstr "Seção"
 
@@ -1209,12 +1209,14 @@ msgstr "Nota"
 #: crates/desk-ui/src/document_controls.rs:138
 #: crates/desk-ui/src/format_pane.rs:122 crates/desk-ui/src/format_pane.rs:125
 #: crates/desk-ui/src/format_pane.rs:127 crates/desk-ui/src/format_pane.rs:131
+#: crates/desk-ui/src/formatting.rs:836 crates/desk-ui/src/formatting.rs:839
+#: crates/desk-ui/src/formatting.rs:842 crates/desk-ui/src/formatting.rs:846
 msgid "Link"
 msgstr "Link"
 
 #: crates/desk-ui/src/document_controls.rs:139
-#: crates/desk-ui/src/editing.rs:1958 crates/desk-ui/src/links_pane.rs:85
-#: crates/desk-ui/src/links_pane.rs:478 crates/desk-ui/src/links_pane.rs:540
+#: crates/desk-ui/src/editing.rs:1992 crates/desk-ui/src/links_pane.rs:86
+#: crates/desk-ui/src/links_pane.rs:481 crates/desk-ui/src/links_pane.rs:544
 msgid "Bookmark"
 msgstr "Marcador"
 
@@ -1395,7 +1397,7 @@ msgid "Lines"
 msgstr "Linhas"
 
 #: crates/desk-ui/src/drop_cap_pane.rs:57 crates/desk-ui/src/effects.rs:286
-#: crates/desk-ui/src/formatting.rs:769 crates/desk-ui/src/writing_tools.rs:74
+#: crates/desk-ui/src/formatting.rs:778 crates/desk-ui/src/writing_tools.rs:74
 msgid "Characters"
 msgstr "Caracteres"
 
@@ -1485,15 +1487,15 @@ msgstr "Redefinir estilo a partir da seleção"
 msgid "Delete Style"
 msgstr "Excluir estilo"
 
-#: crates/desk-ui/src/editing.rs:4446
+#: crates/desk-ui/src/editing.rs:4498
 msgid "Open This Link?"
 msgstr "Abrir este link?"
 
-#: crates/desk-ui/src/editing.rs:4450
+#: crates/desk-ui/src/editing.rs:4502
 msgid "_Open"
 msgstr "_Abrir"
 
-#: crates/desk-ui/src/editing.rs:4455
+#: crates/desk-ui/src/editing.rs:4507
 msgid ""
 "{link}\n"
 "\n"
@@ -1507,19 +1509,19 @@ msgstr ""
 "antes a cada vez ou nunca abri-los. Links para outros documentos sempre "
 "abrem. Você pode mudar isso nas Preferências."
 
-#: crates/desk-ui/src/editing.rs:4457
+#: crates/desk-ui/src/editing.rs:4509
 msgid "Open Links to the Web?"
 msgstr "Abrir links para a web?"
 
-#: crates/desk-ui/src/editing.rs:4458
+#: crates/desk-ui/src/editing.rs:4510
 msgid "_Never Open"
 msgstr "_Nunca abrir"
 
-#: crates/desk-ui/src/editing.rs:4459
+#: crates/desk-ui/src/editing.rs:4511
 msgid "_Ask First"
 msgstr "_Perguntar antes"
 
-#: crates/desk-ui/src/editing.rs:4460
+#: crates/desk-ui/src/editing.rs:4512
 msgid "Open at _Once"
 msgstr "Abrir na _hora"
 
@@ -1539,8 +1541,8 @@ msgid "Shape"
 msgstr "Forma"
 
 #: crates/desk-ui/src/editing/objects.rs:1631
-#: crates/desk-ui/src/formatting.rs:304 crates/desk-ui/src/formatting.rs:311
-#: crates/desk-ui/src/formatting.rs:333 crates/desk-ui/src/formatting.rs:352
+#: crates/desk-ui/src/formatting.rs:314 crates/desk-ui/src/formatting.rs:321
+#: crates/desk-ui/src/formatting.rs:343 crates/desk-ui/src/formatting.rs:362
 #: crates/desk-ui/src/object_text_pane.rs:136
 #: crates/desk-ui/src/tables/bars.rs:140
 msgid "Style"
@@ -1551,7 +1553,7 @@ msgid "Table Style {number}"
 msgstr "Estilo de tabela {number}"
 
 #: crates/desk-ui/src/editing/tables.rs:206
-#: crates/desk-ui/src/formatting.rs:372 crates/desk-ui/src/inspector.rs:67
+#: crates/desk-ui/src/formatting.rs:382 crates/desk-ui/src/inspector.rs:67
 #: crates/desk-ui/src/table_pane.rs:267 crates/desk-ui/src/tables/header.rs:53
 #: crates/desk-ui/src/tables/inspector.rs:194
 #: crates/desk-ui/src/tables/inspector.rs:400
@@ -1867,7 +1869,7 @@ msgstr "Preenchimento"
 msgid "Choose…"
 msgstr "Escolher…"
 
-#: crates/desk-ui/src/fill_rows.rs:153 crates/desk-ui/src/formatting.rs:334
+#: crates/desk-ui/src/fill_rows.rs:153 crates/desk-ui/src/formatting.rs:344
 #: crates/desk-ui/src/inspector.rs:60 crates/desk-ui/src/lists_pane.rs:242
 #: crates/desk-ui/src/picture_pane.rs:176
 msgid "Image"
@@ -2402,7 +2404,7 @@ msgid "L_ist"
 msgstr "_Lista"
 
 #: crates/desk-ui/src/format_pane.rs:348 crates/desk-ui/src/format_pane.rs:375
-#: crates/desk-ui/src/format_pane.rs:378 crates/desk-ui/src/formatting.rs:302
+#: crates/desk-ui/src/format_pane.rs:378 crates/desk-ui/src/formatting.rs:309
 #: crates/desk-ui/src/window.rs:2884
 msgid "Arrange"
 msgstr "Organizar"
@@ -2521,57 +2523,61 @@ msgstr "Páginas espelhadas"
 msgid "Left and right pages swap their margins, as in a book"
 msgstr "As páginas da esquerda e da direita trocam as margens, como num livro"
 
-#: crates/desk-ui/src/formatting.rs:324 crates/desk-ui/src/layout_pane.rs:275
+#: crates/desk-ui/src/formatting.rs:334 crates/desk-ui/src/layout_pane.rs:275
 msgid "Layout"
 msgstr "Layout"
 
-#: crates/desk-ui/src/formatting.rs:327
+#: crates/desk-ui/src/formatting.rs:337
 msgid "More"
 msgstr "Mais"
 
-#: crates/desk-ui/src/formatting.rs:353 crates/desk-ui/src/tables/header.rs:61
+#: crates/desk-ui/src/formatting.rs:363 crates/desk-ui/src/tables/header.rs:61
 #: crates/desk-ui/src/window/header.rs:73
 #: crates/desk-ui/src/window/header.rs:75
 msgid "Media"
 msgstr "Mídia"
 
-#: crates/desk-ui/src/formatting.rs:392
+#: crates/desk-ui/src/formatting.rs:402
 msgid "Axis"
 msgstr "Eixo"
 
-#: crates/desk-ui/src/formatting.rs:412 crates/desk-ui/src/links_pane.rs:131
-#: crates/desk-ui/src/links_pane.rs:289
+#: crates/desk-ui/src/formatting.rs:422 crates/desk-ui/src/links_pane.rs:132
+#: crates/desk-ui/src/links_pane.rs:290
 msgid "Bookmarks"
 msgstr "Marcadores"
 
-#: crates/desk-ui/src/formatting.rs:413
+#: crates/desk-ui/src/formatting.rs:423
 #: crates/desk-ui/src/tables/inspector.rs:269
 msgid "Info"
 msgstr "Info"
 
-#: crates/desk-ui/src/formatting.rs:760 crates/desk-ui/src/writing_tools.rs:121
+#: crates/desk-ui/src/formatting.rs:769 crates/desk-ui/src/writing_tools.rs:121
 msgid "Statistics"
 msgstr "Estatísticas"
 
-#: crates/desk-ui/src/formatting.rs:762
+#: crates/desk-ui/src/formatting.rs:771
 msgid "Show All"
 msgstr "Mostrar tudo"
 
-#: crates/desk-ui/src/formatting.rs:768 crates/desk-ui/src/writing_tools.rs:73
+#: crates/desk-ui/src/formatting.rs:777 crates/desk-ui/src/writing_tools.rs:73
 msgid "Words"
 msgstr "Palavras"
 
-#: crates/desk-ui/src/formatting.rs:770 crates/desk-ui/src/writing_tools.rs:79
+#: crates/desk-ui/src/formatting.rs:779 crates/desk-ui/src/writing_tools.rs:79
 msgid "Paragraphs"
 msgstr "Parágrafos"
 
-#: crates/desk-ui/src/formatting.rs:771 crates/desk-ui/src/writing_tools.rs:81
+#: crates/desk-ui/src/formatting.rs:780 crates/desk-ui/src/writing_tools.rs:81
 msgid "Sections"
 msgstr "Seções"
 
-#: crates/desk-ui/src/formatting.rs:772 crates/desk-ui/src/writing_tools.rs:84
+#: crates/desk-ui/src/formatting.rs:781 crates/desk-ui/src/writing_tools.rs:84
 msgid "Graphics"
 msgstr "Gráficos"
+
+#: crates/desk-ui/src/formatting.rs:843
+msgid "Where a click on the object goes"
+msgstr "Aonde um clique no objeto leva"
 
 #: crates/desk-ui/src/function_browser.rs:16
 msgid "All"
@@ -3100,31 +3106,31 @@ msgstr "Abrir um documento"
 msgid "All Documents"
 msgstr "Todos os documentos"
 
-#: crates/desk-ui/src/links.rs:80
+#: crates/desk-ui/src/links.rs:82
 msgid "Goes to slide {n}"
 msgstr "Vai para o slide {n}"
 
-#: crates/desk-ui/src/links.rs:81
+#: crates/desk-ui/src/links.rs:83
 msgid "Goes to the next slide"
 msgstr "Vai para o próximo slide"
 
-#: crates/desk-ui/src/links.rs:82
+#: crates/desk-ui/src/links.rs:84
 msgid "Goes to the previous slide"
 msgstr "Vai para o slide anterior"
 
-#: crates/desk-ui/src/links.rs:83
+#: crates/desk-ui/src/links.rs:85
 msgid "Goes to the first slide"
 msgstr "Vai para o primeiro slide"
 
-#: crates/desk-ui/src/links.rs:84
+#: crates/desk-ui/src/links.rs:86
 msgid "Goes to the last slide"
 msgstr "Vai para o último slide"
 
-#: crates/desk-ui/src/links.rs:85
+#: crates/desk-ui/src/links.rs:87
 msgid "Goes to the slide shown last"
 msgstr "Vai para o último slide visto"
 
-#: crates/desk-ui/src/links.rs:86
+#: crates/desk-ui/src/links.rs:88
 msgid "Ends the slideshow"
 msgstr "Encerra a apresentação"
 
@@ -3136,156 +3142,162 @@ msgstr "Página da web"
 msgid "Email Message"
 msgstr "Mensagem de e-mail"
 
-#: crates/desk-ui/src/links_pane.rs:89
+#: crates/desk-ui/src/links_pane.rs:84 crates/desk-ui/src/links_pane.rs:479
+msgid "Phone Number"
+msgstr "Número de telefone"
+
+#: crates/desk-ui/src/links_pane.rs:90
 msgid "Link To"
 msgstr "Link para"
 
-#: crates/desk-ui/src/links_pane.rs:92
+#: crates/desk-ui/src/links_pane.rs:93
 msgid "Follow Link"
 msgstr "Seguir link"
 
-#: crates/desk-ui/src/links_pane.rs:93
+#: crates/desk-ui/src/links_pane.rs:94
 msgid "Remove Link"
 msgstr "Remover link"
 
-#: crates/desk-ui/src/links_pane.rs:97 crates/desk-ui/src/links_pane.rs:479
+#: crates/desk-ui/src/links_pane.rs:98 crates/desk-ui/src/links_pane.rs:482
 msgid "Address"
 msgstr "Endereço"
 
-#: crates/desk-ui/src/links_pane.rs:100 crates/desk-ui/src/links_pane.rs:521
+#: crates/desk-ui/src/links_pane.rs:101 crates/desk-ui/src/links_pane.rs:525
 msgid "Choose Document"
 msgstr "Escolher documento"
 
-#: crates/desk-ui/src/links_pane.rs:105 crates/desk-ui/src/links_pane.rs:108
+#: crates/desk-ui/src/links_pane.rs:106 crates/desk-ui/src/links_pane.rs:109
 msgid "Choose Bookmark"
 msgstr "Escolher marcador"
 
-#: crates/desk-ui/src/links_pane.rs:111 crates/desk-ui/src/links_pane.rs:476
+#: crates/desk-ui/src/links_pane.rs:112 crates/desk-ui/src/links_pane.rs:478
 msgid "Subject"
 msgstr "Assunto"
 
-#: crates/desk-ui/src/links_pane.rs:115
+#: crates/desk-ui/src/links_pane.rs:116
 msgid "Make Links Inactive"
 msgstr "Desativar links"
 
-#: crates/desk-ui/src/links_pane.rs:117
+#: crates/desk-ui/src/links_pane.rs:118
 msgid "A click puts the cursor in a link instead of following it"
 msgstr "Um clique põe o cursor no link em vez de segui-lo"
 
-#: crates/desk-ui/src/links_pane.rs:121
+#: crates/desk-ui/src/links_pane.rs:122
 msgid "Hyperlinks"
 msgstr "Hiperlinks"
 
-#: crates/desk-ui/src/links_pane.rs:123
+#: crates/desk-ui/src/links_pane.rs:124
 msgid ""
 "Insert ▸ Hyperlink links the selection. A link to a bookmark starts with #."
 msgstr ""
 "Inserir ▸ Hiperlink cria um link na seleção. Um link para um marcador começa "
 "com #."
 
-#: crates/desk-ui/src/links_pane.rs:133
+#: crates/desk-ui/src/links_pane.rs:134
 msgid ""
 "Add Bookmark marks the selection, or the word at the cursor. An empty name "
 "takes a bookmark away."
-msgstr "Adicionar marcador marca a seleção, ou a palavra no cursor. Um nome vazio remove o marcador."
+msgstr ""
+"Adicionar marcador marca a seleção, ou a palavra no cursor. Um nome vazio "
+"remove o marcador."
 
-#: crates/desk-ui/src/links_pane.rs:136
+#: crates/desk-ui/src/links_pane.rs:137
 msgid "By Name"
 msgstr "Por nome"
 
-#: crates/desk-ui/src/links_pane.rs:136
+#: crates/desk-ui/src/links_pane.rs:137
 msgid "By Page"
 msgstr "Por página"
 
-#: crates/desk-ui/src/links_pane.rs:138 crates/desk-ui/src/links_pane.rs:139
+#: crates/desk-ui/src/links_pane.rs:139 crates/desk-ui/src/links_pane.rs:140
 msgid "Sort Bookmarks"
 msgstr "Ordenar marcadores"
 
-#: crates/desk-ui/src/links_pane.rs:141
+#: crates/desk-ui/src/links_pane.rs:142
 msgid "Add Bookmark"
 msgstr "Adicionar marcador"
 
-#: crates/desk-ui/src/links_pane.rs:150
+#: crates/desk-ui/src/links_pane.rs:151
 msgid "Styles to Suggest"
 msgstr "Estilos a sugerir"
 
-#: crates/desk-ui/src/links_pane.rs:153 crates/desk-ui/src/undo_names.rs:19
+#: crates/desk-ui/src/links_pane.rs:154 crates/desk-ui/src/undo_names.rs:19
 msgid "Bookmark Suggestions"
 msgstr "Sugestões de marcadores"
 
-#: crates/desk-ui/src/links_pane.rs:155
+#: crates/desk-ui/src/links_pane.rs:156
 msgid "A link to a bookmark also suggests the paragraphs of these styles."
 msgstr "Um link para um marcador também sugere os parágrafos destes estilos."
 
-#: crates/desk-ui/src/links_pane.rs:307
+#: crates/desk-ui/src/links_pane.rs:308
 msgid "Suggested"
 msgstr "Sugeridos"
 
-#: crates/desk-ui/src/links_pane.rs:326
+#: crates/desk-ui/src/links_pane.rs:327
 msgid "No Bookmarks"
 msgstr "Nenhum marcador"
 
-#: crates/desk-ui/src/links_pane.rs:375 crates/desk-ui/src/links_pane.rs:743
+#: crates/desk-ui/src/links_pane.rs:376 crates/desk-ui/src/links_pane.rs:747
 msgid "{n} styles"
 msgstr "{n} estilos"
 
-#: crates/desk-ui/src/links_pane.rs:469
+#: crates/desk-ui/src/links_pane.rs:471
 msgid "Link of a Presentation"
 msgstr "Link de apresentação"
 
-#: crates/desk-ui/src/links_pane.rs:476
+#: crates/desk-ui/src/links_pane.rs:478
 msgid "To"
 msgstr "Para"
 
-#: crates/desk-ui/src/links_pane.rs:477
+#: crates/desk-ui/src/links_pane.rs:480
 msgid "Bookmark in the Document"
 msgstr "Marcador no documento"
 
-#: crates/desk-ui/src/links_pane.rs:477
+#: crates/desk-ui/src/links_pane.rs:480
 msgid "File"
 msgstr "Arquivo"
 
-#: crates/desk-ui/src/links_pane.rs:544
+#: crates/desk-ui/src/links_pane.rs:548
 msgid "Go to Bookmark"
 msgstr "Ir para o marcador"
 
-#: crates/desk-ui/src/links_pane.rs:545
+#: crates/desk-ui/src/links_pane.rs:549
 msgid "Remove Bookmark"
 msgstr "Remover marcador"
 
-#: crates/desk-ui/src/links_pane.rs:579
+#: crates/desk-ui/src/links_pane.rs:583
 msgid "To Next Occurrence"
 msgstr "Até a próxima ocorrência"
 
-#: crates/desk-ui/src/links_pane.rs:601
+#: crates/desk-ui/src/links_pane.rs:605
 msgid "Make Page Numbers Links"
 msgstr "Números de página como links"
 
-#: crates/desk-ui/src/links_pane.rs:605
+#: crates/desk-ui/src/links_pane.rs:609
 msgid "Styles to Include"
 msgstr "Estilos a incluir"
 
-#: crates/desk-ui/src/links_pane.rs:608
+#: crates/desk-ui/src/links_pane.rs:612
 msgid "Range"
 msgstr "Intervalo"
 
-#: crates/desk-ui/src/links_pane.rs:609
+#: crates/desk-ui/src/links_pane.rs:613
 msgid "The paragraphs that the table at the cursor lists"
 msgstr "Os parágrafos que o sumário no cursor lista"
 
-#: crates/desk-ui/src/links_pane.rs:616
+#: crates/desk-ui/src/links_pane.rs:620
 msgid "Update Now"
 msgstr "Atualizar agora"
 
-#: crates/desk-ui/src/links_pane.rs:622
+#: crates/desk-ui/src/links_pane.rs:626
 msgid "Insert ▸ Table of Contents adds one before the paragraph of the cursor."
 msgstr "Inserir ▸ Sumário adiciona um antes do parágrafo do cursor."
 
-#: crates/desk-ui/src/links_pane.rs:698
+#: crates/desk-ui/src/links_pane.rs:702
 msgid "Show Page Number"
 msgstr "Mostrar número da página"
 
-#: crates/desk-ui/src/links_pane.rs:741
+#: crates/desk-ui/src/links_pane.rs:745
 msgid "Headings, once a table is inserted"
 msgstr "Títulos, quando um sumário for inserido"
 

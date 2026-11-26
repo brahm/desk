@@ -8,6 +8,9 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
 
 ## Changes since 0.7.0 (unreleased)
 
+* Added: Links to a phone number, and links on shapes, pictures, text
+  boxes and groups, as in Pages 15.4. (#247)
+
 * Added: The Bookmarks tab of the Document pane of Pages 15.4, and the
   bookmarks that a link suggests from the paragraphs of the styles
   chosen in it, Heading 2 and Heading 3 in a new document. (#246)

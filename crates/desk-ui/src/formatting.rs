@@ -299,7 +299,17 @@ impl Inspector {
         let [character, text_shadow, borders] = effects.groups();
         let [page, layout, section] = layouts.groups();
         let [link, bookmarks, suggestions] = links.groups();
-        let arrange = || Tab::new("arrange", n_("Arrange"), &[&arrange_group, metrics, wrap]);
+        let link_popover = link_popover(&[link]);
+        // The link of the selected objects, in the popover of the link of
+        // the text (W102).
+        let object_link = link_group(&link_popover);
+        let arrange = || {
+            Tab::new(
+                "arrange",
+                n_("Arrange"),
+                &[&arrange_group, metrics, wrap, &object_link],
+            )
+        };
         let styles = object_styles.group();
         let style = || Tab::new("style", n_("Style"), &[styles, graphic, shape]);
         let mut contexts = HashMap::new();
@@ -414,7 +424,6 @@ impl Inspector {
         ];
         let levels = Levels::new(contexts, document_tabs);
         levels.set_header(Context::Text, text.header().widget());
-        let link_popover = link_popover(&[link]);
         text.set_link_popover(&link_popover);
         let root = levels.widget().clone();
         {
@@ -803,8 +812,42 @@ impl InfoRows {
     }
 }
 
-/// A popover that holds the groups of the hyperlink and the bookmarks,
-/// as the Link inspector of Pages became in interface B.
+/// Makes a button show a popover that other buttons show too: it takes
+/// the popover from the button that had it, when it opens.
+pub fn share_popover(button: &gtk::MenuButton, popover: &gtk::Popover) {
+    let popover = popover.clone();
+    button.set_create_popup_func(move |button| {
+        if button.popover().as_ref() != Some(&popover) {
+            if let Some(old) = popover.parent().and_downcast::<gtk::MenuButton>() {
+                old.set_popover(None::<&gtk::Popover>);
+            }
+            button.set_popover(Some(&popover));
+        }
+    });
+}
+
+/// The Link group of the selected objects, whose button shows the popover
+/// of the link (W102).
+fn link_group(popover: &gtk::Popover) -> compact::Group {
+    let button = gtk::MenuButton::builder()
+        .icon_name("desk-link-symbolic")
+        .tooltip_text(tr("Link"))
+        .valign(gtk::Align::Center)
+        .build();
+    labelled(&button, &tr("Link"));
+    share_popover(&button, popover);
+    let row = compact::ActionRow::builder()
+        .title(tr("Link"))
+        .subtitle(tr("Where a click on the object goes"))
+        .build();
+    row.add_suffix(&button);
+    let group = compact::Group::builder().title(tr("Link")).build();
+    group.add(&row);
+    group
+}
+
+/// A popover that holds the group of the hyperlink, as the Link
+/// inspector of Pages became in interface B.
 fn link_popover(groups: &[&compact::Group]) -> gtk::Popover {
     let content = gtk::Box::builder()
         .orientation(gtk::Orientation::Vertical)
