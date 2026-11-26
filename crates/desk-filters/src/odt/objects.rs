@@ -1794,9 +1794,22 @@ fn import_page_templates<'a>(
         let mut found: Vec<&odf::DrawObject> = template.objects.iter().collect();
         found.sort_by_key(|o| o.z_index.unwrap_or(u32::MAX));
         let mut objects = Vec::new();
+        // The shapes by id, which its connectors join (OBJ-31).
+        let mut shapes: HashMap<&str, NodeId> = HashMap::new();
         for object in found {
-            if let Some(mut built) =
-                import_one(source, document, object, None, setup, paragraph, 0)?
+            // A template has no comments: those of its objects would be
+            // on no object of the document, and are left out.
+            let without_comments;
+            let read = if object.annotations.is_empty() {
+                object
+            } else {
+                without_comments = odf::DrawObject {
+                    annotations: Vec::new(),
+                    ..object.clone()
+                };
+                &without_comments
+            };
+            if let Some(mut built) = import_one(source, document, read, None, setup, paragraph, 0)?
             {
                 built.anchor = Anchor::Page(0);
                 built.template_object = None;
@@ -1805,8 +1818,39 @@ fn import_page_templates<'a>(
                 }
                 if let Some(id) = &object.id {
                     ids.insert(id.as_str(), built.id);
+                    shapes.insert(id.as_str(), built.id);
                 }
-                objects.push(built);
+                objects.push((object, built));
+            }
+        }
+        // The connectors of the template join its shapes.
+        let joined: Vec<(NodeId, Option<NodeId>, Option<NodeId>)> = objects
+            .iter()
+            .filter_map(|(object, built)| {
+                let odf::DrawKind::Connector {
+                    start_shape,
+                    end_shape,
+                    ..
+                } = &object.kind
+                else {
+                    return None;
+                };
+                let end = |name: &Option<String>| {
+                    shapes
+                        .get(name.as_deref()?)
+                        .copied()
+                        .filter(|other| *other != built.id)
+                };
+                Some((built.id, end(start_shape), end(end_shape)))
+            })
+            .collect();
+        let mut objects: Vec<Object> = objects.into_iter().map(|(_, built)| built).collect();
+        for (id, start, end) in joined {
+            if let Some(object) = objects.iter_mut().find(|o| o.id == id)
+                && let ObjectKind::Shape(Shape::Connection(line)) = &mut object.kind
+            {
+                line.start = start;
+                line.end = end;
             }
         }
         for &page in &template.pages {

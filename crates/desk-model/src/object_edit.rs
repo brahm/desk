@@ -544,7 +544,27 @@ impl Edit {
     /// each is a character of it. Each copy shares its origin with the
     /// object it copies, which takes one if it has none and is in the
     /// document (IOP-33).
+    /// A copy copies no object of a page template, so that Reapply Page
+    /// Template leaves it (W095).
     pub fn add_copies(&mut self, objects: &[Object]) -> Result<Vec<NodeId>, ModelError> {
+        self.add_copies_with(objects, false)
+    }
+
+    /// Adds copies of objects as [`Self::add_copies`] does, keeping the
+    /// objects of page templates they copy: those of a page put back or
+    /// copied with its template (W095).
+    pub(crate) fn add_copies_of_template(
+        &mut self,
+        objects: &[Object],
+    ) -> Result<Vec<NodeId>, ModelError> {
+        self.add_copies_with(objects, true)
+    }
+
+    fn add_copies_with(
+        &mut self,
+        objects: &[Object],
+        templates: bool,
+    ) -> Result<Vec<NodeId>, ModelError> {
         let objects: Vec<Object> = objects
             .iter()
             .filter(|o| o.anchor != Anchor::InText)
@@ -553,7 +573,11 @@ impl Edit {
         let objects: Vec<&Object> = objects.iter().collect();
         let mut copies = Vec::with_capacity(objects.len());
         for object in &objects {
-            copies.push(self.renumbered_object(object)?);
+            let mut copy = self.renumbered_object(object)?;
+            if !templates {
+                copy.template_object = None;
+            }
+            copies.push(copy);
         }
         let copied = |id: Option<NodeId>| {
             let id = id?;
@@ -985,7 +1009,7 @@ impl Edit {
                 })
             })
             .collect();
-        self.add_copies(&objects)?;
+        self.add_copies_of_template(&objects)?;
         Ok(before)
     }
 

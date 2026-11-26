@@ -702,7 +702,8 @@ pub(super) fn export_all(
 ) -> Vec<odf::ChangedRegion> {
     let mut regions = Vec::new();
     text(&mut out.body, document, &mut regions);
-    for object in &mut out.page_objects {
+    let templates = out.page_templates.iter_mut().flat_map(|t| &mut t.objects);
+    for object in out.page_objects.iter_mut().chain(templates) {
         object_text(object, document, &mut regions);
     }
     let masters = std::iter::once(&mut out.master).chain(out.masters.iter_mut().map(|(_, m)| m));

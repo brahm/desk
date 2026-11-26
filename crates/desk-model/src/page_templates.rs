@@ -162,22 +162,56 @@ impl Edit {
     /// of copies of the objects of a page: Create Page Template From This
     /// Page (W095). The objects of the page stay as they are.
     pub fn add_page_template_from_page(&mut self, page: u32, name: &str) -> Result<(), ModelError> {
-        let mut objects: Vec<Object> = self
+        let sources: Vec<Object> = self
             .document()
             .objects()
             .iter()
             .filter(|o| o.anchor == Anchor::Page(page))
             .cloned()
             .collect();
-        for object in &mut objects {
-            object.id = self.new_id();
+        // The objects that copy those of the template being replaced keep
+        // their ids, so that its pages keep the content of their
+        // placeholders when it is applied again.
+        let old: Vec<NodeId> = self
+            .document()
+            .page_templates()
+            .get(name)
+            .map(|t| t.objects.iter().map(|o| o.id).collect())
+            .unwrap_or_default();
+        let mut objects = Vec::with_capacity(sources.len());
+        for source in &sources {
+            // New ids for it, its paragraphs and the objects of a group,
+            // out of its comments and tracked changes.
+            let mut object = self.renumbered_object(source)?;
+            if let Some(id) = source.template_object.filter(|id| old.contains(id))
+                && !objects.iter().any(|o: &Object| o.id == id)
+            {
+                object.id = id;
+            }
             object.anchor = Anchor::Page(0);
             object.template_object = None;
-            object.comments = crate::CommentIds::none();
-            object.moved = None;
-            if let ObjectKind::TextBox(text) = &mut object.kind {
-                // A template's boxes are not linked to the page's.
-                text.next = None;
+            objects.push(object);
+        }
+        // Connectors join the copies of the shapes they joined.
+        let copy = |id: Option<NodeId>| {
+            let at = sources.iter().position(|o| Some(o.id) == id)?;
+            Some(objects[at].id)
+        };
+        let joined: Vec<Option<(Option<NodeId>, Option<NodeId>)>> = sources
+            .iter()
+            .map(|o| match &o.kind {
+                ObjectKind::Shape(crate::Shape::Connection(line)) => {
+                    Some((copy(line.start), copy(line.end)))
+                }
+                _ => None,
+            })
+            .collect();
+        for (object, joined) in objects.iter_mut().zip(joined) {
+            if let (Some((start, end)), ObjectKind::Shape(crate::Shape::Connection(line))) =
+                (joined, &mut object.kind)
+            {
+                line.start = start;
+                line.end = end;
             }
         }
         self.put_page_template(PageTemplate {
@@ -204,21 +238,43 @@ impl Edit {
     /// no template.
     pub fn remove_page_template(&mut self, name: &str) -> Result<(), ModelError> {
         let mut templates = self.document().page_templates().clone();
+        let Some(removed) = templates.get(name).cloned() else {
+            return Ok(());
+        };
         templates.templates.retain(|t| &*t.name != name);
         for page in templates.pages.iter_mut() {
             if page.as_deref() == Some(name) {
                 *page = None;
             }
         }
+        // Its copies become plain objects of their pages.
+        let ids: Vec<NodeId> = removed.objects.iter().map(|o| o.id).collect();
+        let copies: Vec<Object> = self
+            .document()
+            .objects()
+            .iter()
+            .filter(|o| o.template_object.is_some_and(|t| ids.contains(&t)))
+            .cloned()
+            .collect();
+        for mut object in copies {
+            object.template_object = None;
+            self.replace_object(object)?;
+        }
         self.set_page_templates(templates)
     }
 
     /// Adds a page from a template after page `after` of a page layout
     /// document: Add Page of Pages 15.4 (W095). Gives back its index.
+    /// Does nothing, giving back `after`, without the template or outside
+    /// a page layout document.
     pub fn add_page_from_template(&mut self, after: u32, name: &str) -> Result<u32, ModelError> {
-        if self.document().page_setup().layout_pages.is_none() {
-            return Ok(0);
+        let Some(count) = self.document().page_setup().layout_pages else {
+            return Ok(after);
+        };
+        if self.document().page_templates().get(name).is_none() {
+            return Ok(after);
         }
+        let after = after.min(count.saturating_sub(1));
         self.add_layout_page(after)?;
         let page = after + 1;
         self.apply_page_template(page, name)?;
@@ -231,6 +287,10 @@ impl Edit {
     /// object they copy when the template is the same. Applying the
     /// template of the page again is Reapply Page Template.
     pub fn apply_page_template(&mut self, page: u32, name: &str) -> Result<(), ModelError> {
+        let count = self.document().page_setup().layout_pages.unwrap_or(0);
+        if page >= count {
+            return Ok(());
+        }
         let Some(template) = self.document().page_templates().get(name).cloned() else {
             return Ok(());
         };
@@ -283,11 +343,10 @@ impl Edit {
                 copy
             })
             .collect();
-        self.add_copies(&copies)?;
+        self.add_copies_of_template(&copies)?;
         let name: Arc<str> = template.name.clone();
-        let count = self.document().page_setup().layout_pages.unwrap_or(0);
         let mut templates = self.document().page_templates().clone();
-        let mut pages = templates.fitted(count.max(page + 1));
+        let mut pages = templates.fitted(count);
         if let Some(slot) = pages.get_mut(page as usize) {
             *slot = Some(name);
         }
