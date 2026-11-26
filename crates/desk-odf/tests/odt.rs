@@ -417,6 +417,13 @@ fn full_document() -> TextDocument {
                     }],
                     ..HeaderFooter::default()
                 }),
+                // The background of its pages (W098).
+                background: Some(desk_odf::PageFill {
+                    fill: "solid".into(),
+                    color: Color::parse("#2040c0"),
+                    ..desk_odf::PageFill::default()
+                }),
+                match_previous: true,
                 ..MasterPage::default()
             },
         )],

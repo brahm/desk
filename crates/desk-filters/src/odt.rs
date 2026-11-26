@@ -395,6 +395,52 @@ fn text_fill(source: &odf::TextDocument, t: &odf::TextProperties) -> Option<Opti
     }
 }
 
+/// The name of a way to size a picture that fills, as
+/// `desk:fill-image-mode` writes it.
+fn image_mode_name(mode: ImageFill) -> &'static str {
+    match mode {
+        ImageFill::ScaleToFill => "scale-to-fill",
+        ImageFill::ScaleToFit => "scale-to-fit",
+        ImageFill::Stretch => "stretch",
+        ImageFill::OriginalSize => "original-size",
+        ImageFill::Tile => "tile",
+    }
+}
+
+/// What fills the pages of a master page (W098), from ODF: none when
+/// what it names is missing.
+fn page_fill(source: &odf::TextDocument, fill: &odf::PageFill) -> Option<Fill> {
+    match fill.fill.as_str() {
+        "solid" => fill.color.map(|c| Fill::Color(rgba(c))),
+        "gradient" => {
+            let name = fill.gradient_name.as_deref()?;
+            let gradient = source.gradients.iter().find(|g| g.name == name)?;
+            Some(objects::model_gradient(gradient))
+        }
+        "bitmap" => {
+            let picture = objects::fill_picture(source, fill.image_name.as_deref()?)?;
+            let mode = match (fill.image_mode.as_deref(), fill.repeat.as_deref()) {
+                (Some("scale-to-fill"), _) => ImageFill::ScaleToFill,
+                (Some("scale-to-fit"), _) => ImageFill::ScaleToFit,
+                (Some("original-size"), _) | (None, Some("no-repeat")) => ImageFill::OriginalSize,
+                // Repeat is what ODF does when it names neither.
+                (Some("tile"), _) | (None, Some("repeat") | None) => ImageFill::Tile,
+                _ => ImageFill::Stretch,
+            };
+            let tint = fill.tint.map(|color| Rgba {
+                a: (fill.tint_opacity.unwrap_or(100.0).clamp(0.0, 100.0) * 2.55).round() as u8,
+                ..rgba(color)
+            });
+            Some(Fill::Image {
+                picture,
+                mode,
+                tint,
+            })
+        }
+        _ => None,
+    }
+}
+
 /// The gradients and pictures that fill letters (PXV-04), which go to
 /// `office:styles` beside those of the objects, under names of their own.
 #[derive(Default)]
@@ -456,6 +502,54 @@ impl TextFills {
         pictures.extend(self.pictures);
     }
 
+    /// What fills the pages of a section, in ODF (W098), with its
+    /// gradient or picture added.
+    fn page_fill(&mut self, fill: &Fill) -> odf::PageFill {
+        match fill {
+            Fill::Color(color) => odf::PageFill {
+                fill: "solid".into(),
+                color: Some(odf_color(*color)),
+                ..odf::PageFill::default()
+            },
+            &Fill::Gradient { from, to, angle } => odf::PageFill {
+                fill: "gradient".into(),
+                gradient_name: Some(self.gradient(objects::odf_gradient(from, to, angle))),
+                ..odf::PageFill::default()
+            },
+            Fill::Advanced(gradient) => odf::PageFill {
+                fill: "gradient".into(),
+                gradient_name: Some(self.gradient(objects::odf_advanced_gradient(gradient))),
+                ..odf::PageFill::default()
+            },
+            Fill::Image {
+                picture,
+                mode,
+                tint,
+            } => odf::PageFill {
+                fill: "bitmap".into(),
+                image_name: Some(self.image(picture)),
+                repeat: Some(
+                    match mode {
+                        ImageFill::Tile => "repeat",
+                        ImageFill::OriginalSize => "no-repeat",
+                        _ => "stretch",
+                    }
+                    .into(),
+                ),
+                image_mode: Some(image_mode_name(*mode).into()),
+                tint: tint.map(odf_color),
+                tint_opacity: tint.map(|t| (f64::from(t.a) / 2.55 * 10.0).round() / 10.0),
+                ..odf::PageFill::default()
+            },
+            // Kinds of fill that pages do not have yet are no fill.
+            #[allow(unreachable_patterns)]
+            _ => odf::PageFill {
+                fill: "none".into(),
+                ..odf::PageFill::default()
+            },
+        }
+    }
+
     /// The fill attributes of ODF text properties for a fill of letters.
     fn properties(&mut self, fill: Option<&Fill>, t: &mut odf::TextProperties) {
         match fill {
@@ -476,16 +570,7 @@ impl TextFills {
             }) => {
                 t.fill = Some("bitmap".into());
                 t.fill_image_name = Some(self.image(picture));
-                t.fill_image_mode = Some(
-                    match mode {
-                        ImageFill::ScaleToFill => "scale-to-fill",
-                        ImageFill::ScaleToFit => "scale-to-fit",
-                        ImageFill::Stretch => "stretch",
-                        ImageFill::OriginalSize => "original-size",
-                        ImageFill::Tile => "tile",
-                    }
-                    .into(),
-                );
+                t.fill_image_mode = Some(image_mode_name(*mode).into());
                 if let Some(tint) = *tint {
                     t.fill_tint = Some(odf_color(tint));
                     t.fill_tint_opacity = Some((f64::from(tint.a) / 2.55 * 10.0).round() / 10.0);
@@ -1478,6 +1563,9 @@ fn import_text(source: &odf::TextDocument) -> Result<Document, FilterError> {
     // The sections with master pages of their own, by their first
     // paragraph.
     let mut own_masters: Vec<(NodeId, String)> = Vec::new();
+    // Every section with a master page, by the paragraph that starts it,
+    // for its background (W098).
+    let mut section_pages: Vec<(NodeId, String)> = Vec::new();
 
     // The ids of the paragraphs of the body, ahead, for the page
     // references to them.
@@ -1580,11 +1668,20 @@ fn import_text(source: &odf::TextDocument) -> Result<Document, FilterError> {
         // headers and footers.
         let start = match (own_master, start) {
             (Some(name), start) => {
-                own_masters.push((built.id(), name.to_owned()));
+                // One that only gives the section its background keeps
+                // the headers and footers of the section before (W098).
+                let own = !source
+                    .masters
+                    .iter()
+                    .any(|(n, m)| n == name && m.match_previous);
+                if own {
+                    own_masters.push((built.id(), name.to_owned()));
+                }
+                section_pages.push((built.id(), name.to_owned()));
                 Some(match start {
                     Some(Start::Section(section, layout)) => Start::Section(
                         Section {
-                            own_margins: true,
+                            own_margins: own,
                             ..section
                         },
                         layout,
@@ -1594,7 +1691,7 @@ fn import_text(source: &odf::TextDocument) -> Result<Document, FilterError> {
                         Start::Section(
                             Section {
                                 first_number: page_number.flatten(),
-                                own_margins: true,
+                                own_margins: own,
                                 ..Section::default()
                             },
                             layout,
@@ -1743,6 +1840,35 @@ fn import_text(source: &odf::TextDocument) -> Result<Document, FilterError> {
         fill_images: source.fill_images.clone(),
         ..odf::TextDocument::default()
     };
+    // What fills the pages of each section (W098), the first's from the
+    // master page its first paragraph names, when it names one.
+    let first_master = source
+        .body
+        .first()
+        .and_then(|p| p.style.as_deref())
+        .and_then(|name| {
+            source
+                .automatic_styles
+                .iter()
+                .find(|s| s.family == odf::Family::Paragraph && s.name == name)
+        })
+        .and_then(|s| s.master_page.as_deref())
+        .and_then(|name| source.masters.iter().find(|(n, _)| n == name))
+        .map_or(master, |(_, page)| page);
+    let mut backgrounds = vec![(None, first_master)];
+    for (id, name) in &section_pages {
+        if let Some((_, page)) = source.masters.iter().find(|(n, _)| n == name) {
+            backgrounds.push((Some(*id), page));
+        }
+    }
+    for (section, page) in backgrounds {
+        if let Some(fill) = page.background.as_ref().and_then(|f| page_fill(source, f)) {
+            document.apply(Op::SetSectionBackground {
+                section,
+                fill: Some(fill),
+            })?;
+        }
+    }
     let mut parts: Vec<(Option<NodeId>, &odf::MasterPage)> = vec![(None, master)];
     for (id, name) in &own_masters {
         if let Some((_, page)) = source.masters.iter().find(|(n, _)| n == name) {
@@ -3348,20 +3474,47 @@ fn page_layout_body(out: &mut odf::TextDocument, automatic: &mut Vec<odf::Style>
     }
 }
 
-/// The names of the master pages of the sections that have headers and
-/// footers of their own, by the paragraph that starts each (EST-16).
-fn section_masters(document: &Document) -> HashMap<NodeId, String> {
-    let mut out = HashMap::new();
-    for paragraph in document.body().iter().skip(1) {
+/// The sections that start a master page of their own, in order, each
+/// with the index of the paragraph that starts it and whether it has
+/// headers and footers of its own: those with their own headers and
+/// footers or a background of their own (W098), and those after a
+/// section with a background, which would otherwise show it too.
+fn master_sections(document: &Document) -> Vec<(usize, NodeId, bool)> {
+    let mut out = Vec::new();
+    let mut background = document.section_background(None).is_some();
+    for (index, paragraph) in document.body().iter().enumerate().skip(1) {
         if let Some(Some(start)) = &paragraph.attrs().start
             && let Start::Section(section, _) = &**start
-            && section.own_margins
         {
-            let name = format!("Desk{}", out.len() + 1);
-            out.insert(paragraph.id(), name);
+            let own = document.section_background(Some(paragraph.id())).is_some();
+            if section.own_margins || own || background {
+                out.push((index, paragraph.id(), section.own_margins));
+                background = own;
+            }
         }
     }
     out
+}
+
+/// The names of the master pages of the sections that start one, by the
+/// paragraph that starts each (EST-16, W098).
+fn section_masters(document: &Document) -> HashMap<NodeId, String> {
+    master_sections(document)
+        .into_iter()
+        .enumerate()
+        .map(|(n, (_, id, _))| (id, format!("Desk{}", n + 1)))
+        .collect()
+}
+
+/// The sections that start a master page without headers and footers of
+/// their own (W098), each with the section whose headers, footers and
+/// master objects its master page copies.
+fn background_masters(document: &Document) -> HashMap<NodeId, Option<NodeId>> {
+    master_sections(document)
+        .into_iter()
+        .filter(|(_, _, own)| !own)
+        .map(|(index, id, _)| (id, document.headers_section(index)))
+        .collect()
 }
 
 /// The headers and footers of a document in its master pages, the first
@@ -3401,6 +3554,11 @@ fn export_margins(
         });
         name
     };
+    // What fills the pages of each section (W098).
+    let mut backgrounds: HashMap<Option<NodeId>, odf::PageFill> = HashMap::new();
+    for (section, fill) in document.section_backgrounds() {
+        backgrounds.insert(section, fills.page_fill(fill));
+    }
     let mut part = |margins: &desk_model::HeadersFooters,
                     place: MarginPlace,
                     shown: bool|
@@ -3527,13 +3685,26 @@ fn export_margins(
         footer_first: part(margins, footer(MarginPages::First), setup.footers),
         footer_left: part(margins, footer(MarginPages::Left), setup.footers),
         objects: Vec::new(),
+        background: None,
+        match_previous: false,
     };
     out.master = master(document.headers_footers());
+    out.master.background = backgrounds.remove(&None);
     let mut masters: Vec<(NodeId, String)> = section_masters(document).into_iter().collect();
     masters.sort_by_key(|(_, name)| name[4..].parse::<usize>().unwrap_or(0));
+    let copies = background_masters(document);
     out.masters = masters
         .into_iter()
-        .map(|(id, name)| (name, master(document.section_headers_footers(Some(id)))))
+        .map(|(id, name)| {
+            // A section with only a background of its own copies the
+            // headers and footers it shows (W098).
+            let copied = copies.get(&id);
+            let margins = copied.copied().unwrap_or(Some(id));
+            let mut page = master(document.section_headers_footers(margins));
+            page.match_previous = copied.is_some();
+            page.background = backgrounds.remove(&Some(id));
+            (name, page)
+        })
         .collect();
     // Text styles without a parent.
     for style in &mut automatic {

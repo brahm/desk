@@ -5,6 +5,7 @@
 
 use std::collections::HashMap;
 
+use crate::PageFill;
 use crate::error::OdfError;
 use crate::ns::{
     CONFIG, DC, DESK, DRAW, FO, LOEXT, META, OFFICE, STYLE, SVG, TABLE, TEXT, XLINK, XML,
@@ -95,13 +96,15 @@ pub fn read_streams(
                 .extend(automatic.elements().filter_map(|e| reader.style(e)));
         }
         if let Some(master) = master_page(styles) {
-            document.master = read_master(master);
+            document.master = read_master(styles, master);
             let name = master.attr(STYLE, "name");
             if let Some(masters) = styles.child(OFFICE, "master-styles") {
                 document.masters = masters
                     .children_named(STYLE, "master-page")
                     .filter(|m| m.attr(STYLE, "name") != name)
-                    .filter_map(|m| Some((m.attr(STYLE, "name")?.to_owned(), read_master(m))))
+                    .filter_map(|m| {
+                        Some((m.attr(STYLE, "name")?.to_owned(), read_master(styles, m)))
+                    })
                     .collect();
             }
         }
@@ -951,8 +954,57 @@ fn master_page(styles: &Element) -> Option<&Element> {
         .or_else(|| masters.child(STYLE, "master-page"))
 }
 
-/// The headers and footers of a master page.
-fn read_master(master: &Element) -> MasterPage {
+/// What fills the pages of a master page (W098): the `draw:fill` of its
+/// drawing page style, as ODF 1.3 gives it, or of its page layout, as
+/// older programs did, or the `fo:background-color` of its page layout.
+fn master_background(styles: &Element, master: &Element) -> Option<PageFill> {
+    let automatic = styles.child(OFFICE, "automatic-styles");
+    let page = master.attr(DRAW, "style-name").and_then(|name| {
+        automatic
+            .into_iter()
+            .chain(styles.child(OFFICE, "styles"))
+            .flat_map(|s| s.children_named(STYLE, "style"))
+            .find(|s| {
+                s.attr(STYLE, "name") == Some(name)
+                    && s.attr(STYLE, "family") == Some("drawing-page")
+            })?
+            .child(STYLE, "drawing-page-properties")
+    });
+    let layout = master.attr(STYLE, "page-layout-name").and_then(|name| {
+        automatic?
+            .children_named(STYLE, "page-layout")
+            .find(|l| l.attr(STYLE, "name") == Some(name))?
+            .child(STYLE, "page-layout-properties")
+    });
+    let p = page.filter(|p| p.attr(DRAW, "fill").is_some()).or(layout)?;
+    let text = |ns, name| p.attr(ns, name).map(str::to_owned);
+    let color = p
+        .attr(DRAW, "fill-color")
+        .and_then(Color::parse)
+        .or_else(|| p.attr(FO, "background-color").and_then(Color::parse));
+    let fill = match p.attr(DRAW, "fill") {
+        Some("none") => return None,
+        Some(fill) => fill.to_owned(),
+        // Older programs give only the color.
+        None if color.is_some() => "solid".to_owned(),
+        None => return None,
+    };
+    Some(PageFill {
+        fill,
+        color,
+        gradient_name: text(DRAW, "fill-gradient-name"),
+        image_name: text(DRAW, "fill-image-name"),
+        repeat: text(STYLE, "repeat"),
+        image_mode: text(DESK, "fill-image-mode"),
+        tint: p.attr(DESK, "fill-tint").and_then(Color::parse),
+        tint_opacity: p
+            .attr(DESK, "fill-tint-opacity")
+            .and_then(crate::units::parse_percent),
+    })
+}
+
+/// The headers and footers of a master page, and its background.
+fn read_master(styles: &Element, master: &Element) -> MasterPage {
     let part = |name: &str| {
         master.child(STYLE, name).map(|e| {
             let mut paragraphs = Vec::new();
@@ -994,6 +1046,8 @@ fn read_master(master: &Element) -> MasterPage {
         footer: part("footer"),
         footer_first: part("footer-first"),
         footer_left: part("footer-left"),
+        background: master_background(styles, master),
+        match_previous: master.attr(DESK, "match-previous") == Some("true"),
         objects: master
             .elements()
             .filter_map(|e| crate::draw::draw_object(e, &paragraph))

@@ -555,6 +555,8 @@ pub struct Format {
     pub section: Section,
     /// Whether that section is the first one of the document.
     pub first_section: bool,
+    /// What fills the pages of that section (W098).
+    pub background: Option<desk_model::Fill>,
     /// The section whose headers and footers the selection shows, by the
     /// paragraph that starts it, or none for the first one's (EST-16).
     pub headers_section: Option<desk_model::NodeId>,
@@ -2335,6 +2337,16 @@ impl TextEditor {
         });
     }
 
+    /// Sets what fills the pages of the section at the cursor, as one
+    /// action of the history (W098).
+    pub fn set_section_background(&self, fill: Option<desk_model::Fill>) {
+        let (start, _) = self.selection().ordered();
+        self.format_edit("Background", move |edit| {
+            let section = edit.document().section_key(start.paragraph);
+            edit.set_section_background(section, fill)
+        });
+    }
+
     /// Changes the section that the cursor is in, as one action of the
     /// history.
     pub fn set_section(&self, name: &str, section: Section) {
@@ -2901,6 +2913,9 @@ impl TextEditor {
             layout: document.layout_at(start.paragraph).1,
             section: document.section_at(start.paragraph).1,
             first_section: document.section_at(start.paragraph).0.is_none(),
+            background: document
+                .section_background(document.section_key(start.paragraph))
+                .cloned(),
             headers_section: document.headers_section(start.paragraph),
             headers: document
                 .section_headers_footers(document.headers_section(start.paragraph))

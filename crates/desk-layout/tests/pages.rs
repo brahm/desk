@@ -1825,3 +1825,34 @@ fn w096_a_header_has_three_fields_side_by_side() {
         (200.0, 100.0)
     );
 }
+
+#[test]
+fn w098_each_page_has_the_background_of_its_section() {
+    use desk_model::{Editor, Fill, Rgba};
+    let mut system = TextSystem::new();
+    // Three paragraphs, the second starting a section on a new page.
+    let document = with_headers(&["One", "Two", "Three"], "Head", &[(1, false, None)]);
+    let mut editor = Editor::new(document);
+    let blue = Fill::Color(Rgba::rgb(0, 0, 255));
+    editor
+        .edit("Background", |edit| {
+            let key = edit.document().section_key(1);
+            assert!(key.is_some());
+            edit.set_section_background(key, Some(blue.clone()))
+        })
+        .unwrap();
+    let layout = paginate(editor.document(), &mut system);
+    assert!(layout.pages.len() >= 2);
+    assert_eq!(layout.pages[0].background, None);
+    assert_eq!(layout.pages.last().unwrap().background, Some(blue.clone()));
+    // The first section's background, and undoing it.
+    editor
+        .edit("Background", |edit| {
+            edit.set_section_background(None, Some(Fill::Color(Rgba::WHITE)))
+        })
+        .unwrap();
+    let layout = paginate(editor.document(), &mut system);
+    assert_eq!(layout.pages[0].background, Some(Fill::Color(Rgba::WHITE)));
+    editor.undo().unwrap();
+    assert_eq!(editor.document().section_background(None), None);
+}

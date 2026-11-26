@@ -147,6 +147,36 @@ pub struct MasterPage {
     /// The drawing objects of the master page, which show on every page
     /// that uses it, behind the text.
     pub objects: Vec<crate::draw::DrawObject>,
+    /// What fills its pages: the `draw:fill` of the
+    /// `style:page-layout-properties` of its page layout (W098). A master
+    /// page with one has a page layout of its own.
+    pub background: Option<PageFill>,
+    /// `desk:match-previous`: whether the master page is there only for
+    /// the background of its section, whose headers, footers and master
+    /// objects are those of the section before, copied (W098).
+    pub match_previous: bool,
+}
+
+/// What fills the pages of a page layout, in its
+/// `style:page-layout-properties` (W098).
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct PageFill {
+    /// `draw:fill`: `solid`, `gradient` or `bitmap`.
+    pub fill: String,
+    /// `draw:fill-color`, and `fo:background-color` for older readers.
+    pub color: Option<Color>,
+    /// `draw:fill-gradient-name`.
+    pub gradient_name: Option<String>,
+    /// `draw:fill-image-name`.
+    pub image_name: Option<String>,
+    /// `style:repeat`: `no-repeat`, `repeat` or `stretch`.
+    pub repeat: Option<String>,
+    /// `desk:fill-image-mode`: how Pages sizes the picture.
+    pub image_mode: Option<String>,
+    /// `desk:fill-tint`: a color laid over the picture.
+    pub tint: Option<Color>,
+    /// `desk:fill-tint-opacity`, in percent.
+    pub tint_opacity: Option<f64>,
 }
 
 /// A header or a footer.

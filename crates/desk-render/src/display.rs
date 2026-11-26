@@ -477,7 +477,22 @@ impl DisplayList {
             height: layout.setup.height.to_pt() as f32,
             items: Vec::new(),
         };
-        // The objects of the master of the section, behind all else
+        // The background of the section, behind all else (W098).
+        if let Some(fill) = &page.background {
+            let (w, h) = (list.width, list.height);
+            list.items.push(Item::Path {
+                path: vec![
+                    PathOp::Move(0.0, 0.0),
+                    PathOp::Line(w, 0.0),
+                    PathOp::Line(w, h),
+                    PathOp::Line(0.0, h),
+                    PathOp::Close,
+                ],
+                fill: Some(fill_paint(fill.clone(), (0.0, 0.0, w, h))),
+                stroke: None,
+            });
+        }
+        // The objects of the master of the section, behind them
         // (INT-05).
         for object in page.objects.iter().filter(|o| o.object.anchor.is_master()) {
             list.items.push(object_item(object));

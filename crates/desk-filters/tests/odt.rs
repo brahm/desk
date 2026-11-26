@@ -4116,3 +4116,207 @@ fn w096_the_three_fields_of_a_header_round_trip() {
     assert!(styles.contains(r#"desk:header-field="center""#), "{styles}");
     assert!(styles.contains(r#"desk:header-field="right""#));
 }
+
+#[test]
+fn w098_the_background_of_each_section_round_trips() {
+    use desk_model::{
+        Editor, Fill, MarginKind, MarginPages, MarginPlace, Position, Rgba, Section, Start,
+    };
+    let mut editor = Editor::new(Document::new_word_processing());
+    let start = editor.document().start();
+    let header = MarginPlace::new(MarginKind::Header, MarginPages::Default);
+    let blue = Rgba::rgb(0x20, 0x40, 0xc0);
+    let gradient = Fill::Gradient {
+        from: Rgba::WHITE,
+        to: Rgba::rgb(0xf0, 0xe0, 0x90),
+        angle: 9000,
+    };
+    let second = editor
+        .edit("Setup", |edit| {
+            let at = edit.insert_text(start, "One")?;
+            let at = edit.split_paragraph(at)?;
+            edit.insert_text(at, "Two")?;
+            let mut setup = *edit.document().page_setup();
+            setup.headers = true;
+            edit.set_page_setup(setup)?;
+            let body = edit.document().styles().default_paragraph();
+            let title = Paragraph::from_runs(
+                edit.new_id(),
+                body,
+                ParaAttrs::default(),
+                [Run::new("Head")],
+            )?;
+            edit.set_header_footer(header, vec![title])?;
+            // The second section keeps the headers of the first, with a
+            // background of its own.
+            edit.set_paragraph_attrs(
+                Position::new(at.paragraph, 0),
+                Position::new(at.paragraph, 0),
+                &ParaAttrs {
+                    start: Some(Some(std::sync::Arc::new(Start::Section(
+                        Section::default(),
+                        desk_model::Layout::default(),
+                    )))),
+                    ..ParaAttrs::default()
+                },
+            )?;
+            edit.set_section_background(None, Some(gradient.clone()))?;
+            edit.set_section_background(Some(at.paragraph), Some(Fill::Color(blue)))?;
+            Ok(at.paragraph)
+        })
+        .unwrap();
+    let bytes = write_odt(editor.document()).unwrap();
+    keep("w098-section-backgrounds.odt", &bytes);
+    let read = read_odt(&bytes).unwrap();
+    assert_eq!(read.section_background(None), Some(&gradient));
+    let key = read.section_key(1);
+    assert_eq!(read.body().get(1).map(|p| p.id()), key);
+    assert_eq!(read.section_background(key), Some(&Fill::Color(blue)));
+    // It still shows the headers of the section before.
+    assert!(!read.section_at(1).1.own_margins);
+    assert_eq!(read.headers_section(1), None);
+    assert_eq!(read.headers_footers().get(header)[0].text(), "Head");
+    let _ = second;
+    // Other programs see a page layout of its own, with its color.
+    let mut archive = zip::ZipArchive::new(std::io::Cursor::new(&bytes)).unwrap();
+    let mut styles = String::new();
+    std::io::Read::read_to_string(&mut archive.by_name("styles.xml").unwrap(), &mut styles)
+        .unwrap();
+    assert!(
+        styles.contains(r##"draw:fill-color="#2040c0""##),
+        "{styles}"
+    );
+    assert!(styles.contains(r#"desk:match-previous="true""#));
+}
+
+#[test]
+fn w098_a_section_after_a_background_has_a_master_page_without_it() {
+    use desk_model::{
+        Anchor, Editor, FIELD_CHARACTER, Field, Fill, Frame, MarginKind, MarginPages, MarginPlace,
+        Object, ObjectKind, Picture, Position, Section, Start,
+    };
+    let mut editor = Editor::new(Document::new_word_processing());
+    let start = editor.document().start();
+    let blue = Rgba::rgb(0x20, 0x40, 0xc0);
+    let place = MarginPlace::new(MarginKind::Header, MarginPages::Default);
+    editor
+        .edit("Setup", |edit| {
+            let at = edit.insert_text(start, "One")?;
+            let at = edit.split_paragraph(at)?;
+            let at = edit.insert_text(at, "Two")?;
+            let second = at.paragraph;
+            let at = edit.split_paragraph(at)?;
+            edit.insert_text(at, "Three")?;
+            let third = at.paragraph;
+            let mut setup = *edit.document().page_setup();
+            setup.headers = true;
+            edit.set_page_setup(setup)?;
+            // A picture in the line of the header.
+            let logo = edit.new_id();
+            let body = edit.document().styles().default_paragraph();
+            let header = Paragraph::from_runs(
+                edit.new_id(),
+                body,
+                ParaAttrs::default(),
+                vec![
+                    Run::new("Logo "),
+                    Run::with_attrs(
+                        &FIELD_CHARACTER.to_string(),
+                        None,
+                        CharAttrs {
+                            field: Some(Some(Field::ObjectMark { object: logo })),
+                            ..CharAttrs::default()
+                        },
+                    ),
+                ],
+            )?;
+            edit.set_header_footer(place, vec![header])?;
+            let mut picture = Object::new(
+                logo,
+                ObjectKind::Image(Picture::from_png(pixel_png()).unwrap()),
+                Frame::from_pt(0.0, 0.0, 30.0, 20.0),
+            );
+            picture.anchor = Anchor::InText;
+            edit.apply(Op::InsertObject {
+                index: 0,
+                object: picture,
+            })?;
+            for paragraph in [second, third] {
+                edit.set_paragraph_attrs(
+                    Position::new(paragraph, 0),
+                    Position::new(paragraph, 0),
+                    &ParaAttrs {
+                        start: Some(Some(std::sync::Arc::new(Start::Section(
+                            Section::default(),
+                            desk_model::Layout::default(),
+                        )))),
+                        ..ParaAttrs::default()
+                    },
+                )?;
+            }
+            // Only the second section has a background.
+            edit.set_section_background(Some(second), Some(Fill::Color(blue)))?;
+            Ok(())
+        })
+        .unwrap();
+    let out = export(editor.document());
+    // The third section has a master page of its own, without the
+    // background of the second, and both show the picture of the header.
+    assert_eq!(out.masters.len(), 2);
+    for (_, page) in &out.masters {
+        assert!(page.match_previous);
+        let objects: usize = page.paragraphs().map(|p| p.objects().count()).sum();
+        assert_eq!(objects, 1);
+    }
+    assert!(out.masters[0].1.background.is_some());
+    assert!(out.masters[1].1.background.is_none());
+    let bytes = write_odt(editor.document()).unwrap();
+    keep("w098-after-a-background.odt", &bytes);
+    let read = read_odt(&bytes).unwrap();
+    assert_eq!(read.section_background(None), None);
+    assert_eq!(
+        read.section_background(read.section_key(1)),
+        Some(&Fill::Color(blue))
+    );
+    assert_eq!(read.section_background(read.section_key(2)), None);
+    assert!(!read.section_at(2).1.own_margins);
+    assert_eq!(
+        read.headers_footers().get(place)[0].text(),
+        format!("Logo {FIELD_CHARACTER}")
+    );
+    assert_eq!(read.objects().len(), 1);
+}
+
+#[test]
+fn w098_the_first_section_has_the_background_of_the_master_page_it_names() {
+    use desk_model::{Editor, Fill, Position, Section, Start};
+    let mut editor = Editor::new(Document::new_word_processing());
+    let start = editor.document().start();
+    let blue = Rgba::rgb(0x20, 0x40, 0xc0);
+    editor
+        .edit("Setup", |edit| {
+            let at = edit.insert_text(start, "One")?;
+            let at = edit.split_paragraph(at)?;
+            edit.insert_text(at, "Two")?;
+            edit.set_paragraph_attrs(
+                Position::new(at.paragraph, 0),
+                Position::new(at.paragraph, 0),
+                &ParaAttrs {
+                    start: Some(Some(std::sync::Arc::new(Start::Section(
+                        Section::default(),
+                        desk_model::Layout::default(),
+                    )))),
+                    ..ParaAttrs::default()
+                },
+            )?;
+            edit.set_section_background(Some(at.paragraph), Some(Fill::Color(blue)))?;
+            Ok(())
+        })
+        .unwrap();
+    // As other programs write it, the first paragraph names the master
+    // page with the background, not "Standard".
+    let mut out = export(editor.document());
+    out.body[0].style = out.body[1].style.clone();
+    let read = import(&out).unwrap();
+    assert_eq!(read.section_background(None), Some(&Fill::Color(blue)));
+}

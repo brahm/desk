@@ -879,6 +879,20 @@ impl Edit {
         Ok(())
     }
 
+    /// Sets or removes the background of the pages of a section, by the
+    /// paragraph that starts it, or of the first section with none
+    /// (W098).
+    pub fn set_section_background(
+        &mut self,
+        section: Option<NodeId>,
+        fill: Option<crate::Fill>,
+    ) -> Result<(), ModelError> {
+        if self.doc.section_background(section) != fill.as_ref() {
+            self.apply(Op::SetSectionBackground { section, fill })?;
+        }
+        Ok(())
+    }
+
     /// Adds, replaces or removes a note.
     pub fn set_note(
         &mut self,
