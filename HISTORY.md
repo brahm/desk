@@ -10,7 +10,7 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
 
 * Added: The Section tab of Pages 15.4: each section writes the numbers
   of its pages in its own format, can hide its headers and footers on
-  its first page, and a new section starts from the tab. (#PR)
+  its first page, and a new section starts from the tab. (#243)
 
 * Added: Each section can fill its pages with a color, a gradient or a
   picture, as the background of the Section tab of Pages 15.4. (#242)
