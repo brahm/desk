@@ -88,7 +88,7 @@ flowchart TB
         table[desk-table]
         anim[desk-anim]
         lang[desk-lang<br>spelling, hyphenation]
-        contacts[desk-contacts]
+        contacts[desk-contacts<br>sources of mail merge]
     end
     subgraph formats [File formats]
         filters[desk-filters<br>model to and from files]
@@ -98,6 +98,7 @@ flowchart TB
     end
     writer & tables & slides --> ui & filters
     writer & tables --> contacts
+    contacts --> model & odf
     slides --> anim
     ui --> render & layout & text & model & lang
     convert --> filters & render & layout

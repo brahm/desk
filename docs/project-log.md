@@ -2969,6 +2969,27 @@ paragraph, and objects on a second page.
 - *Next:* the sources: contacts, vCard and spreadsheets, in
   `desk-contacts`. No task moved to another phase.
 
+### 26 November: the sources of a mail merge (step 11 of W3, second part)
+
+- `desk-contacts`, until now a comment, reads the records of a merge:
+  the cards of a vCard file, in the versions 2.1, 3.0 and 4.0, and the
+  rows of a table of a spreadsheet, ODS or CSV, whose first row names
+  the fields. A table is chosen by its name, or the first with rows.
+- A card has the fields of Pages, parts of the name, nickname, job
+  title, department, company, phones, emails, URL, birthday, addresses
+  and their parts, and note, and a field of a kind alone, as Phone,
+  takes the first, the preferred one before the others. A column of a
+  spreadsheet answers to the name of a field and to its other names, in
+  English and in Portuguese, so that a column Empresa fills Company.
+- `desk-odf` reads the sheets of a spreadsheet as text, the first step
+  of the ODS of Desk Tables.
+- The name of the file of a source comes from the document, so the
+  crate opens nothing itself: the window reads the file once the person
+  chose it. A new fuzz target reads any bytes as each kind of source.
+- *Next:* the contacts of the desktop, from Evolution Data Server, with
+  the preview and the merge in the window. No task moved to another
+  phase.
+
 ## Decisions, with their reasons and consequences
 
 Ids `D-nnn` and `R-nnn` are those of [decisions.md](decisions.md).

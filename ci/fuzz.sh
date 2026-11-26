@@ -38,6 +38,7 @@ dict_of() {
         formula_*) echo formula.dict ;;
         picture) echo picture.dict ;;
         equation) echo equation.dict ;;
+        merge_source) echo merge.dict ;;
         *) echo odf.dict ;;
     esac
 }

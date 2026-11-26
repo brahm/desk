@@ -20,6 +20,7 @@ desk-model = { path = "../crates/desk-model" }
 desk-formula = { path = "../crates/desk-formula" }
 desk-table = { path = "../crates/desk-table" }
 desk-math = { path = "../crates/desk-math" }
+desk-contacts = { path = "../crates/desk-contacts" }
 
 # Not part of the main workspace.
 [workspace]
@@ -79,6 +80,13 @@ bench = false
 [[bin]]
 name = "equation"
 path = "fuzz_targets/equation.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "merge_source"
+path = "fuzz_targets/merge_source.rs"
 test = false
 doc = false
 bench = false
