@@ -2408,7 +2408,8 @@ impl Exporter<'_> {
                 odf::DrawKind::Table(super::tables::export_table(table, &locale, self, document))
             }
             ObjectKind::Chart(chart) => {
-                let href = format!("./Object {}", self.charts.len() + 1);
+                // Named by the object, apart from those of master pages.
+                let href = format!("./Object {}", object.id);
                 self.charts
                     .push((href.clone(), super::tables::export_chart(chart, w, h)));
                 odf::DrawKind::Object {
@@ -2927,6 +2928,9 @@ pub(super) fn import_master_objects(
             gradients: source.gradients.clone(),
             markers: source.markers.clone(),
             fill_images: source.fill_images.clone(),
+            // The charts and equations that the objects show.
+            charts: source.charts.clone(),
+            formulas: source.formulas.clone(),
             ..odf::TextDocument::default()
         };
     if !master.objects.is_empty() {

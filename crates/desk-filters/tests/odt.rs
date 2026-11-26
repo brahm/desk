@@ -4869,3 +4869,24 @@ fn w104_an_equation_is_mathml_in_an_object_with_its_latex() {
         2
     );
 }
+
+#[test]
+fn w104_an_equation_on_the_master_of_a_section_is_kept() {
+    use desk_model::{Anchor, Equation, Frame, Object, ObjectKind};
+    let mut document = Document::new_word_processing();
+    let mathml = r#"<math xmlns="http://www.w3.org/1998/Math/MathML"><mi>y</mi></math>"#;
+    let mut object = Object::new(
+        document.new_id(),
+        ObjectKind::Equation(std::sync::Arc::new(Equation::from_mathml(mathml))),
+        Frame::from_pt(72.0, 72.0, 40.0, 20.0),
+    );
+    object.anchor = Anchor::Master(None, desk_model::MarginPages::Default);
+    document
+        .apply(Op::InsertObject { index: 0, object })
+        .unwrap();
+    let read = read_odt(&write_odt(&document).unwrap()).unwrap();
+    let kept = read.objects().iter().any(|o| {
+        o.anchor.is_master() && matches!(&o.kind, ObjectKind::Equation(e) if &*e.mathml == mathml)
+    });
+    assert!(kept);
+}

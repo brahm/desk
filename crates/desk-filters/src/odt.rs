@@ -2012,6 +2012,17 @@ fn import_text(source: &odf::TextDocument) -> Result<Document, FilterError> {
         gradients: source.gradients.clone(),
         markers: source.markers.clone(),
         fill_images: source.fill_images.clone(),
+        // The charts and equations in their lines.
+        charts: if drawn {
+            source.charts.clone()
+        } else {
+            Vec::new()
+        },
+        formulas: if drawn {
+            source.formulas.clone()
+        } else {
+            Vec::new()
+        },
         ..odf::TextDocument::default()
     };
     // What fills the pages of each section (W098).
