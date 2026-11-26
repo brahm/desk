@@ -658,8 +658,8 @@ phase	T3	not-started
 phase	T4	not-started
 phase	T5	not-started
 phase	W1	done
-phase	W2	in-progress
-phase	W3	not-started
+phase	W2	done
+phase	W3	in-progress
 phase	W4	not-started
 phase	W5	not-started
 phase	W6	not-started
