@@ -1408,6 +1408,12 @@ fn import_one(
         .origin
         .as_deref()
         .and_then(|o| u64::from_str_radix(o, 16).ok());
+    // Where a click on it goes (W102).
+    built.link = object
+        .link
+        .as_deref()
+        .filter(|l| !l.is_empty())
+        .map(Arc::from);
     // The comments on the object (W149).
     for mut comment in super::comments::object_comments(&object.annotations) {
         let id = document.new_id();
@@ -2332,6 +2338,7 @@ impl Exporter<'_> {
         out.style = Some(style);
         out.text = text;
         out.origin = object.origin.map(|o| format!("{o:016x}"));
+        out.link = object.link.as_deref().map(str::to_owned);
         // Where it was before a tracked change moved it (W148).
         out.moved_from = object.moved.and_then(|m| moved_from(self.document, &m));
         // The comments on the object (W149).

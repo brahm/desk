@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 //! What a link points to (EST-25), as Pages' Link inspector offers it: a
-//! web page, an e-mail message with its subject, another document, at
-//! one of its bookmarks if wanted, or a bookmark of this document. Each
-//! is kept as the text of a URI.
+//! web page, an e-mail message with its subject, a phone number (W102),
+//! another document, at one of its bookmarks if wanted, or a bookmark of
+//! this document. Each is kept as the text of a URI.
 //!
 //! Some links only work in one app, such as going to a slide in Keynote
 //! (IOP-32). They are kept as `desk:slide/…` URIs, so that text copied
@@ -29,6 +29,8 @@ pub enum Target {
         /// Its subject; empty for none.
         subject: String,
     },
+    /// A phone number, called by the app that takes `tel:` links (W102).
+    Phone(String),
     /// Another document, at one of its bookmarks or at its start.
     Document {
         /// The URI of the file, or its path from the folder of this
@@ -178,6 +180,9 @@ impl Target {
         if let Some(name) = link.strip_prefix('#') {
             return Self::Bookmark(name.to_owned());
         }
+        if let Some(number) = link.strip_prefix("tel:") {
+            return Self::Phone(unescape(number));
+        }
         if let Some(rest) = link.strip_prefix("mailto:") {
             let (to, query) = rest.split_once('?').unwrap_or((rest, ""));
             let subject = query
@@ -216,6 +221,17 @@ impl Target {
             Self::Web(address) => address.clone(),
             Self::Email { to, subject } if subject.is_empty() => format!("mailto:{to}"),
             Self::Email { to, subject } => format!("mailto:{to}?subject={}", escape(subject)),
+            // A number without its spaces, which a `tel:` URI has none
+            // of, and with its parameters (RFC 3966).
+            Self::Phone(number) => format!(
+                "tel:{}",
+                number
+                    .chars()
+                    .filter(|c| !c.is_whitespace())
+                    .collect::<String>()
+                    .replace('%', "%25")
+                    .replace('#', "%23")
+            ),
             Self::Document { file, bookmark } if bookmark.is_empty() => file.clone(),
             Self::Document { file, bookmark } => format!("{file}#{}", escape(bookmark)),
             Self::Bookmark(name) => format!("#{name}"),
@@ -236,9 +252,10 @@ impl Target {
         match self {
             Self::Web(_) => 0,
             Self::Email { .. } => 1,
-            Self::Document { .. } => 2,
-            Self::Bookmark(_) => 3,
-            Self::Slide(_) => 4,
+            Self::Phone(_) => 2,
+            Self::Document { .. } => 3,
+            Self::Bookmark(_) => 4,
+            Self::Slide(_) => 5,
         }
     }
 }
@@ -420,6 +437,27 @@ mod tests {
         assert!(!is_web("https://a%5Cb@c/") && !is_web("https://evil%5c.example/"));
         // A host in other letters shows as DNS has it.
         assert_eq!(shown("https://bücher.de/"), "https://xn--bcher-kva.de/");
+    }
+
+    #[test]
+    fn w102_a_phone_number_is_a_tel_link_that_asks_before_it_calls() {
+        let target = Target::Phone("+55 11 3456-7890".into());
+        assert_eq!(target.link(), "tel:+55113456-7890");
+        assert_eq!(
+            Target::parse("tel:+55113456-7890"),
+            Target::Phone("+55113456-7890".into())
+        );
+        assert_eq!(target.kind(), 2);
+        // Its parameters stay as they are.
+        let extension = Target::parse("tel:+1-555-1234;ext=99");
+        assert_eq!(extension.link(), "tel:+1-555-1234;ext=99");
+        assert_eq!(Target::Phone("*21#".into()).link(), "tel:*21%23");
+        assert_eq!(Target::parse("tel:*21%23"), Target::Phone("*21#".into()));
+        // Not a page of the web: its number shows before it is called.
+        assert_eq!(
+            follow(&target.link(), Some(OpenLinks::Open)),
+            Follow::Confirm
+        );
     }
 
     #[test]

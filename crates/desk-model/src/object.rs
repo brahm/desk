@@ -84,6 +84,10 @@ pub struct Object {
     /// resized it, which rejecting the change puts it back to (W148,
     /// REV-01); none when it is in no such change.
     pub moved: Option<Moved>,
+    /// Where a click on the object goes, as a link of the text does:
+    /// Format > Add Link on a shape, a picture or a text box of Pages
+    /// 15.4 (W102).
+    pub link: Option<Arc<str>>,
 }
 
 impl Object {
@@ -292,6 +296,7 @@ impl Object {
             picture: PictureSettings::default(),
             comments: crate::CommentIds::none(),
             moved: None,
+            link: None,
         }
     }
 

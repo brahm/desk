@@ -228,6 +228,22 @@ impl Edit {
         Ok(())
     }
 
+    /// Links objects to a place, or takes their links away (W102).
+    pub fn set_object_links(
+        &mut self,
+        ids: &[NodeId],
+        link: Option<Arc<str>>,
+    ) -> Result<(), ModelError> {
+        for &id in ids {
+            let mut object = self.object(id)?.clone();
+            if object.link != link {
+                object.link.clone_from(&link);
+                self.replace_object(object)?;
+            }
+        }
+        Ok(())
+    }
+
     /// Locks objects, or unlocks them (OBJ-07).
     pub fn lock_objects(&mut self, ids: &[NodeId], locked: bool) -> Result<(), ModelError> {
         for &id in ids {
