@@ -16,7 +16,9 @@ use crate::editing::{NewShape, TextEditor};
 use crate::i18n::{tr, trc};
 
 /// The actions of these menus, which need a document.
-pub(super) const OBJECT_ACTIONS: [&str; 30] = [
+pub(super) const OBJECT_ACTIONS: [&str; 32] = [
+    "insert-equation",
+    "edit-equation",
     "mask-with-shape",
     "unmask",
     "duplicate-objects",
@@ -50,7 +52,9 @@ pub(super) const OBJECT_ACTIONS: [&str; 30] = [
 ];
 
 /// The keys of the Arrange menu.
-pub(crate) const OBJECT_ACCELS: [(&str, &[&str]); 11] = [
+pub(crate) const OBJECT_ACCELS: [(&str, &[&str]); 12] = [
+    // Insert > Equation of Pages 15.4, Option-Command-E (W104).
+    ("win.insert-equation", &["<Control><Alt>e"]),
     ("win.duplicate-objects", &["<Control>d"]),
     // Ctrl+Shift+V is Paste Special in GNOME, so Choose… of Pages moves
     // to Ctrl+Alt+P, for picture.
@@ -74,7 +78,11 @@ type ChoiceAction = fn(&TextEditor, &str);
 
 impl DocumentWindow {
     pub(super) fn add_object_actions(self: &Rc<Self>) {
-        let simple: [(&str, EditorAction); 23] = [
+        let simple: [(&str, EditorAction); 25] = [
+            // The editor of equations, for a new one or the selected one
+            // (W104).
+            ("insert-equation", TextEditor::insert_equation_dialog),
+            ("edit-equation", TextEditor::edit_equation_dialog),
             ("unmask", TextEditor::unmask_picture),
             ("duplicate-objects", TextEditor::duplicate_objects),
             ("move-to-master", TextEditor::move_objects_to_master),

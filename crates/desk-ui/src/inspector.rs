@@ -32,6 +32,8 @@ pub enum Context {
     Group,
     Table,
     Chart,
+    /// An equation (W104).
+    Equation,
     /// Nothing selected in Desk Slides: the slide itself (KINT-13).
     Slide,
 }
@@ -48,6 +50,7 @@ impl Context {
             Some(ObjectKind::Media(_)) => Self::Movie,
             Some(ObjectKind::Table(_)) => Self::Table,
             Some(ObjectKind::Chart(_)) => Self::Chart,
+            Some(ObjectKind::Equation(_)) => Self::Equation,
             // A group, or a kind of object that came later.
             Some(_) => Self::Group,
         }
@@ -66,6 +69,7 @@ impl Context {
             Self::Group => trc("inspector title", "Group"),
             Self::Table => tr("Table"),
             Self::Chart => tr("Chart"),
+            Self::Equation => tr("Equation"),
             Self::Slide => tr("Slide"),
         }
     }
@@ -484,6 +488,7 @@ mod tests {
             Context::Group,
             Context::Table,
             Context::Chart,
+            Context::Equation,
             Context::Slide,
         ] {
             assert!(!context.title().is_empty());

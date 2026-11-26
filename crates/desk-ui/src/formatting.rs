@@ -416,6 +416,27 @@ impl Inspector {
                 arrange(),
             ],
         );
+        // Edit Equation of the Format pane of Pages 15.4 (W104).
+        let equation = compact::Group::builder().title(tr("Equation")).build();
+        let edit_equation = compact::ActionRow::builder()
+            .title(tr("Edit Equation"))
+            .subtitle(tr("Write it again in LaTeX or MathML"))
+            .build();
+        edit_equation.add_suffix(
+            &gtk::Button::builder()
+                .label(tr("Edit…"))
+                .action_name("win.edit-equation")
+                .valign(gtk::Align::Center)
+                .build(),
+        );
+        equation.add(&edit_equation);
+        contexts.insert(
+            Context::Equation,
+            vec![
+                Tab::new("equation", n_("Equation"), &[&equation]),
+                arrange(),
+            ],
+        );
         let statistics = InfoRows::new();
         let document_tabs = vec![
             Tab::new(
