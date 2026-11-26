@@ -73,6 +73,23 @@ pub enum Field {
         /// The paragraph.
         paragraph: NodeId,
     },
+    /// A merge field (W105, MAL-01): a datum of the recipient of a mail
+    /// merge, or of its sender, by the name of the field, as `First Name`
+    /// for a contact or a column of a spreadsheet. Without data it shows
+    /// its name, as its label.
+    Merge {
+        /// The name of the field.
+        name: Arc<str>,
+        /// Whether it is a sender field, which stays a field after a merge
+        /// and is filled from the card of the sender (MAL-01, MAL-02).
+        sender: bool,
+        /// Whether an address shows on one line, its lines joined by
+        /// commas (MAL-08).
+        single_line: bool,
+        /// The datum it shows, once a contact or a record filled it; none
+        /// shows its name.
+        shown: Option<Arc<str>>,
+    },
     /// The place of an object in the line of the text, as Pages puts an
     /// inline object (OBJ-01): the object, anchored in the text, is drawn
     /// there, as a character as large as its frame.
@@ -99,9 +116,40 @@ impl Field {
             Self::PageNumber { format } => format.write(page),
             Self::PageCount { format } => format.write(pages),
             Self::DateTime { shown, .. } | Self::FileName { shown, .. } => shown.to_string(),
+            Self::Merge {
+                name,
+                single_line,
+                shown,
+                ..
+            } => match shown {
+                Some(shown) if *single_line => one_line(shown),
+                Some(shown) => shown.to_string(),
+                None => name.to_string(),
+            },
             // Layout numbers the notes, and knows the pages of
             // paragraphs.
             Self::NoteMark { .. } | Self::PageOf { .. } | Self::ObjectMark { .. } => String::new(),
+        }
+    }
+}
+
+/// The lines of an address on one line, joined by commas (MAL-08).
+pub fn one_line(text: &str) -> String {
+    text.split(['\n', crate::LINE_BREAK])
+        .map(str::trim)
+        .filter(|l| !l.is_empty())
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
+impl Field {
+    /// A merge field of a name, for the recipient, with no datum yet.
+    pub fn merge(name: &str) -> Self {
+        Self::Merge {
+            name: name.into(),
+            sender: false,
+            single_line: false,
+            shown: None,
         }
     }
 }

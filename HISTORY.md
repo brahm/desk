@@ -8,6 +8,11 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
 
 ## Changes since 0.7.0 (unreleased)
 
+* Added: Merge fields of a mail merge, for the recipient and the sender,
+  are kept in documents as fields of a column of data, which LibreOffice
+  reads, with the source of their data; those of Pages '09 open as merge
+  fields. (#PR)
+
 * Added: Insert > Equation (Ctrl+Alt+E) writes an equation in LaTeX or
   MathML with a preview of it, in the line of the text at its size and
   color, or on the page of a page layout document; a double click or

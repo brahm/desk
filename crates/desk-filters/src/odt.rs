@@ -2280,6 +2280,7 @@ fn import_text(source: &odf::TextDocument) -> Result<Document, FilterError> {
                 page_links: source.toc_levels.iter().any(|l| l.link),
             },
             links_inactive: text.links_inactive.unwrap_or(false),
+            merge_source: merge_source(text),
             // The styles suggested, by name (W101).
             bookmark_suggestions: text.bookmark_suggestions.as_ref().map(|names| {
                 names
@@ -2874,6 +2875,57 @@ pub(crate) fn num_format(format: NumberFormat) -> Option<String> {
     Some(format.to_owned())
 }
 
+/// The source of data that the merge fields of ODF name (W105): the
+/// settings of the document say which it is.
+const MERGE_DATABASE: &str = "Desk Mail Merge";
+
+/// The source of a mail merge of the settings of ODF (W105).
+fn merge_source(text: &odf::TextSettings) -> Option<desk_model::MergeSource> {
+    let source = text.merge_source.as_deref().unwrap_or_default();
+    let table = text
+        .merge_table
+        .as_deref()
+        .filter(|t| !t.is_empty())
+        .map(Into::into);
+    Some(match text.merge_kind.as_deref()? {
+        "contacts" => desk_model::MergeSource::Contacts {
+            group: (!source.is_empty()).then(|| source.into()),
+        },
+        "vcard" if !source.is_empty() => desk_model::MergeSource::VCard {
+            file: source.into(),
+        },
+        "spreadsheet" if !source.is_empty() => desk_model::MergeSource::Spreadsheet {
+            file: source.into(),
+            table,
+        },
+        _ => return None,
+    })
+}
+
+/// The settings of ODF for the source of a mail merge: its kind, the
+/// file or group, and the table.
+fn odf_merge_source(
+    source: Option<&desk_model::MergeSource>,
+) -> (Option<String>, Option<String>, Option<String>) {
+    use desk_model::MergeSource;
+    match source {
+        None => (None, None, None),
+        Some(MergeSource::Contacts { group }) => (
+            Some("contacts".to_owned()),
+            group.as_deref().map(str::to_owned),
+            None,
+        ),
+        Some(MergeSource::VCard { file }) => {
+            (Some("vcard".to_owned()), Some(file.to_string()), None)
+        }
+        Some(MergeSource::Spreadsheet { file, table }) => (
+            Some("spreadsheet".to_owned()),
+            Some(file.to_string()),
+            table.as_deref().map(str::to_owned),
+        ),
+    }
+}
+
 /// The field of the model for a field of ODF that shows a text.
 fn model_field(field: &odf::Field, shown: &str) -> Field {
     match field {
@@ -2892,6 +2944,18 @@ fn model_field(field: &odf::Field, shown: &str) -> Field {
             shown: shown.into(),
             path: matches!(display.as_str(), "full" | "path"),
             extension: matches!(display.as_str(), "full" | "name-and-extension"),
+        },
+        odf::Field::Database {
+            column,
+            sender,
+            single_line,
+            filled,
+            ..
+        } => Field::Merge {
+            name: column.as_str().into(),
+            sender: *sender,
+            single_line: *single_line,
+            shown: filled.then(|| shown.into()),
         },
         // Notes, page references, objects and comments are read on their
         // own.
@@ -2955,6 +3019,24 @@ fn odf_field(field: &Field) -> (odf::Field, String) {
                 shown.to_string(),
             )
         }
+        // Every merge field names the same source, which the settings
+        // say (W105); its table tells the sender from the recipient.
+        Field::Merge {
+            name,
+            sender,
+            single_line,
+            shown,
+        } => (
+            odf::Field::Database {
+                database: MERGE_DATABASE.to_owned(),
+                table: if *sender { "Sender" } else { "Recipients" }.to_owned(),
+                column: name.to_string(),
+                sender: *sender,
+                single_line: *single_line,
+                filled: shown.is_some(),
+            },
+            field.text(1, 1),
+        ),
         // The body exports notes, page references and objects on their
         // own.
         Field::NoteMark { .. } | Field::PageOf { .. } | Field::ObjectMark { .. } => (
@@ -4026,6 +4108,7 @@ pub fn export(document: &Document) -> odf::TextDocument {
 
     let mut pictures: Vec<(String, Vec<u8>)> = Vec::new();
     let mut fills = TextFills::default();
+    let merge = odf_merge_source(settings.merge_source.as_ref());
     let mut out = odf::TextDocument {
         text_settings: odf::TextSettings {
             hyphenation: (!settings.hyphenation).then_some(false),
@@ -4035,6 +4118,9 @@ pub fn export(document: &Document) -> odf::TextDocument {
             // document that does not say takes the sum (FMT-15).
             larger_spacing: Some(settings.spacing == ParagraphSpacing::Larger),
             links_inactive: settings.links_inactive.then_some(true),
+            merge_kind: merge.0,
+            merge_source: merge.1,
+            merge_table: merge.2,
             bookmark_suggestions: settings.bookmark_suggestions.as_ref().map(|styles| {
                 styles
                     .iter()

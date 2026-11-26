@@ -536,6 +536,9 @@ fn full_document() -> TextDocument {
             chart_styles: Some(vec![r#"{"fills":[]}"#.into(), "{}".into()]),
             custom_formats: vec![r#"{"name":"kg","pattern":"0 kg"}"#.into()],
             author_colors: vec![r#"{"author":"Ana","color":"teal"}"#.into()],
+            merge_source: Some("/home/ana/Letters/Clients.ods".into()),
+            merge_table: Some("Clients".into()),
+            merge_kind: Some("spreadsheet".into()),
         },
         style_shortcuts: vec![
             StyleShortcut {
@@ -1051,4 +1054,42 @@ fn cells_repeated_with_much_text_are_counted_by_their_weight() {
     let (cells, bytes) = table_size(&document);
     assert!(bytes <= desk_odf::MAX_DOCUMENT_BYTES, "{bytes}");
     assert!(cells > 0);
+}
+
+#[test]
+fn mal_07_a_merge_field_of_libreoffice_shows_its_column_without_data() {
+    let document = read_streams(
+        &content(
+            r#"<text:p>Dear <text:database-display text:table-name="Clients" text:table-type="table" text:column-name="First Name" text:database-name="Addresses">&lt;First Name&gt;</text:database-display> <text:database-display text:table-name="Clients" text:table-type="table" text:column-name="City" text:database-name="Addresses">Lisboa</text:database-display></text:p>"#,
+        ),
+        None,
+        None,
+    )
+    .unwrap();
+    let fields: Vec<_> = document.body[0]
+        .spans
+        .iter()
+        .filter_map(|s| s.field.clone())
+        .collect();
+    assert_eq!(
+        fields,
+        [
+            Field::Database {
+                database: "Addresses".into(),
+                table: "Clients".into(),
+                column: "First Name".into(),
+                sender: false,
+                single_line: false,
+                filled: false,
+            },
+            Field::Database {
+                database: "Addresses".into(),
+                table: "Clients".into(),
+                column: "City".into(),
+                sender: false,
+                single_line: false,
+                filled: true,
+            },
+        ]
+    );
 }

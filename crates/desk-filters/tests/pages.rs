@@ -1381,10 +1381,29 @@ fn est_12_doc_22_headers_of_a_template_with_contacts_are_read_as_pages_shows_the
             .map(|p| p.text().replace(desk_model::FIELD_CHARACTER, "[]"))
             .collect::<Vec<_>>()
     };
+    // The company of the sender is a sender field, which shows what Pages
+    // filled in from the card (MAL-01).
     assert_eq!(
         text(MarginKind::Header, MarginPages::Default),
-        ["DM9DDB Brasil"]
+        ["[] Brasil"]
     );
+    let header = &document
+        .headers_footers()
+        .get(MarginPlace::new(MarginKind::Header, MarginPages::Default))[0];
+    let field = header
+        .runs()
+        .find_map(|r| r.attrs.field.clone().flatten())
+        .expect("the merge field");
+    assert_eq!(
+        field,
+        desk_model::Field::Merge {
+            name: "Empresa".into(),
+            sender: true,
+            single_line: false,
+            shown: Some("DM9DDB".into()),
+        }
+    );
+    assert_eq!(field.text(1, 1), "DM9DDB");
     assert_eq!(
         text(MarginKind::Footer, MarginPages::First),
         ["[]Av. Brigadeiro"]

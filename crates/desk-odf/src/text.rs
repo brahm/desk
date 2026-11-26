@@ -390,6 +390,14 @@ pub struct TextSettings {
     /// The colours that authors chose for the document (W150), one a
     /// line, as the filter writes them.
     pub author_colors: Vec<String>,
+    /// The source of the mail merge (W105): `CurrentDatabaseDataSource`,
+    /// as LibreOffice names it, the file of the data or the group of
+    /// contacts.
+    pub merge_source: Option<String>,
+    /// `CurrentDatabaseCommand`: the table of the source.
+    pub merge_table: Option<String>,
+    /// `MergeSourceKind`: `contacts`, `vcard` or `spreadsheet`.
+    pub merge_kind: Option<String>,
 }
 
 /// A list style (`text:list-style`).
@@ -1129,6 +1137,24 @@ pub enum Field {
         /// `text:display`: `full`, `path`, `name` or
         /// `name-and-extension`.
         display: String,
+    },
+    /// `text:database-display`, a merge field: the column of a table of
+    /// a source of data. Its text is the datum it shows, or the name of
+    /// the column.
+    Database {
+        /// `text:database-name`, the source of the data.
+        database: String,
+        /// `text:table-name`, its table.
+        table: String,
+        /// `text:column-name`, the name of the field.
+        column: String,
+        /// `desk:merge-sender`: a sender field (MAL-01).
+        sender: bool,
+        /// `desk:single-line`: an address on one line (MAL-08).
+        single_line: bool,
+        /// `desk:filled`: whether the text is a datum, not the name of
+        /// the column.
+        filled: bool,
     },
     /// `text:bookmark-ref` with `text:reference-format="page"`: the
     /// number of the page of a bookmark, by its name.

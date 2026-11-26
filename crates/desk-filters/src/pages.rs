@@ -1426,6 +1426,19 @@ fn model_field(field: &iwork::Field) -> Field {
                 |d| d & 2 != 0,
             ),
         },
+        // A field that shows other text than its name was filled in from
+        // a card, as a sender field of a template is (MAL-01).
+        iwork::Field::Merge {
+            name,
+            sender,
+            shown,
+        } => Field::Merge {
+            name: name.as_str().into(),
+            sender: *sender,
+            single_line: false,
+            shown: (!shown.trim().is_empty() && shown.trim() != name)
+                .then(|| shown.as_str().into()),
+        },
         // The importer numbers the notes.
         iwork::Field::Note { .. }
         | iwork::Field::NoteMark

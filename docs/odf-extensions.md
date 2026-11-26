@@ -702,6 +702,36 @@ their own setting says.
 - **Fallback:** the text of the field, the date as it was formatted when
   the document was saved; `text:fixed` says whether it updates.
 
+#### `desk:merge-sender`, `desk:single-line`, `desk:filled`
+
+- **Feature:** the merge fields of a mail merge of Pages 15.4 (W105,
+  MAL-01, MAL-07, MAL-08). Each is a `text:database-display` of the
+  column named by the field, as `First Name`, in the table `Recipients`,
+  or `Sender` for a sender field, of the source `Desk Mail Merge`; the
+  source itself is in the settings (below).
+- **On:** `text:database-display`.
+- **Value:** `true` or absent. `desk:merge-sender`: a sender field,
+  filled from the card of the sender, which stays a field after a merge.
+  `desk:single-line`: an address written on one line, its lines joined by
+  commas. `desk:filled`: the text of the field is a datum, not its name.
+- **Fallback:** the field of ODF, which other programs show with the
+  text Desk wrote, the name of the field or the datum, and fill from a
+  source of their own of the same name. Without `desk:filled`, Desk takes
+  a text that is the name of the column, alone or in angle brackets as
+  LibreOffice writes it, for a field without data.
+
+#### Source of a mail merge (settings, not an attribute)
+
+Where the data of the merge fields come from (W105, MAL-04, MAL-05) is
+kept in the `DeskTextSettings` set of `settings.xml`, with the names
+LibreOffice gives the data source of a document:
+`CurrentDatabaseDataSource` is the file of a vCard or a spreadsheet, or
+the group of contacts (empty for every contact), `CurrentDatabaseCommand`
+the table of a spreadsheet of several, with `CurrentDatabaseCommandType`
+0, and `MergeSourceKind` is `contacts`, `vcard` or `spreadsheet`. A
+document without `MergeSourceKind` has no source; other programs read
+the data source by name from their own registry and find none.
+
 ### Text: headers and footers (`style:header`, `style:footer`)
 
 #### `desk:header-field`

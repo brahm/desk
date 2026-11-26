@@ -39,7 +39,10 @@ fn token(field: &Field) -> &'static str {
         Field::PageCount { .. } => "{pages}",
         Field::DateTime { .. } => "{date}",
         Field::FileName { .. } => "{file}",
-        Field::NoteMark { .. } | Field::PageOf { .. } | Field::ObjectMark { .. } => "",
+        Field::NoteMark { .. }
+        | Field::PageOf { .. }
+        | Field::ObjectMark { .. }
+        | Field::Merge { .. } => "",
     }
 }
 

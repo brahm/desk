@@ -432,6 +432,12 @@ fn sample() -> Document {
                 author_colors: vec![("Ana".into(), desk_model::AuthorColor::Teal)],
                 // Tracking paused (W148).
                 tracking: desk_model::Tracking::Paused,
+                // A table of a spreadsheet as the source of the merge
+                // fields (W105).
+                merge_source: Some(desk_model::MergeSource::Spreadsheet {
+                    file: "/home/ana/Clients.ods".into(),
+                    table: Some("2026".into()),
+                }),
             },
         })
         .unwrap();

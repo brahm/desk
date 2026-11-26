@@ -4687,7 +4687,11 @@ fn fill_field(menu: &gio::Menu, window: &adw::ApplicationWindow, editor: Option<
                 Some("win.field-file-extension"),
             );
         }
-        Field::NoteMark { .. } | Field::PageOf { .. } | Field::ObjectMark { .. } => {}
+        // The menu of a merge field comes with the mail merge (W105).
+        Field::NoteMark { .. }
+        | Field::PageOf { .. }
+        | Field::ObjectMark { .. }
+        | Field::Merge { .. } => {}
     }
 }
 

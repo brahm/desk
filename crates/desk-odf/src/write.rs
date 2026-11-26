@@ -315,6 +315,19 @@ fn write_settings(document: &TextDocument) -> Option<String> {
         if let Some(styles) = &text.drop_cap_styles {
             config_item(&mut w, "DropCapStyles", "string", &styles.join("\n"));
         }
+        if let Some(kind) = &text.merge_kind {
+            config_item(&mut w, "MergeSourceKind", "string", kind);
+            config_item(
+                &mut w,
+                "CurrentDatabaseDataSource",
+                "string",
+                text.merge_source.as_deref().unwrap_or_default(),
+            );
+            if let Some(table) = &text.merge_table {
+                config_item(&mut w, "CurrentDatabaseCommand", "string", table);
+                config_item(&mut w, "CurrentDatabaseCommandType", "int", "0");
+            }
+        }
         if let Some(styles) = &text.chart_styles {
             config_item(&mut w, "ChartStyles", "string", &styles.join("\n"));
         }
@@ -1489,6 +1502,29 @@ fn write_field(w: &mut Writer, field: &Field, shown: &str) {
             w.start("text:file-name")
                 .attr("text:display", display)
                 .attr("text:fixed", "true");
+        }
+        Field::Database {
+            database,
+            table,
+            column,
+            sender,
+            single_line,
+            filled,
+        } => {
+            w.start("text:database-display")
+                .attr("text:table-name", table)
+                .attr("text:table-type", "table")
+                .attr("text:column-name", column)
+                .attr("text:database-name", database);
+            if *sender {
+                w.attr("desk:merge-sender", "true");
+            }
+            if *single_line {
+                w.attr("desk:single-line", "true");
+            }
+            if *filled {
+                w.attr("desk:filled", "true");
+            }
         }
         Field::PageOf { name } => {
             w.start("text:bookmark-ref")
