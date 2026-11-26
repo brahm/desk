@@ -475,6 +475,69 @@ def main():
         wait_for("Spelling and Grammar", lambda: showing_named(app, "Spelling and Grammar"))
         check("Ctrl+: shows Spelling and Grammar", True)
 
+        # With Check Grammar, the proofreader of Pages '09 that Desk keeps
+        # finds a word written twice in the text selected (TXT-11).
+        grammar = wait_for(
+            "Check Grammar",
+            lambda: next(
+                (
+                    n
+                    for n in walk(app)
+                    if n.get_role() == Atspi.Role.CHECK_BOX
+                    and n.get_name() == "Check Grammar"
+                    and showing(n)
+                ),
+                None,
+            ),
+        )
+        # A check button of GTK has no action through AT-SPI: it is clicked.
+        if not grammar.get_state_set().contains(Atspi.StateType.CHECKED):
+            click_node(grammar, "Letter.odt")
+        wait_for(
+            "Check Grammar on",
+            lambda: grammar.get_state_set().contains(Atspi.StateType.CHECKED),
+        )
+        # The click gave the check button the keyboard: the document
+        # takes it back with a click of its own.
+        click_node(document, "Letter.odt")
+        wait_for(
+            "the document to have the keyboard",
+            lambda: document.get_state_set().contains(Atspi.StateType.FOCUSED),
+        )
+        press("ctrl+End")
+        before = text_of(document)
+        press("Return")
+        type_text("Go to to bed")
+        wait_for("the repeated word", lambda: "Go to to bed" in text_of(document))
+        press("shift+Home")
+        wait_for("the new paragraph selected", lambda: selected() == "Go to to bed")
+        find_next = wait_for(
+            "the Find Next button",
+            lambda: next(
+                (
+                    n
+                    for n in walk(app)
+                    if n.get_role() == Atspi.Role.PUSH_BUTTON
+                    and n.get_name() == "Find Next"
+                    and showing(n)
+                ),
+                None,
+            ),
+        )
+        Atspi.Action.do_action(find_next, 0)
+        wait_for("the repeated word found", lambda: selected() == "to to")
+        check(
+            "the proofreader finds a repeated word (TXT-11)",
+            showing_named(app, "Repeated word") is not None,
+        )
+        # The paragraph goes again, for the checks that follow.
+        subprocess.run(
+            ["xdotool", "search", "--sync", "--name", "Letter.odt", "windowfocus", "--sync"],
+            check=True,
+        )
+        press("End", "shift+Home", "BackSpace", "BackSpace")
+        wait_for("the paragraph gone", lambda: text_of(document) == before)
+
         # Ctrl+. shows the emoji and symbols at the cursor (TXT-05).
         subprocess.run(
             ["xdotool", "search", "--sync", "--name", "Letter.odt", "windowfocus", "--sync"],
