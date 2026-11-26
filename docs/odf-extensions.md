@@ -681,6 +681,21 @@ their own setting says.
 - **Fallback:** the text of the field, the date as it was formatted when
   the document was saved; `text:fixed` says whether it updates.
 
+### Text: headers and footers (`style:header`, `style:footer`)
+
+#### `desk:header-field`
+
+- **Feature:** the centre and right fields of a header or footer of
+  Pages 15.4, each a third of the width of the text (W096); the left
+  field alone is the free header of Pages '09.
+- **On:** `text:p` and `text:h` of a `style:header`, `style:footer` or
+  their first and left variants, after the paragraphs of the left field:
+  those of the centre field, then those of the right one.
+- **Value:** `center` or `right`.
+- **Fallback:** the paragraphs themselves, below those of the left field,
+  centred and aligned right by their own paragraph properties: the text
+  stays, stacked instead of side by side.
+
 ### Text: comments (`office:annotation`)
 
 A comment is the standard `office:annotation` where the text it is on

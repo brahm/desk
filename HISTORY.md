@@ -8,6 +8,10 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
 
 ## Changes since 0.7.0 (unreleased)
 
+* Added: Headers and footers have the three fields of Pages 15.4, left,
+  centre and right, and a header with text in the left field alone stays
+  the free header of Pages '09. (#PR)
+
 * Changed: The parity rows of sections, headers and footers, tables of
   contents, bookmarks, links and mail merge now describe Pages 15.4, and
   new rows test page templates, page backgrounds and equations, from a

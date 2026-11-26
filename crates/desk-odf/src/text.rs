@@ -155,8 +155,15 @@ pub struct HeaderFooter {
     /// `style:display`: whether pages show it; false keeps its text
     /// hidden.
     pub display: bool,
-    /// Its paragraphs.
+    /// Its paragraphs: those of its left field, which alone is the whole
+    /// header.
     pub paragraphs: Vec<Paragraph>,
+    /// The paragraphs of its centre field (W096), written after the left
+    /// ones with `desk:header-field="center"`.
+    pub centre: Vec<Paragraph>,
+    /// The paragraphs of its right field (W096), written last with
+    /// `desk:header-field="right"`.
+    pub right: Vec<Paragraph>,
 }
 
 /// The size of the header or the footer of a page layout
@@ -983,7 +990,12 @@ impl MasterPage {
         ]
         .into_iter()
         .flatten()
-        .flat_map(|part| &part.paragraphs)
+        .flat_map(|part| {
+            part.paragraphs
+                .iter()
+                .chain(&part.centre)
+                .chain(&part.right)
+        })
     }
 }
 

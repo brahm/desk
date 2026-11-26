@@ -8,6 +8,11 @@
 //! when it asks for them. Each is a few paragraphs of their own, outside
 //! the body.
 //!
+//! Each header and footer has three fields, left, centre and right, as in
+//! Pages 15.4 (W096). The left one alone, with the others empty, is the
+//! free header of Pages '09, as wide as the text (D-003); once the centre
+//! or the right one has text, each takes a third of the width.
+//!
 //! A field is one character of the text, U+FFFC, whose run says what it
 //! shows: the number of the page it is on, the number of pages, a date or
 //! the name of the file. Layout draws the value in its place.
@@ -180,18 +185,47 @@ pub enum MarginPages {
     Left,
 }
 
-/// One of the headers and footers of a document.
+/// One of the three fields of a header or footer (W096).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum MarginField {
+    /// At the left; alone, the free header of Pages '09, as wide as the
+    /// text.
+    Left,
+    /// In the middle.
+    Centre,
+    /// At the right.
+    Right,
+}
+
+impl MarginField {
+    /// The three, from left to right.
+    pub const ALL: [Self; 3] = [Self::Left, Self::Centre, Self::Right];
+
+    /// Its place among [`MarginField::ALL`].
+    pub const fn index(self) -> usize {
+        match self {
+            Self::Left => 0,
+            Self::Centre => 1,
+            Self::Right => 2,
+        }
+    }
+}
+
+/// One of the headers and footers of a document, and one of its fields.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct MarginPlace {
     /// Header or footer.
     pub kind: MarginKind,
     /// The pages it is for.
     pub pages: MarginPages,
+    /// Its field.
+    pub field: MarginField,
 }
 
 impl MarginPlace {
-    /// Every header and footer, in order.
-    pub const ALL: [Self; 6] = [
+    /// The left field of every header and footer, in order: each header
+    /// and footer once.
+    pub const MARGINS: [Self; 6] = [
         Self::new(MarginKind::Header, MarginPages::Default),
         Self::new(MarginKind::Header, MarginPages::First),
         Self::new(MarginKind::Header, MarginPages::Left),
@@ -200,13 +234,44 @@ impl MarginPlace {
         Self::new(MarginKind::Footer, MarginPages::Left),
     ];
 
-    /// Makes a place.
+    /// Every field of every header and footer, in order: the fields of
+    /// each, from left to right, in the order of [`MarginPlace::MARGINS`].
+    pub const ALL: [Self; 18] = {
+        let mut all = [Self::MARGINS[0]; 18];
+        let mut i = 0;
+        while i < 18 {
+            let margin = Self::MARGINS[i / 3];
+            all[i] = margin.with_field(MarginField::ALL[i % 3]);
+            i += 1;
+        }
+        all
+    };
+
+    /// Makes the place of the left field of a header or footer.
     pub const fn new(kind: MarginKind, pages: MarginPages) -> Self {
-        Self { kind, pages }
+        Self {
+            kind,
+            pages,
+            field: MarginField::Left,
+        }
+    }
+
+    /// The same header or footer, at another field.
+    pub const fn with_field(self, field: MarginField) -> Self {
+        Self { field, ..self }
+    }
+
+    /// Its three fields, from left to right.
+    pub const fn fields(self) -> [Self; 3] {
+        [
+            self.with_field(MarginField::Left),
+            self.with_field(MarginField::Centre),
+            self.with_field(MarginField::Right),
+        ]
     }
 
     /// The place of a page: the first of a section, or a left page, in a
-    /// section with these flags.
+    /// section with these flags; its left field.
     pub fn of_page(
         kind: MarginKind,
         first_of_section: bool,
@@ -225,7 +290,12 @@ impl MarginPlace {
     }
 
     /// Its place among [`MarginPlace::ALL`].
-    pub fn index(self) -> usize {
+    pub const fn index(self) -> usize {
+        self.margin_index() * 3 + self.field.index()
+    }
+
+    /// The place of its header or footer among [`MarginPlace::MARGINS`].
+    pub const fn margin_index(self) -> usize {
         let kind = match self.kind {
             MarginKind::Header => 0,
             MarginKind::Footer => 3,
@@ -241,13 +311,27 @@ impl MarginPlace {
 /// The text of the headers and footers of a document.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct HeadersFooters {
-    texts: [Arc<[Paragraph]>; 6],
+    texts: [Arc<[Paragraph]>; 18],
 }
 
 impl HeadersFooters {
-    /// The paragraphs of a header or footer; none when it is empty.
+    /// The paragraphs of a field of a header or footer; none when it is
+    /// empty.
     pub fn get(&self, place: MarginPlace) -> &[Paragraph] {
         &self.texts[place.index()]
+    }
+
+    /// Whether a field of a header or footer has no text.
+    pub fn is_field_empty(&self, place: MarginPlace) -> bool {
+        self.get(place).iter().all(Paragraph::is_empty)
+    }
+
+    /// Whether the header or footer of a place shows its fields in thirds
+    /// of the width: when its centre or right field has text (W096).
+    /// Otherwise its left field is a free header, as wide as the text.
+    pub fn is_split(&self, place: MarginPlace) -> bool {
+        !self.is_field_empty(place.with_field(MarginField::Centre))
+            || !self.is_field_empty(place.with_field(MarginField::Right))
     }
 
     /// Whether every header and footer is empty.
@@ -280,6 +364,38 @@ mod tests {
         assert_eq!(place(false, true, true, true), MarginPages::Left);
         assert_eq!(place(false, true, true, false), MarginPages::Default);
         assert_eq!(place(false, false, true, true), MarginPages::Default);
+    }
+
+    #[test]
+    fn w096_each_header_and_footer_has_three_fields() {
+        assert_eq!(MarginPlace::ALL.len(), 18);
+        for (i, place) in MarginPlace::ALL.iter().enumerate() {
+            assert_eq!(place.index(), i);
+            assert_eq!(
+                MarginPlace::MARGINS[place.margin_index()].fields()[i % 3],
+                *place
+            );
+        }
+        let header = MarginPlace::new(MarginKind::Header, MarginPages::Default);
+        assert_eq!(header.field, MarginField::Left);
+        let mut margins = HeadersFooters::default();
+        let paragraph = |text: &str| {
+            let id = |n| NodeId::new(n).unwrap();
+            Paragraph::from_runs(
+                id(1),
+                id(2),
+                crate::format::ParaAttrs::default(),
+                [crate::text::Run::new(text)],
+            )
+            .unwrap()
+        };
+        margins.replace(header, vec![paragraph("Title")]);
+        assert!(!margins.is_split(header));
+        let right = header.with_field(MarginField::Right);
+        margins.replace(right, vec![paragraph("1")]);
+        assert!(margins.is_split(header));
+        assert_eq!(margins.get(right)[0].text(), "1");
+        assert_eq!(margins.get(header)[0].text(), "Title");
     }
 
     #[test]
