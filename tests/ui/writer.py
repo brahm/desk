@@ -490,8 +490,9 @@ def main():
                 None,
             ),
         )
+        # A check button of GTK has no action through AT-SPI: it is clicked.
         if not grammar.get_state_set().contains(Atspi.StateType.CHECKED):
-            Atspi.Action.do_action(grammar, 0)
+            click_node(grammar, "Letter.odt")
         wait_for(
             "Check Grammar on",
             lambda: grammar.get_state_set().contains(Atspi.StateType.CHECKED),
