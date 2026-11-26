@@ -12,6 +12,7 @@ publish.workspace = true
 adw.workspace = true
 desk-lang.workspace = true
 desk-layout.workspace = true
+desk-math.workspace = true
 desk-model.workspace = true
 desk-render.workspace = true
 desk-text.workspace = true

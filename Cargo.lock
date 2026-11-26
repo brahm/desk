@@ -375,6 +375,7 @@ version = "0.1.0"
 dependencies = [
  "desk-lang",
  "desk-layout",
+ "desk-math",
  "desk-model",
  "desk-render",
  "desk-text",

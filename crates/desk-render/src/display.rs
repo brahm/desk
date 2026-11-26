@@ -770,6 +770,17 @@ impl DisplayList {
 }
 
 impl DisplayList {
+    /// An equation alone, as large as it is laid out, for a preview of it
+    /// (W104).
+    pub fn of_equation(laid: &desk_layout::EquationLayout) -> Self {
+        let (width, height) = (laid.drawing.width.max(1.0), laid.drawing.height.max(1.0));
+        Self {
+            width,
+            height,
+            items: equation_items(laid, 0.0, 0.0, width, height),
+        }
+    }
+
     /// The display list of an object alone, as large as its frame, as the
     /// outline shows it in miniature (TXT-14).
     pub fn of_object(placed: &PlacedObject) -> Self {
@@ -1679,16 +1690,21 @@ fn equation_items(laid: &desk_layout::EquationLayout, x: f32, y: f32, w: f32, h:
                 y,
                 width,
                 height,
+                color,
             } => items.push(Item::Path {
                 path: shape_path(&Shape::Rectangle, *x, *y, *width, *height),
-                fill: Some(Paint::Color(Rgba::BLACK)),
+                fill: Some(Paint::Color(Rgba::rgb(color[0], color[1], color[2]))),
                 stroke: None,
             }),
-            desk_math::Mark::Stroke { points, width } => items.push(Item::Stroke {
+            desk_math::Mark::Stroke {
+                points,
+                width,
+                color,
+            } => items.push(Item::Stroke {
                 points: points.clone(),
                 closed: false,
                 width: *width,
-                color: Rgba::BLACK,
+                color: Rgba::rgb(color[0], color[1], color[2]),
                 dashes: Vec::new(),
             }),
         }

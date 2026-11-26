@@ -8,6 +8,11 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
 
 ## Changes since 0.7.0 (unreleased)
 
+* Added: Insert > Equation (Ctrl+Alt+E) writes an equation in LaTeX or
+  MathML with a preview of it, in the line of the text at its size and
+  color, or on the page of a page layout document; a double click or
+  the Equation tab edits it again. (#PR)
+
 * Added: Equations are drawn on the page and in PDF, from their MathML,
   and LaTeX turns into MathML: fractions, roots, scripts, sums and
   integrals with their limits, fences, accents, matrices and cases.

@@ -33,6 +33,7 @@ mod drop_cap_pane;
 mod drop_cap_styles;
 mod editing;
 mod effects;
+mod equation_editor;
 mod eyedropper;
 mod fields;
 mod fill_rows;

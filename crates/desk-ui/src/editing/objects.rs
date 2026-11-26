@@ -2096,6 +2096,13 @@ impl TextEditor {
             if self.play_media(id) {
                 return true;
             }
+            // A double click on an equation edits it (W104).
+            if matches!(self.object_by_id(id).kind, ObjectKind::Equation(_)) {
+                if self.selected_objects() == [id] {
+                    self.open_equation_editor();
+                }
+                return true;
+            }
             // A double click on a text box or a shape edits its text
             // (OBJ-08, OBJ-13).
             if self.object_by_id(id).holds_text() {

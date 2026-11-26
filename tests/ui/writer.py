@@ -3521,6 +3521,60 @@ def tables_and_charts(work):
 
         wait_for("the new chart style in the saved file", chart_style_saved)
         check("the Chart tab shows the chart styles and Create Style keeps one (W080)", True)
+        # Insert Equation writes LaTeX with a preview of it; with the chart
+        # selected, the equation goes on the page, and is saved as MathML
+        # with its LaTeX (W104, PXV-22).
+        activate("insert-equation")
+        wait_for("the equation editor", lambda: find(app, Atspi.Role.TEXT, "Equation"))
+        type_text("x^2 + 1")
+
+        def in_editor(node):
+            while node is not None:
+                if node.get_name() == "Insert Equation" and node.get_role() != Atspi.Role.LABEL:
+                    return True
+                node = node.get_parent()
+            return False
+
+        insert = wait_for(
+            "the Insert button of the editor",
+            lambda: next(
+                (
+                    n
+                    for n in walk(app)
+                    if n.get_role() == Atspi.Role.BUTTON
+                    and n.get_name() == "Insert"
+                    and showing(n)
+                    and n.get_state_set().contains(Atspi.StateType.SENSITIVE)
+                    and in_editor(n)
+                ),
+                None,
+            ),
+        )
+        if shots:
+            subprocess.run([*shots.split(), "equation-editor"], check=False)
+        Atspi.Action.do_action(insert, 0)
+        wait_for("the Equation tab", lambda: context_title(app, "Equation"))
+        check(
+            "an equation shows the tabs Equation and Arrange (W104)",
+            tab_names(app) == ["Arrange", "Equation"],
+        )
+        press("ctrl+s")
+
+        def equation_saved():
+            try:
+                with zipfile.ZipFile(letter) as package:
+                    return any(
+                        name.startswith("Equation ") and name.endswith("/content.xml")
+                        for name in package.namelist()
+                    )
+            except (zipfile.BadZipFile, OSError):
+                return False
+
+        wait_for("the equation in the saved file", equation_saved)
+        check(
+            "Insert Equation writes LaTeX, saved as MathML with it (W104)",
+            saved_content(letter, r'desk:latex="x\^2 \+ 1"'),
+        )
     finally:
         writer.terminate()
         writer.wait(timeout=10)

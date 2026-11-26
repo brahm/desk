@@ -445,6 +445,7 @@ pub(super) fn insert_menu(objects: bool) -> gio::Menu {
         Some("win.add-linked-text-box"),
     );
     other.append(Some(&tr("C_hoose…")), Some("win.insert-picture"));
+    other.append(Some(&tr("_Equation…")), Some("win.insert-equation"));
     menu.append_section(None, &other);
     menu
 }

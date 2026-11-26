@@ -2937,6 +2937,19 @@ paragraph, and objects on a second page.
 - *Next:* the editor in the window, where an equation is written and
   placed in the line or on the page.
 
+### 26 November: the equation editor (step 10 of W3, third part)
+
+- Insert > Equation (Ctrl+Alt+E, Option-Command-E in Pages 15.4) opens
+  the editor: LaTeX or MathML, a preview as it is written, and what is
+  wrong with the LaTeX in words. Insert puts the equation in the line
+  of the text, at the size and color of the text, in a word processing
+  document; on the page in a page layout one, or with an object
+  selected. A double click, or Edit in the Equation tab of the Format
+  pane, edits it again, and its frame keeps its scale.
+- The color of an equation is `mathcolor` on its MathML, which other
+  programs read too.
+- W104 is done. No task moved to another phase.
+
 ## Decisions, with their reasons and consequences
 
 Ids `D-nnn` and `R-nnn` are those of [decisions.md](decisions.md).

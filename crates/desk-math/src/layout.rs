@@ -44,6 +44,8 @@ pub enum Mark {
         italic: bool,
         /// Whether it is bold.
         bold: bool,
+        /// Its color, as red, green and blue.
+        color: [u8; 3],
     },
     /// A filled rectangle: the bar of a fraction, or the line over a root.
     Rule {
@@ -55,6 +57,8 @@ pub enum Mark {
         width: f32,
         /// The height.
         height: f32,
+        /// Its color.
+        color: [u8; 3],
     },
     /// A line through points: a radical sign, or a delimiter that grows.
     Stroke {
@@ -62,6 +66,8 @@ pub enum Mark {
         points: Vec<(f32, f32)>,
         /// The width of the line.
         width: f32,
+        /// Its color.
+        color: [u8; 3],
     },
 }
 
@@ -98,7 +104,9 @@ pub fn draw(mathml: &str, size: f32, measure: Measure<'_>) -> Drawing {
         level: 0,
         italic: None,
         bold: false,
+        color: [0, 0, 0],
     };
+    let context = styled(&root, &context);
     let laid = Layout { measure }.row(&root.children, &context);
     let pad = size * 0.08;
     Drawing {
@@ -178,6 +186,8 @@ struct Context {
     /// The style that `mathvariant` gives the text inside.
     italic: Option<bool>,
     bold: bool,
+    /// The color that `mathcolor` gives what is inside.
+    color: [u8; 3],
 }
 
 impl Context {
@@ -237,6 +247,7 @@ impl Layout<'_> {
                 size: c.size,
                 italic,
                 bold,
+                color: c.color,
             }],
             ..Laid::empty()
         }
@@ -569,6 +580,7 @@ impl Layout<'_> {
                 y: -c.axis() - thickness / 2.0,
                 width: width - pad,
                 height: thickness,
+                color: c.color,
             });
         }
         let nx = (width - numerator.width) / 2.0;
@@ -608,6 +620,7 @@ impl Layout<'_> {
         laid.marks.push(Mark::Stroke {
             points,
             width: thickness,
+            color: c.color,
         });
         if let Some(index) = index {
             let raise = -tick.1 + index.descent + c.size * 0.1;
@@ -732,6 +745,7 @@ impl Layout<'_> {
                     y: -thickness,
                     width: base.width,
                     height: thickness,
+                    color: c.color,
                 }],
                 ..Laid::empty()
             };
@@ -858,11 +872,50 @@ fn styled(node: &Node, c: &Context) -> Context {
             c = c.script();
         }
     }
+    if let Some(color) = node.get("mathcolor").or(node.get("color")).and_then(color) {
+        c.color = color;
+    }
     if let Some(variant) = node.get("mathvariant") {
         c.italic = Some(variant.contains("italic"));
         c.bold = variant.contains("bold");
     }
     c
+}
+
+/// A color of MathML: `#rgb`, `#rrggbb` or one of the colors of HTML 4
+/// by name.
+pub(crate) fn color(value: &str) -> Option<[u8; 3]> {
+    let value = value.trim();
+    if let Some(hex) = value.strip_prefix('#') {
+        let digits: Vec<u8> = hex
+            .chars()
+            .map(|c| c.to_digit(16).map(|d| d as u8))
+            .collect::<Option<_>>()?;
+        return match digits[..] {
+            [r, g, b] => Some([r * 17, g * 17, b * 17]),
+            [r1, r2, g1, g2, b1, b2] => Some([r1 * 16 + r2, g1 * 16 + g2, b1 * 16 + b2]),
+            _ => None,
+        };
+    }
+    Some(match value.to_ascii_lowercase().as_str() {
+        "black" => [0, 0, 0],
+        "silver" => [192, 192, 192],
+        "gray" | "grey" => [128, 128, 128],
+        "white" => [255, 255, 255],
+        "maroon" => [128, 0, 0],
+        "red" => [255, 0, 0],
+        "purple" => [128, 0, 128],
+        "fuchsia" => [255, 0, 255],
+        "green" => [0, 128, 0],
+        "lime" => [0, 255, 0],
+        "olive" => [128, 128, 0],
+        "yellow" => [255, 255, 0],
+        "navy" => [0, 0, 128],
+        "blue" => [0, 0, 255],
+        "teal" => [0, 128, 128],
+        "aqua" => [0, 255, 255],
+        _ => return None,
+    })
 }
 
 /// Letters in a variant that Unicode has its own letters for.
@@ -1042,7 +1095,11 @@ fn delimiter(fence: char, half: f32, c: &Context) -> Laid {
         descent: bottom,
         marks: strokes
             .into_iter()
-            .map(|points| Mark::Stroke { points, width })
+            .map(|points| Mark::Stroke {
+                points,
+                width,
+                color: c.color,
+            })
             .collect(),
         ..Laid::empty()
     }
@@ -1307,6 +1364,31 @@ mod tests {
             &measure,
         );
         assert!((x_of(&table, "b").unwrap() - x_of(&table, "a").unwrap() - 5.4).abs() < 0.01);
+    }
+
+    #[test]
+    fn w104_an_equation_takes_the_color_of_its_text() {
+        let drawing = draw(
+            &format!(
+                "<math {NS} mathcolor=\"#c00\"><mfrac><mi>a</mi>\
+                 <mi mathcolor=\"blue\">b</mi></mfrac></math>"
+            ),
+            10.0,
+            &measure,
+        );
+        let colors: Vec<[u8; 3]> = drawing
+            .marks
+            .iter()
+            .map(|m| match m {
+                Mark::Text { color, .. }
+                | Mark::Rule { color, .. }
+                | Mark::Stroke { color, .. } => *color,
+            })
+            .collect();
+        assert_eq!(colors, [[204, 0, 0], [204, 0, 0], [0, 0, 255]]);
+        assert_eq!(color("#0a0B0c"), Some([10, 11, 12]));
+        assert_eq!(color("#12"), None);
+        assert_eq!(color("chartreuse"), None);
     }
 
     #[test]

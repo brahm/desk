@@ -37,6 +37,7 @@ pub use comments::{CommentTarget, ReviewItem};
 mod connections;
 mod copies;
 mod custom_formats;
+mod equations;
 mod guides;
 mod media;
 mod navigate;

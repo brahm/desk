@@ -42,7 +42,7 @@ impl EquationLayout {
     }
 }
 
-fn attrs(size: f32, italic: bool, bold: bool) -> CharAttrs {
+fn attrs(size: f32, italic: bool, bold: bool, color: [u8; 3]) -> CharAttrs {
     CharAttrs {
         font_family: Some(EQUATION_FONT.into()),
         font_size: Some(desk_model::Length::from_pt(f64::from(size))),
@@ -52,7 +52,7 @@ fn attrs(size: f32, italic: bool, bold: bool) -> CharAttrs {
             FontWeight::NORMAL
         }),
         italic: Some(italic),
-        color: Some(Rgba::BLACK),
+        color: Some(Rgba::rgb(color[0], color[1], color[2])),
         ..CharAttrs::default()
     }
 }
@@ -69,7 +69,7 @@ pub fn lay_out_equation(
         let lines = text_lines(
             document,
             text,
-            &attrs(size, italic, bold),
+            &attrs(size, italic, bold, [0, 0, 0]),
             Alignment::Left,
             100_000.0,
             &mut cell.borrow_mut(),
@@ -89,6 +89,7 @@ pub fn lay_out_equation(
                 size,
                 italic,
                 bold,
+                color,
             } = mark
             else {
                 return None;
@@ -96,7 +97,7 @@ pub fn lay_out_equation(
             let mut lines = text_lines(
                 document,
                 text,
-                &attrs(*size, *italic, *bold),
+                &attrs(*size, *italic, *bold, *color),
                 Alignment::Left,
                 100_000.0,
                 system,
