@@ -497,9 +497,12 @@ def main():
             "Check Grammar on",
             lambda: grammar.get_state_set().contains(Atspi.StateType.CHECKED),
         )
-        subprocess.run(
-            ["xdotool", "search", "--sync", "--name", "Letter.odt", "windowfocus", "--sync"],
-            check=True,
+        # The click gave the check button the keyboard: the document
+        # takes it back with a click of its own.
+        click_node(document, "Letter.odt")
+        wait_for(
+            "the document to have the keyboard",
+            lambda: document.get_state_set().contains(Atspi.StateType.FOCUSED),
         )
         press("ctrl+End")
         before = text_of(document)
