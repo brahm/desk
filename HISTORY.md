@@ -11,7 +11,7 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
 * Added: Merge fields of a mail merge, for the recipient and the sender,
   are kept in documents as fields of a column of data, which LibreOffice
   reads, with the source of their data; those of Pages '09 open as merge
-  fields. (#PR)
+  fields. (#253)
 
 * Added: Insert > Equation (Ctrl+Alt+E) writes an equation in LaTeX or
   MathML with a preview of it, in the line of the text at its size and
