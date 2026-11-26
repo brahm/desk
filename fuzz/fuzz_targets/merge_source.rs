@@ -31,7 +31,7 @@ fuzz_target!(|data: &[u8]| {
         },
     ];
     for source in &sources {
-        let Ok(records) = read_source(source, |_| Ok(data.to_vec())) else {
+        let Ok(records) = read_source(source, |_| Ok(data)) else {
             continue;
         };
         for row in &records.rows {

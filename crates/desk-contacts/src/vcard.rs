@@ -108,7 +108,15 @@ fn property(line: &str) -> Option<Property> {
     for parameter in parts {
         let (key, values) = match parameter.split_once('=') {
             Some((key, values)) => (key.trim().to_ascii_uppercase(), values),
-            // vCard 2.1 names a type alone, as `TEL;WORK;VOICE`.
+            // vCard 2.1 names an encoding alone, as
+            // `NOTE;QUOTED-PRINTABLE`, and a type alone, as
+            // `TEL;WORK;VOICE`.
+            None if ["QUOTED-PRINTABLE", "8BIT", "BASE64"]
+                .iter()
+                .any(|e| parameter.trim().eq_ignore_ascii_case(e)) =>
+            {
+                ("ENCODING".to_owned(), parameter)
+            }
             None => ("TYPE".to_owned(), parameter),
         };
         match key.as_str() {
@@ -121,8 +129,8 @@ fn property(line: &str) -> Option<Property> {
             ),
             "ENCODING" => quoted |= values.eq_ignore_ascii_case("QUOTED-PRINTABLE"),
             "CHARSET" => charset = Some(values.trim_matches('"').to_owned()),
-            // vCard 4.0 marks the preferred one with PREF=1.
-            "PREF" => types.push("pref".to_owned()),
+            // vCard 4.0 ranks them from PREF=1, the preferred one.
+            "PREF" if values.trim() == "1" => types.push("pref".to_owned()),
             _ => {}
         }
     }
@@ -181,6 +189,27 @@ fn push(out: &mut [String], c: char) {
     if let Some(last) = out.last_mut() {
         last.push(c);
     }
+}
+
+/// The first of a list of values, split at the commas that are not
+/// escaped, with its escapes undone.
+fn first_of_list(value: &str) -> Option<String> {
+    let mut first = String::new();
+    let mut escaped = false;
+    for c in value.chars() {
+        match c {
+            ',' if !escaped => break,
+            '\\' if !escaped => escaped = true,
+            _ => {
+                if escaped {
+                    first.push('\\');
+                }
+                escaped = false;
+                first.push(c);
+            }
+        }
+    }
+    Some(text(&first))
 }
 
 /// A value with its escapes undone, its commas and semicolons kept.
@@ -290,7 +319,7 @@ impl Card {
             "Suffix" => part(4),
             "Nickname" => self
                 .of("NICKNAME", None)
-                .and_then(|p| p.value.split(',').next().map(text)),
+                .and_then(|p| first_of_list(&p.value)),
             "Job Title" => self.of("TITLE", None).map(|p| text(&p.value)),
             "Company" => org().and_then(|o| o.into_iter().next()),
             "Department" => org().and_then(|o| o.into_iter().nth(1)),
@@ -378,6 +407,12 @@ mod tests {
             Some("1 Main St\nSpringfield")
         );
         assert_eq!(cards[1].get("Name").as_deref(), Some("Card Two"));
+        // An encoding named alone, and a charset of its own.
+        let text = "BEGIN:VCARD\nN;CHARSET=ISO-8859-1;QUOTED-PRINTABLE:Jo=E3o;Ana\nNICKNAME:Bo\\, Jr.,Bobby\nEMAIL;PREF=100:old@x\nEMAIL:new@x\nEMAIL;PREF=1:best@x\nEND:VCARD\n";
+        let card = &parse(text)[0];
+        assert_eq!(card.get("Last Name").as_deref(), Some("João"));
+        assert_eq!(card.get("Nickname").as_deref(), Some("Bo, Jr."));
+        assert_eq!(card.get("Email").as_deref(), Some("best@x"));
     }
 
     #[test]

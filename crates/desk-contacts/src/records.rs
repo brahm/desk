@@ -4,6 +4,8 @@
 //! The records of a source of a mail merge, as a table: the names of its
 //! fields and, for each record, its data (MAL-04, MAL-05).
 
+use std::io::Read;
+
 use desk_model::MergeSource;
 
 use crate::vcard;
@@ -25,6 +27,9 @@ pub enum SourceError {
     /// The contacts of the desktop are read by the window, from
     /// Evolution Data Server.
     Desktop,
+    /// The file is of a kind that cannot be read, as a spreadsheet of
+    /// another program.
+    Unsupported,
 }
 
 impl std::fmt::Display for SourceError {
@@ -35,6 +40,7 @@ impl std::fmt::Display for SourceError {
             Self::NoTable(name) => write!(f, "the spreadsheet has no table named {name}"),
             Self::TooLarge => write!(f, "the file is too large"),
             Self::Desktop => write!(f, "the contacts of the desktop are read by the window"),
+            Self::Unsupported => write!(f, "the file is not a vCard, ODS or CSV file"),
         }
     }
 }
@@ -53,6 +59,8 @@ pub struct Records {
     /// The names of the tables of the spreadsheet, for its source to
     /// choose from; none for other sources.
     pub tables: Vec<String>,
+    /// Whether records were left out, past the limits of a source.
+    pub truncated: bool,
 }
 
 impl Records {
@@ -73,6 +81,7 @@ impl Records {
                 })
                 .collect(),
             tables: Vec::new(),
+            truncated: cards.len() >= vcard::MAX_CARDS,
         }
     }
 
@@ -90,17 +99,19 @@ impl Records {
             .collect();
         Self {
             fields: columns.iter().map(|(_, name)| name.clone()).collect(),
+            // A row with no datum in a named column is no record.
             rows: rows
                 .iter()
-                .filter(|row| row.iter().any(|c| !c.trim().is_empty()))
                 .map(|row| {
                     columns
                         .iter()
                         .map(|(i, _)| row.get(*i).cloned().unwrap_or_default())
-                        .collect()
+                        .collect::<Vec<_>>()
                 })
+                .filter(|row| row.iter().any(|c| !c.trim().is_empty()))
                 .collect(),
             tables: Vec::new(),
+            truncated: false,
         }
     }
 
@@ -152,37 +163,71 @@ pub fn decode(bytes: &[u8]) -> String {
     }
 }
 
-/// Whether a file is a spreadsheet of ODF, by its name.
-fn is_ods(file: &str) -> bool {
-    let lower = file.to_ascii_lowercase();
-    lower.ends_with(".ods") || lower.ends_with(".ots") || lower.ends_with(".fods")
+/// What a file of a spreadsheet is, by the end of its name.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Kind {
+    Ods,
+    FlatOds,
+    Text,
 }
 
-/// The records of a source, whose file `read` reads; the caller decides
-/// whether a file that the document names may be read.
-pub fn read_source(
+fn kind(file: &str) -> Option<Kind> {
+    let lower = file.to_ascii_lowercase();
+    let extension = lower.rsplit_once('.').map(|(_, e)| e).unwrap_or_default();
+    match extension {
+        "ods" | "ots" => Some(Kind::Ods),
+        "fods" => Some(Kind::FlatOds),
+        "csv" | "tsv" | "tab" | "txt" => Some(Kind::Text),
+        _ => None,
+    }
+}
+
+/// Whether bytes start as a zip package or a compound file of Office
+/// does, which are no text.
+fn is_binary(bytes: &[u8]) -> bool {
+    bytes.starts_with(b"PK\x03\x04") || bytes.starts_with(&[0xd0, 0xcf, 0x11, 0xe0])
+}
+
+/// The records of a source, whose file `open` opens; the caller decides
+/// whether a file that the document names may be opened. At most
+/// [`MAX_SOURCE_BYTES`] of it are read.
+pub fn read_source<R: Read>(
     source: &MergeSource,
-    read: impl FnOnce(&str) -> std::io::Result<Vec<u8>>,
+    open: impl FnOnce(&str) -> std::io::Result<R>,
 ) -> Result<Records, SourceError> {
-    let file = match source {
+    let (file, kind) = match source {
         MergeSource::Contacts { .. } => return Err(SourceError::Desktop),
-        MergeSource::VCard { file } | MergeSource::Spreadsheet { file, .. } => file,
+        MergeSource::VCard { file } => (file, None),
+        MergeSource::Spreadsheet { file, .. } => {
+            (file, Some(kind(file).ok_or(SourceError::Unsupported)?))
+        }
     };
-    let bytes = read(file).map_err(SourceError::Io)?;
+    let mut bytes = Vec::new();
+    open(file)
+        .and_then(|reader| {
+            reader
+                .take(MAX_SOURCE_BYTES as u64 + 1)
+                .read_to_end(&mut bytes)
+        })
+        .map_err(SourceError::Io)?;
     if bytes.len() > MAX_SOURCE_BYTES {
         return Err(SourceError::TooLarge);
     }
-    match source {
-        MergeSource::VCard { .. } => Ok(Records::of_cards(&vcard::parse(&decode(&bytes)))),
-        MergeSource::Spreadsheet { table, .. } if is_ods(file) => {
-            let sheets = if file.to_ascii_lowercase().ends_with(".fods") {
-                let content = decode(&bytes);
-                desk_odf::read_sheets(&content)
+    let table = match source {
+        MergeSource::Spreadsheet { table, .. } => table.as_deref(),
+        _ => None,
+    };
+    match kind {
+        None => Ok(Records::of_cards(&vcard::parse(&decode(&bytes)))),
+        Some(Kind::Ods | Kind::FlatOds) => {
+            let sheets = if kind == Some(Kind::FlatOds) {
+                desk_odf::read_sheets(&decode(&bytes))
             } else {
                 desk_odf::read_ods(&bytes)
             }
             .map_err(SourceError::Spreadsheet)?;
-            let sheet = match table.as_deref() {
+            let tables = sheets.iter().map(|s| s.name.clone()).collect();
+            let sheet = match table {
                 Some(name) => sheets
                     .iter()
                     .find(|s| s.name == name)
@@ -192,19 +237,28 @@ pub fn read_source(
                     Some(sheet) => sheet,
                     None => {
                         return Ok(Records {
-                            tables: sheets.iter().map(|s| s.name.clone()).collect(),
+                            tables,
                             ..Records::default()
                         });
                     }
                 },
             };
             Ok(Records {
-                tables: sheets.iter().map(|s| s.name.clone()).collect(),
+                tables,
+                truncated: sheet.truncated,
                 ..Records::of_table(&sheet.rows)
             })
         }
-        // Any other file is text of separated values.
-        _ => Ok(Records::of_table(&crate::csv::parse(&decode(&bytes)))),
+        Some(Kind::Text) => {
+            if is_binary(&bytes) {
+                return Err(SourceError::Unsupported);
+            }
+            let rows = crate::csv::parse(&decode(&bytes));
+            Ok(Records {
+                truncated: rows.len() >= crate::csv::MAX_ROWS,
+                ..Records::of_table(&rows)
+            })
+        }
     }
 }
 
@@ -218,6 +272,8 @@ mod tests {
         let records = Records::of_table(&rows);
         assert_eq!(records.fields, ["Nome", "Cidade", "E-mail"]);
         assert_eq!(records.len(), 2);
+        // A row with data only in a column without a name is no record.
+        assert!(Records::of_table(&crate::csv::parse("Nome,,Cidade\n,note,\n")).is_empty());
         assert_eq!(records.value(0, "Cidade"), Some("Lisboa"));
         // A field of a contact finds the column of another of its names.
         assert_eq!(records.value(0, "First Name"), Some("Ana"));
@@ -234,7 +290,7 @@ mod tests {
         };
         let records = read_source(&source, |file| {
             assert_eq!(file, "/x/cards.vcf");
-            Ok(b"BEGIN:VCARD\nN:Lee;Bo\nEND:VCARD\nBEGIN:VCARD\nN:Souza;Ana\nEND:VCARD\n".to_vec())
+            Ok(&b"BEGIN:VCARD\nN:Lee;Bo\nEND:VCARD\nBEGIN:VCARD\nN:Souza;Ana\nEND:VCARD\n"[..])
         })
         .unwrap();
         assert_eq!(records.len(), 2);
@@ -245,19 +301,38 @@ mod tests {
             table: None,
         };
         // Windows-1252, as an old spreadsheet exports it.
-        let records = read_source(&source, |_| {
-            Ok(b"Nome;Cidade\nJo\xe3o;Bras\xedlia\n".to_vec())
-        })
-        .unwrap();
+        let records =
+            read_source(&source, |_| Ok(&b"Nome;Cidade\nJo\xe3o;Bras\xedlia\n"[..])).unwrap();
         assert_eq!(records.value(0, "Nome"), Some("João"));
         assert_eq!(records.value(0, "Cidade"), Some("Brasília"));
         assert!(matches!(
-            read_source(&MergeSource::Contacts { group: None }, |_| Ok(Vec::new())),
+            read_source(&MergeSource::Contacts { group: None }, |_| Ok(&b""[..])),
             Err(SourceError::Desktop)
         ));
         assert!(matches!(
-            read_source(&source, |_| Err(std::io::Error::other("gone"))),
+            read_source(&source, |_| Err::<&[u8], _>(std::io::Error::other("gone"))),
             Err(SourceError::Io(_))
+        ));
+        // A workbook of another program is not read as text.
+        let workbook = MergeSource::Spreadsheet {
+            file: "/x/list.xlsx".into(),
+            table: None,
+        };
+        assert!(matches!(
+            read_source(&workbook, |_| Ok(&b"PK\x03\x04"[..])),
+            Err(SourceError::Unsupported)
+        ));
+        assert!(matches!(
+            read_source(&source, |_| Ok(&b"PK\x03\x04 zip"[..])),
+            Err(SourceError::Unsupported)
+        ));
+        // Past the limit, the file is not read whole.
+        let large = MergeSource::VCard {
+            file: "/x/large.vcf".into(),
+        };
+        assert!(matches!(
+            read_source(&large, |_| Ok(std::io::repeat(b'x'))),
+            Err(SourceError::TooLarge)
         ));
     }
 }

@@ -11,8 +11,9 @@
 //! note, and a field of the name of a kind takes its first value.
 //!
 //! The source of a document names its file; that name comes from the
-//! document, so this crate opens nothing itself: the caller reads the
-//! file, after the person chose it or agreed to it.
+//! document, so this crate opens nothing itself: the caller opens the
+//! file, after the person chose it or agreed to it, and this crate reads
+//! at most [`MAX_SOURCE_BYTES`] of it.
 
 #![deny(clippy::indexing_slicing, clippy::unwrap_used)]
 #![cfg_attr(test, allow(clippy::indexing_slicing, clippy::unwrap_used))]

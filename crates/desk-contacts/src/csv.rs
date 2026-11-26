@@ -13,36 +13,42 @@ pub const MAX_FIELDS: usize = 1024;
 
 /// The separator of a text: of the comma, the semicolon and the tab, the
 /// one its first line has most of outside quotes; the comma when it has
-/// none.
+/// none. A quote opens only at the start of a field, as [`parse`] reads
+/// it.
 pub fn separator(text: &str) -> char {
-    let line = first_line(text);
     let mut counts = [(',', 0usize), (';', 0), ('\t', 0)];
     let mut quoted = false;
-    for c in line.chars() {
-        if c == '"' {
-            quoted = !quoted;
-        } else if !quoted && let Some(count) = counts.iter_mut().find(|(s, _)| *s == c) {
-            count.1 += 1;
+    let mut start = true;
+    let mut chars = text.chars().peekable();
+    while let Some(c) = chars.next() {
+        if quoted {
+            if c == '"' {
+                if chars.peek() == Some(&'"') {
+                    chars.next();
+                } else {
+                    quoted = false;
+                }
+            }
+            continue;
         }
+        match c {
+            '"' if start => quoted = true,
+            '\n' | '\r' => break,
+            c => {
+                if let Some(count) = counts.iter_mut().find(|(s, _)| *s == c) {
+                    count.1 += 1;
+                    start = true;
+                    continue;
+                }
+            }
+        }
+        start = false;
     }
     counts
         .iter()
         .filter(|(_, n)| *n > 0)
         .max_by_key(|(_, n)| *n)
         .map_or(',', |(s, _)| *s)
-}
-
-/// The first record's line, up to a line break outside quotes.
-fn first_line(text: &str) -> &str {
-    let mut quoted = false;
-    for (at, c) in text.char_indices() {
-        match c {
-            '"' => quoted = !quoted,
-            '\n' | '\r' if !quoted => return text.get(..at).unwrap_or(text),
-            _ => {}
-        }
-    }
-    text
 }
 
 /// The rows of a text, split at its separator; a line that is empty is
@@ -133,5 +139,7 @@ mod tests {
             [["Nome", "Cidade"], ["Ana", "Lisboa"]]
         );
         assert!(parse("").is_empty());
+        // A quote inside a field opens nothing.
+        assert_eq!(separator("Nome;Altura 5\";Cidade;Estado\na,b,c"), ';');
     }
 }

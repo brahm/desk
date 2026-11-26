@@ -41,7 +41,7 @@ fn read(table: Option<&str>) -> Result<Records, SourceError> {
         file: "/home/ana/Clients.ods".into(),
         table: table.map(Into::into),
     };
-    read_source(&source, |_| Ok(spreadsheet()))
+    read_source(&source, |_| Ok(std::io::Cursor::new(spreadsheet())))
 }
 
 #[test]
