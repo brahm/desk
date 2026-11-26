@@ -1150,7 +1150,7 @@ mod tests {
                 edit.set_text_settings(settings)?;
                 edit.insert_text(start, "Chapter")?;
                 edit.add_toc_entry_styles()?;
-                edit.insert_table_of_contents(0)
+                edit.insert_table_of_contents(0, desk_model::TocScope::Document)
             })
             .unwrap();
         let document = editor.document();

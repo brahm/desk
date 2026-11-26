@@ -8,6 +8,10 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
 
 ## Changes since 0.7.0 (unreleased)
 
+* Added: Each table of contents lists the whole document, its section
+  or up to the next table, chosen in Insert > Table of Contents and
+  changed in the Range of the Format pane, as in Pages 15.4. (#245)
+
 * Added: Captured Pages, the Capture Pages of Pages '09: a section
   captured under a name is inserted again from Insert > Break or the Add
   Page menu, and saved with the document. (#244)

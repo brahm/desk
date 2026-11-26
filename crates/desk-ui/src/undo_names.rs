@@ -74,6 +74,7 @@ const NAMES: &[&str] = &[
     n_("Insert Shape"),
     n_("Insert Table"),
     n_("Insert Table of Contents"),
+    n_("Table of Contents Range"),
     n_("Insert Text Box"),
     n_("Instant Alpha"),
     n_("Language"),

@@ -1275,11 +1275,13 @@ fn collect_paragraphs(
             }
         } else if name.is(TEXT, "table-of-content") {
             // The entries, after the title of the table if it has one.
+            let scope = child.attr(DESK, "toc-scope").map(str::to_owned);
             if let Some(body) = child.child(TEXT, "index-body") {
                 for part in body.elements() {
                     if part.name.is(TEXT, "p") || part.name.is(TEXT, "h") {
                         let mut paragraph = paragraph(part);
                         paragraph.toc = true;
+                        paragraph.toc_scope.clone_from(&scope);
                         out.push(paragraph);
                     } else {
                         collect_paragraphs(part, list, section, out, objects);
@@ -1643,6 +1645,7 @@ fn paragraph(e: &Element) -> Paragraph {
         section: None,
         marks: builder.marks,
         toc: false,
+        toc_scope: None,
         spans: builder.spans,
         frames: builder.frames,
     }

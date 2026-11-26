@@ -247,7 +247,7 @@ thread_local! {
 }
 
 /// The actions that need a document.
-const DOCUMENT_ACTIONS: [&str; 95] = [
+const DOCUMENT_ACTIONS: [&str; 96] = [
     "outline",
     "screen-view",
     "text-size",
@@ -321,6 +321,7 @@ const DOCUMENT_ACTIONS: [&str; 95] = [
     "next-review-item",
     "previous-review-item",
     "insert-toc",
+    "insert-toc-in",
     "update-toc",
     "insert-link",
     "insert-bookmark",
@@ -3603,6 +3604,22 @@ impl DocumentWindow {
             });
             self.actions.add_action(&action);
         }
+
+        // A table of contents of the document, of its section or up to
+        // the next table (W100).
+        let toc = gio::SimpleAction::new("insert-toc-in", Some(glib::VariantTy::STRING));
+        let weak = Rc::downgrade(self);
+        toc.connect_activate(move |_, parameter| {
+            let scope = match parameter.and_then(|p| p.str()) {
+                Some("section") => desk_model::TocScope::Section,
+                Some("next") => desk_model::TocScope::NextTable,
+                _ => desk_model::TocScope::Document,
+            };
+            if let Some(editor) = weak.upgrade().and_then(|this| this.editor()) {
+                editor.insert_table_of_contents_in(scope);
+            }
+        });
+        self.actions.add_action(&toc);
 
         let import = gio::SimpleAction::new("import-styles", None);
         let weak = Rc::downgrade(self);

@@ -6,9 +6,11 @@
 //! A table of contents is a run of paragraphs of the body, each an entry
 //! of it ([`ParaAttrs::toc_entry`]). The document says which paragraph
 //! styles it lists, with which style for their entries and whether they
-//! show a page number. Updating a table makes its entries again from the
-//! paragraphs after it, up to the next table: the text of each, a tab,
-//! and a field of the page it is on.
+//! show a page number. Each table says which paragraphs it lists, as
+//! Pages 15.4 does (W100): those of the whole document, of its section,
+//! or those after it up to the next table. Updating a table makes its
+//! entries again from them: the text of each, a tab, and a field of the
+//! page it is on.
 //!
 //! [`ParaAttrs::toc_entry`]: crate::ParaAttrs::toc_entry
 
@@ -26,6 +28,22 @@ pub struct TocEntry {
     /// The paragraph that the entry lists; none for the one entry of a
     /// table that lists nothing yet.
     pub target: Option<NodeId>,
+    /// Which paragraphs the table lists, the same in each of its entries.
+    pub scope: TocScope,
+}
+
+/// Which paragraphs a table of contents lists (W100): Insert > Table of
+/// Contents and the Range of the Format pane in Pages 15.4.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+pub enum TocScope {
+    /// Those of the whole document, outside tables of contents.
+    #[default]
+    Document,
+    /// Those of the section that the table starts in.
+    Section,
+    /// Those after the table, up to the next table: "To Next
+    /// Occurrence", and every table of Pages '09.
+    NextTable,
 }
 
 /// One paragraph style that tables of contents list.
@@ -191,9 +209,60 @@ impl Edit {
         Ok(())
     }
 
-    /// Puts an empty table of contents before a paragraph, and fills it.
-    pub fn insert_table_of_contents(&mut self, index: usize) -> Result<(), ModelError> {
+    /// Changes which paragraphs the table of contents of paragraph
+    /// `index` lists, and makes its entries again (W100).
+    pub fn set_toc_scope(&mut self, index: usize, scope: TocScope) -> Result<(), ModelError> {
+        let Some(range) = self.document().table_of_contents_at(index) else {
+            return Ok(());
+        };
+        for i in range {
+            let paragraph = self.document().body().get(i).cloned().expect("in the body");
+            let mut attrs = paragraph.attrs().clone();
+            let Some(Some(entry)) = attrs.toc_entry else {
+                continue;
+            };
+            if entry.scope == scope {
+                continue;
+            }
+            attrs.toc_entry = Some(Some(TocEntry { scope, ..entry }));
+            self.apply(crate::Op::SetParagraphFormat {
+                paragraph: paragraph.id(),
+                style: paragraph.style(),
+                attrs,
+            })?;
+        }
+        self.update_tables_of_contents()
+    }
+
+    /// Puts an empty table of contents before a paragraph, listing what
+    /// `scope` says, and fills it. A section or a break that starts at
+    /// the paragraph starts at the table instead, which is then in that
+    /// section. Neighbouring entries are one table, so a table goes
+    /// neither in another nor right after one.
+    pub fn insert_table_of_contents(
+        &mut self,
+        index: usize,
+        scope: TocScope,
+    ) -> Result<(), ModelError> {
         let document = self.document();
+        let next_to = |i: usize| document.table_of_contents_at(i).is_some();
+        if next_to(index) || (index > 0 && next_to(index - 1)) {
+            return Err(ModelError::TableOfContentsNextToAnother);
+        }
+        let moved = document.body().get(index).cloned().map(|paragraph| {
+            let attrs = paragraph.attrs();
+            let starts = ParaAttrs {
+                start: attrs.start.clone(),
+                column_break_before: attrs.column_break_before,
+                ..ParaAttrs::default()
+            };
+            let rest = ParaAttrs {
+                start: None,
+                column_break_before: None,
+                ..attrs.clone()
+            };
+            (paragraph, starts, rest)
+        });
         let settings = document.text_settings().toc.clone();
         let style = settings
             .levels
@@ -204,11 +273,26 @@ impl Edit {
             id,
             style,
             ParaAttrs {
-                toc_entry: Some(Some(TocEntry { target: None })),
-                ..ParaAttrs::default()
+                toc_entry: Some(Some(TocEntry {
+                    target: None,
+                    scope,
+                })),
+                ..moved
+                    .as_ref()
+                    .map(|(_, starts, _)| starts.clone())
+                    .unwrap_or_default()
             },
             std::iter::empty(),
         )?;
+        if let Some((old, starts, rest)) = moved
+            && starts != ParaAttrs::default()
+        {
+            self.apply(crate::Op::SetParagraphFormat {
+                paragraph: old.id(),
+                style: old.style(),
+                attrs: rest,
+            })?;
+        }
         self.apply(crate::Op::InsertParagraph { index, paragraph })?;
         loop_tables(self, &settings)
     }
@@ -221,21 +305,36 @@ fn loop_tables(edit: &mut Edit, settings: &TocSettings) -> Result<(), ModelError
     };
     // Each table, from the first: the ones after it move as it changes.
     for n in 0..count {
-        let (range, entries) = {
+        let (range, scope, entries) = {
             let document = edit.document();
             let body: Vec<&Paragraph> = document.body().iter().collect();
             let found = tables_of_contents(&body);
             let range = found[n].clone();
-            let end = found.get(n + 1).map_or(body.len(), |r| r.start);
-            let entries: Vec<(StyleId, NodeId, String, bool)> = body[range.end..end]
+            let scope = body[range.start]
+                .attrs()
+                .toc_entry
+                .flatten()
+                .map(|e| e.scope)
+                .unwrap_or_default();
+            let listed = match scope {
+                TocScope::Document => 0..body.len(),
+                TocScope::Section => document
+                    .section_ranges()
+                    .into_iter()
+                    .find(|r| r.contains(&range.start))
+                    .unwrap_or(0..body.len()),
+                TocScope::NextTable => range.end..found.get(n + 1).map_or(body.len(), |r| r.start),
+            };
+            let entries: Vec<(StyleId, NodeId, String, bool)> = body[listed]
                 .iter()
+                .filter(|p| p.attrs().toc_entry.flatten().is_none())
                 .filter_map(|p| {
                     let level = settings.level(p.style())?;
                     let text = entry_text(p);
                     (!text.is_empty()).then(|| (level.entry, p.id(), text, level.page_number))
                 })
                 .collect();
-            (range, entries)
+            (range, scope, entries)
         };
         let old: Vec<Paragraph> = {
             let body = edit.document().body();
@@ -255,6 +354,7 @@ fn loop_tables(edit: &mut Edit, settings: &TocSettings) -> Result<(), ModelError
             let mut attrs = ParaAttrs {
                 toc_entry: Some(Some(TocEntry {
                     target: Some(*target),
+                    scope,
                 })),
                 ..ParaAttrs::default()
             };
@@ -279,7 +379,10 @@ fn loop_tables(edit: &mut Edit, settings: &TocSettings) -> Result<(), ModelError
         if built.is_empty() {
             // A table that lists nothing keeps one empty entry.
             let mut attrs = ParaAttrs {
-                toc_entry: Some(Some(TocEntry { target: None })),
+                toc_entry: Some(Some(TocEntry {
+                    target: None,
+                    scope,
+                })),
                 ..ParaAttrs::default()
             };
             attrs.merge(&structure);

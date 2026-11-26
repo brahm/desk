@@ -696,6 +696,23 @@ their own setting says.
   centred and aligned right by their own paragraph properties: the text
   stays, stacked instead of side by side.
 
+### Text: tables of contents (`text:table-of-content`)
+
+#### `desk:toc-scope`
+
+- **Feature:** which paragraphs a table of contents lists, as Insert >
+  Table of Contents and the Range of the Format pane of Pages 15.4
+  (W100): those of its section, or those after it up to the next table,
+  To Next Occurrence, which every table of Pages '09 lists.
+- **On:** `text:table-of-content`.
+- **Value:** `document`, `section` or `next`.
+- **Fallback:** the entries themselves, which other programs show as
+  written; when they update the table, it lists the whole document, as
+  `text:index-scope` says by default. A table without the attribute is
+  read as one of the whole document, unless `meta:generator` says Desk
+  wrote it, before tables had a range: then it lists up to the next
+  table, as it did.
+
 ### Page backgrounds (`style:drawing-page-properties`, `style:master-page`)
 
 The background of the pages of a section (W098) is the `draw:fill` of the

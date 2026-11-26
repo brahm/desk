@@ -2820,6 +2820,24 @@ paragraph, and objects on a second page.
 - *Not done:* captures in page layout documents, whose pages come with
   page templates (W095).
 
+### 26 November: the range of each table of contents (step 6 of W3)
+
+- Insert > Table of Contents is a menu of three, Document, Section and
+  To Next Occurrence, as in Pages 15.4, and the Range in the Table of
+  Contents group of the Format pane changes the table at the cursor.
+  A table of the document lists the paragraphs before it too; one of
+  its section, those of the section it starts in. Tables of Pages '09
+  keep listing up to the next table, as they did.
+- *ODF:* `desk:toc-scope` on `text:table-of-content`, `document`,
+  `section` or `next`. A table of another program lists the whole
+  document, as `text:index-scope` says; one that an older Desk wrote
+  keeps listing up to the next table.
+- *From the review:* a table inserted at the start of a section takes
+  the start of the section, and so lists that section; a table is not
+  inserted inside another or right after one, which it would join.
+- *Not done:* the text of an empty table, which Pages 15.4 shows when no
+  paragraph uses its styles; the empty entry stays blank (EST-22).
+
 ## Decisions, with their reasons and consequences
 
 Ids `D-nnn` and `R-nnn` are those of [decisions.md](decisions.md).

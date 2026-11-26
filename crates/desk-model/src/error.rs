@@ -66,6 +66,8 @@ pub enum ModelError {
     CommentedCell(NodeId),
     /// The object is not a table.
     NotATable(NodeId),
+    /// A table of contents there would join the one next to it (W100).
+    TableOfContentsNextToAnother,
 }
 
 impl fmt::Display for ModelError {
@@ -97,6 +99,9 @@ impl fmt::Display for ModelError {
             Self::EmptyRange => write!(f, "the range holds no text"),
             Self::CommentedCell(id) => write!(f, "the cell already has the comment {id}"),
             Self::NotATable(id) => write!(f, "the object {id} is not a table"),
+            Self::TableOfContentsNextToAnother => {
+                write!(f, "a table of contents there would join the one next to it")
+            }
         }
     }
 }

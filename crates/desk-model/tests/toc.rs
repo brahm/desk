@@ -5,8 +5,11 @@
 //! the document chooses, with the number of their page, and is made again
 //! when it is updated.
 
+use std::sync::Arc;
+
 use desk_model::{
-    Document, Editor, Field, Position, TocEntry, TocLevel, TocSettings, tables_of_contents,
+    Document, Editor, Field, Layout, ParaAttrs, Position, Section, Start, TocEntry, TocLevel,
+    TocScope, TocSettings, tables_of_contents,
 };
 
 fn texts(document: &Document) -> Vec<String> {
@@ -51,7 +54,9 @@ fn est_22_est_23_a_table_lists_its_styles_and_updates() {
     assert!(editor.document().text_settings().toc.uses(heading));
 
     editor
-        .edit("Table", |edit| edit.insert_table_of_contents(0))
+        .edit("Table", |edit| {
+            edit.insert_table_of_contents(0, TocScope::Document)
+        })
         .unwrap();
     let document = editor.document();
     let body: Vec<_> = document.body().iter().collect();
@@ -61,7 +66,8 @@ fn est_22_est_23_a_table_lists_its_styles_and_updates() {
         assert_eq!(
             paragraph.attrs().toc_entry,
             Some(Some(TocEntry {
-                target: Some(target)
+                target: Some(target),
+                scope: TocScope::Document,
             }))
         );
         let field = paragraph
@@ -118,7 +124,10 @@ fn est_22_est_23_a_table_lists_its_styles_and_updates() {
     assert_eq!(tables_of_contents(&body), vec![0..1]);
     assert_eq!(
         body[0].attrs().toc_entry,
-        Some(Some(TocEntry { target: None }))
+        Some(Some(TocEntry {
+            target: None,
+            scope: TocScope::Document,
+        }))
     );
     assert_eq!(texts(document)[1], "Chapter one");
 
@@ -187,7 +196,7 @@ fn sty_05_a_style_that_a_table_lists_can_be_deleted_and_the_table_updates() {
                 page_links: false,
             };
             edit.set_text_settings(settings)?;
-            edit.insert_table_of_contents(0)?;
+            edit.insert_table_of_contents(0, TocScope::Document)?;
             Ok(heading)
         })
         .unwrap();
@@ -207,4 +216,147 @@ fn sty_05_a_style_that_a_table_lists_can_be_deleted_and_the_table_updates() {
             .iter()
             .any(|t| t.starts_with("Chapter one\t"))
     );
+}
+
+#[test]
+fn w100_a_table_lists_the_document_its_section_or_up_to_the_next_table() {
+    let mut editor = Editor::new(Document::new_word_processing());
+    let start = editor.document().start();
+    editor
+        .edit("Setup", |edit| {
+            let mut ids = vec![start.paragraph];
+            let mut at = edit.insert_text(start, "One")?;
+            for text in ["Two", "Three"] {
+                at = edit.split_paragraph(at)?;
+                ids.push(at.paragraph);
+                at = edit.insert_text(at, text)?;
+            }
+            let heading = edit.new_paragraph_style("Heading", start, start, false)?;
+            for &id in &ids {
+                edit.set_paragraph_style(Position::new(id, 0), Position::new(id, 0), heading)?;
+            }
+            // "Two" starts a second section.
+            let two = Position::new(ids[1], 0);
+            edit.set_paragraph_attrs(
+                two,
+                two,
+                &ParaAttrs {
+                    start: Some(Some(Arc::new(Start::Section(
+                        Section::default(),
+                        Layout::default(),
+                    )))),
+                    ..ParaAttrs::default()
+                },
+            )?;
+            let mut settings = edit.document().text_settings().clone();
+            settings.toc = TocSettings {
+                levels: vec![TocLevel {
+                    style: heading,
+                    entry: edit.document().styles().default_paragraph(),
+                    page_number: false,
+                }],
+                page_links: false,
+            };
+            edit.set_text_settings(settings)?;
+            // A table in the second section, before "Three".
+            edit.insert_table_of_contents(2, TocScope::Document)
+        })
+        .unwrap();
+    let listed = |document: &Document| -> (Vec<String>, Vec<TocScope>) {
+        let body: Vec<_> = document.body().iter().collect();
+        let range = tables_of_contents(&body)[0].clone();
+        body[range]
+            .iter()
+            .map(|p| {
+                let text = p.runs().map(|r| r.text().to_owned()).collect();
+                (text, p.attrs().toc_entry.flatten().unwrap().scope)
+            })
+            .unzip()
+    };
+    // The whole document, before the table too.
+    let (texts, scopes) = listed(editor.document());
+    assert_eq!(texts, ["One", "Two", "Three"]);
+    assert!(scopes.iter().all(|&s| s == TocScope::Document));
+
+    // Its section; any entry of the table changes it.
+    editor
+        .edit("Range", |edit| edit.set_toc_scope(3, TocScope::Section))
+        .unwrap();
+    let (texts, scopes) = listed(editor.document());
+    assert_eq!(texts, ["Two", "Three"]);
+    assert!(scopes.iter().all(|&s| s == TocScope::Section));
+
+    // Up to the next table: only what follows it.
+    editor
+        .edit("Range", |edit| edit.set_toc_scope(2, TocScope::NextTable))
+        .unwrap();
+    let (texts, scopes) = listed(editor.document());
+    assert_eq!(texts, ["Three"]);
+    assert_eq!(scopes, [TocScope::NextTable]);
+
+    // Updating keeps the range, and undo brings the section back.
+    editor
+        .edit("Update", |edit| edit.update_tables_of_contents())
+        .unwrap();
+    assert_eq!(listed(editor.document()).0, ["Three"]);
+    editor.undo().unwrap();
+    assert_eq!(listed(editor.document()).0, ["Two", "Three"]);
+}
+
+#[test]
+fn w100_a_table_at_the_start_of_a_section_is_in_it_and_never_joins_another() {
+    let mut editor = Editor::new(Document::new_word_processing());
+    let start = editor.document().start();
+    let two = editor
+        .edit("Setup", |edit| {
+            let at = edit.insert_text(start, "One")?;
+            let two = edit.split_paragraph(at)?;
+            edit.insert_text(two, "Two")?;
+            let heading = edit.new_paragraph_style("Heading", start, start, false)?;
+            for id in [start.paragraph, two.paragraph] {
+                edit.set_paragraph_style(Position::new(id, 0), Position::new(id, 0), heading)?;
+            }
+            edit.set_paragraph_attrs(
+                two,
+                two,
+                &ParaAttrs {
+                    start: Some(Some(Arc::new(Start::Section(
+                        Section::default(),
+                        Layout::default(),
+                    )))),
+                    ..ParaAttrs::default()
+                },
+            )?;
+            let mut settings = edit.document().text_settings().clone();
+            settings.toc = TocSettings {
+                levels: vec![TocLevel {
+                    style: heading,
+                    entry: edit.document().styles().default_paragraph(),
+                    page_number: false,
+                }],
+                page_links: false,
+            };
+            edit.set_text_settings(settings)?;
+            edit.insert_table_of_contents(1, TocScope::Section)?;
+            Ok(two.paragraph)
+        })
+        .unwrap();
+    let document = editor.document();
+    // The section starts at the table, which lists "Two" only.
+    let body: Vec<_> = document.body().iter().collect();
+    assert_eq!(tables_of_contents(&body), vec![1..2]);
+    assert!(body[1].attrs().start.is_some());
+    assert!(document.paragraph(two).unwrap().attrs().start.is_none());
+    assert_eq!(body[1].runs().map(|r| r.text()).collect::<String>(), "Two");
+    assert_eq!(document.section_ranges(), vec![0..1, 1..3]);
+
+    // A table in another, or right after one, would join it.
+    for index in [1, 2] {
+        assert!(
+            editor
+                .edit("Again", |edit| edit
+                    .insert_table_of_contents(index, TocScope::Document))
+                .is_err()
+        );
+    }
 }
