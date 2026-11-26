@@ -2098,9 +2098,10 @@ impl TextEditor {
             }
             // A double click on an equation edits it (W104).
             if matches!(self.object_by_id(id).kind, ObjectKind::Equation(_)) {
-                if self.selected_objects() == [id] {
-                    self.open_equation_editor();
+                if self.selected_objects() != [id] {
+                    self.select_objects(vec![id]);
                 }
+                self.edit_equation_dialog();
                 return true;
             }
             // A double click on a text box or a shape edits its text

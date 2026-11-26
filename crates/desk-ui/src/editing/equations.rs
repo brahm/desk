@@ -13,21 +13,34 @@ use gtk::prelude::*;
 
 use super::TextEditor;
 
-/// An equation in a color, unless it has one or the color is black.
+/// An equation in a color, unless it has one, or the color is black or
+/// not opaque, which MathML does not say.
 fn colored(equation: Equation, color: desk_model::Rgba) -> Equation {
-    if (color.r, color.g, color.b) == (0, 0, 0) {
+    if (color.r, color.g, color.b) == (0, 0, 0) || color.a != 255 {
         return equation;
     }
+    with_color(
+        equation,
+        &format!("#{:02x}{:02x}{:02x}", color.r, color.g, color.b),
+    )
+}
+
+/// The color of an equation as a whole, as its MathML says it.
+fn color_of(equation: &Equation) -> Option<String> {
+    desk_math::parse(&equation.mathml)?
+        .get("mathcolor")
+        .map(str::to_owned)
+}
+
+/// An equation in a color of MathML, unless it has one.
+fn with_color(equation: Equation, color: &str) -> Equation {
     let Some(root) = desk_math::parse(&equation.mathml) else {
         return equation;
     };
     if root.get("mathcolor").is_some() {
         return equation;
     }
-    let root = root.attr(
-        "mathcolor",
-        &format!("#{:02x}{:02x}{:02x}", color.r, color.g, color.b),
-    );
+    let root = root.attr("mathcolor", color);
     Equation {
         mathml: root.to_xml().into(),
         ..equation
@@ -51,9 +64,13 @@ impl TextEditor {
     /// 15.4 when the cursor is in the text of a word processing document;
     /// on the page otherwise.
     pub fn equation_goes_in_line(&self) -> bool {
-        !self.is_page_layout()
-            && !self.has_selected_objects()
-            && !matches!(self.story(), Some(Story::TextBox(_)))
+        match self.story() {
+            // A header, a footer or a note takes it in its text, as it
+            // takes a picture.
+            Some(Story::Margin { .. } | Story::Note(_)) => true,
+            Some(Story::TextBox(_)) => false,
+            None => !self.is_page_layout() && !self.has_selected_objects(),
+        }
     }
 
     /// The size of an equation as it is laid out, in points.
@@ -83,8 +100,22 @@ impl TextEditor {
     pub fn insert_equation(&self, equation: Equation) {
         let (w, h) = self.new_equation_size(&equation);
         if self.equation_goes_in_line() {
-            // In the line, it takes the color of the text too.
+            // In the line, it takes the color of the text too, and is no
+            // wider than the text, nor taller than two inches in a header,
+            // a footer or a note, as a picture.
             let equation = colored(equation, self.format().character.color);
+            let (width, height) = {
+                let state = self.state.borrow();
+                let setup = state.layout.setup;
+                (setup.body_width().to_pt(), setup.body_height().to_pt())
+            };
+            let tallest = if matches!(self.story(), Some(Story::Margin { .. } | Story::Note(_))) {
+                144.0
+            } else {
+                height
+            };
+            let fit = (width.max(1.0) / w).min(tallest.max(1.0) / h).min(1.0);
+            let (w, h) = (w * fit, h * fit);
             let before = self.selection();
             let (start, end) = before.ordered();
             let result = self
@@ -137,6 +168,11 @@ impl TextEditor {
         let Some(old) = self.selected_equation() else {
             return;
         };
+        // An equation in a color keeps it, as written again without one.
+        let equation = match color_of(&old) {
+            Some(color) => with_color(equation, &color),
+            None => equation,
+        };
         let (old_w, old_h) = self.equation_size(&old);
         let (new_w, new_h) = self.equation_size(&equation);
         let Some(mut object) = self.object_info().map(|info| info.object) else {
@@ -160,11 +196,27 @@ impl TextEditor {
         });
     }
 
-    /// Opens the equation editor: on the selected equation, or for a new
-    /// one.
-    pub fn open_equation_editor(&self) {
+    /// Opens the equation editor for a new equation: Insert > Equation.
+    pub fn insert_equation_dialog(&self) {
+        self.open_equation_editor(None);
+    }
+
+    /// Opens the equation editor on the selected equation: Edit Equation.
+    /// Nothing happens when no equation alone is selected, or it is
+    /// locked.
+    pub fn edit_equation_dialog(&self) {
+        let Some(equation) = self.selected_equation() else {
+            return;
+        };
+        if self.object_info().is_some_and(|info| info.object.locked) {
+            gtk::gdk::Display::default().inspect(gtk::gdk::Display::beep);
+            return;
+        }
+        self.open_equation_editor(Some(equation));
+    }
+
+    fn open_equation_editor(&self, editing: Option<Arc<Equation>>) {
         let parent = self.view.area().root().and_downcast::<gtk::Window>();
-        let editing = self.selected_equation();
         // An equation in the line of the text is set as text, one on its
         // own as a display; one edited keeps how it was set.
         let display = editing.as_ref().map_or(!self.equation_goes_in_line(), |e| {
@@ -245,6 +297,16 @@ mod tests {
             red.mathml
         );
         assert_eq!(red.latex.as_deref(), Some("x"));
+        assert_eq!(super::color_of(&red).as_deref(), Some("#cc0010"));
+        let faint = desk_model::Rgba {
+            a: 64,
+            ..desk_model::Rgba::rgb(0xcc, 0, 0)
+        };
+        assert!(
+            !super::colored(equation("x"), faint)
+                .mathml
+                .contains("mathcolor")
+        );
         let black = super::colored(equation("x"), desk_model::Rgba::BLACK);
         assert!(!black.mathml.contains("mathcolor"));
     }

@@ -79,10 +79,10 @@ type ChoiceAction = fn(&TextEditor, &str);
 impl DocumentWindow {
     pub(super) fn add_object_actions(self: &Rc<Self>) {
         let simple: [(&str, EditorAction); 25] = [
-            // Both open the editor, on the selected equation if there is
-            // one (W104).
-            ("insert-equation", TextEditor::open_equation_editor),
-            ("edit-equation", TextEditor::open_equation_editor),
+            // The editor of equations, for a new one or the selected one
+            // (W104).
+            ("insert-equation", TextEditor::insert_equation_dialog),
+            ("edit-equation", TextEditor::edit_equation_dialog),
             ("unmask", TextEditor::unmask_picture),
             ("duplicate-objects", TextEditor::duplicate_objects),
             ("move-to-master", TextEditor::move_objects_to_master),

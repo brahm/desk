@@ -872,7 +872,13 @@ fn styled(node: &Node, c: &Context) -> Context {
             c = c.script();
         }
     }
-    if let Some(color) = node.get("mathcolor").or(node.get("color")).and_then(color) {
+    // A color that cannot be read leaves the other attribute, then the
+    // color around.
+    if let Some(color) = node
+        .get("mathcolor")
+        .and_then(color)
+        .or_else(|| node.get("color").and_then(color))
+    {
         c.color = color;
     }
     if let Some(variant) = node.get("mathvariant") {
