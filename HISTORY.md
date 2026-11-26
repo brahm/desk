@@ -10,7 +10,7 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
 
 * Changed: in Desk Writer, the bar of comments and changes, Undo, the
   count of Find & Replace and the word count of a selection say what
-  Pages 15.4 says, as the validation of W2 on the Mac found (#PR).
+  Pages 15.4 says, as the validation of W2 on the Mac found (#238).
 * Added: in Desk Writer, Save a Copy as Final, in the menu of the bar
   of comments and changes, saves a copy with every tracked change
   accepted and no comments, and the document keeps them (#235).
