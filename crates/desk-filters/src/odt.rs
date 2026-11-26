@@ -423,7 +423,8 @@ fn page_fill(source: &odf::TextDocument, fill: &odf::PageFill) -> Option<Fill> {
                 (Some("scale-to-fill"), _) => ImageFill::ScaleToFill,
                 (Some("scale-to-fit"), _) => ImageFill::ScaleToFit,
                 (Some("original-size"), _) | (None, Some("no-repeat")) => ImageFill::OriginalSize,
-                (Some("tile"), _) | (None, Some("repeat")) => ImageFill::Tile,
+                // Repeat is what ODF does when it names neither.
+                (Some("tile"), _) | (None, Some("repeat") | None) => ImageFill::Tile,
                 _ => ImageFill::Stretch,
             };
             let tint = fill.tint.map(|color| Rgba {
@@ -1839,8 +1840,22 @@ fn import_text(source: &odf::TextDocument) -> Result<Document, FilterError> {
         fill_images: source.fill_images.clone(),
         ..odf::TextDocument::default()
     };
-    // What fills the pages of each section (W098).
-    let mut backgrounds = vec![(None, master)];
+    // What fills the pages of each section (W098), the first's from the
+    // master page its first paragraph names, when it names one.
+    let first_master = source
+        .body
+        .first()
+        .and_then(|p| p.style.as_deref())
+        .and_then(|name| {
+            source
+                .automatic_styles
+                .iter()
+                .find(|s| s.family == odf::Family::Paragraph && s.name == name)
+        })
+        .and_then(|s| s.master_page.as_deref())
+        .and_then(|name| source.masters.iter().find(|(n, _)| n == name))
+        .map_or(master, |(_, page)| page);
+    let mut backgrounds = vec![(None, first_master)];
     for (id, name) in &section_pages {
         if let Some((_, page)) = source.masters.iter().find(|(n, _)| n == name) {
             backgrounds.push((Some(*id), page));
@@ -3459,37 +3474,47 @@ fn page_layout_body(out: &mut odf::TextDocument, automatic: &mut Vec<odf::Style>
     }
 }
 
-/// The names of the master pages of the sections that have headers and
-/// footers of their own, by the paragraph that starts each (EST-16).
-fn section_masters(document: &Document) -> HashMap<NodeId, String> {
-    let mut out = HashMap::new();
-    for paragraph in document.body().iter().skip(1) {
+/// The sections that start a master page of their own, in order, each
+/// with the index of the paragraph that starts it and whether it has
+/// headers and footers of its own: those with their own headers and
+/// footers or a background of their own (W098), and those after a
+/// section with a background, which would otherwise show it too.
+fn master_sections(document: &Document) -> Vec<(usize, NodeId, bool)> {
+    let mut out = Vec::new();
+    let mut background = document.section_background(None).is_some();
+    for (index, paragraph) in document.body().iter().enumerate().skip(1) {
         if let Some(Some(start)) = &paragraph.attrs().start
             && let Start::Section(section, _) = &**start
-            && (section.own_margins || document.section_background(Some(paragraph.id())).is_some())
         {
-            let name = format!("Desk{}", out.len() + 1);
-            out.insert(paragraph.id(), name);
+            let own = document.section_background(Some(paragraph.id())).is_some();
+            if section.own_margins || own || background {
+                out.push((index, paragraph.id(), section.own_margins));
+                background = own;
+            }
         }
     }
     out
 }
 
-/// The sections with a background of their own and the headers and
-/// footers of the section before (W098), each with the section whose
-/// headers, footers and master objects its master page copies.
+/// The names of the master pages of the sections that start one, by the
+/// paragraph that starts each (EST-16, W098).
+fn section_masters(document: &Document) -> HashMap<NodeId, String> {
+    master_sections(document)
+        .into_iter()
+        .enumerate()
+        .map(|(n, (_, id, _))| (id, format!("Desk{}", n + 1)))
+        .collect()
+}
+
+/// The sections that start a master page without headers and footers of
+/// their own (W098), each with the section whose headers, footers and
+/// master objects its master page copies.
 fn background_masters(document: &Document) -> HashMap<NodeId, Option<NodeId>> {
-    let mut out = HashMap::new();
-    for (index, paragraph) in document.body().iter().enumerate().skip(1) {
-        if let Some(Some(start)) = &paragraph.attrs().start
-            && let Start::Section(section, _) = &**start
-            && !section.own_margins
-            && document.section_background(Some(paragraph.id())).is_some()
-        {
-            out.insert(paragraph.id(), document.headers_section(index));
-        }
-    }
-    out
+    master_sections(document)
+        .into_iter()
+        .filter(|(_, _, own)| !own)
+        .map(|(index, id, _)| (id, document.headers_section(index)))
+        .collect()
 }
 
 /// The headers and footers of a document in its master pages, the first
