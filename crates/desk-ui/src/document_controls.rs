@@ -30,9 +30,9 @@ pub enum Count {
 impl Count {
     /// Every kind, in the order of the menu.
     pub const ALL: [Self; 5] = [
-        Self::Words,
-        Self::Characters,
         Self::CharactersWithoutSpaces,
+        Self::Characters,
+        Self::Words,
         Self::Paragraphs,
         Self::Pages,
     ];
@@ -95,47 +95,36 @@ pub fn grouped(n: usize) -> String {
     out
 }
 
-/// The count at the end of the bar: of the document, or "12 of 3,402
-/// words" when text is selected. Pages are always those of the document.
+/// The count at the end of the bar: of the document, or of the text
+/// selected when there is some, with no total, as Pages 15.4 shows it
+/// ("3 words"). Pages are always those of the document.
 pub fn count_label(
     kind: Count,
     all: &Statistics,
     selected: Option<&Statistics>,
     pages: usize,
 ) -> String {
-    if kind == Count::Pages {
-        return plural_of(kind, false, pages).replace("{n}", &grouped(pages));
-    }
-    let total = kind.of(all);
-    let text = match selected {
-        Some(selected) => plural_of(kind, true, total).replace("{s}", &grouped(kind.of(selected))),
-        None => plural_of(kind, false, total),
+    let n = match (kind, selected) {
+        (Count::Pages, _) => pages,
+        (_, Some(selected)) => kind.of(selected),
+        (_, None) => kind.of(all),
     };
-    text.replace("{n}", &grouped(total))
+    plural_of(kind, n).replace("{n}", &grouped(n))
 }
 
-/// The plural form of the count, with `{n}` for the total and `{s}` for
-/// the selection.
-fn plural_of(kind: Count, selection: bool, n: usize) -> String {
+/// The plural form of the count, with `{n}` for the number.
+fn plural_of(kind: Count, n: usize) -> String {
     let n = n as u64;
-    match (kind, selection) {
-        (Count::Words, false) => trn("{n} word", "{n} words", n),
-        (Count::Words, true) => trn("{s} of {n} word", "{s} of {n} words", n),
-        (Count::Characters, false) => trn("{n} character", "{n} characters", n),
-        (Count::Characters, true) => trn("{s} of {n} character", "{s} of {n} characters", n),
-        (Count::CharactersWithoutSpaces, false) => trn(
+    match kind {
+        Count::Words => trn("{n} word", "{n} words", n),
+        Count::Characters => trn("{n} character", "{n} characters", n),
+        Count::CharactersWithoutSpaces => trn(
             "{n} character without spaces",
             "{n} characters without spaces",
             n,
         ),
-        (Count::CharactersWithoutSpaces, true) => trn(
-            "{s} of {n} character without spaces",
-            "{s} of {n} characters without spaces",
-            n,
-        ),
-        (Count::Paragraphs, false) => trn("{n} paragraph", "{n} paragraphs", n),
-        (Count::Paragraphs, true) => trn("{s} of {n} paragraph", "{s} of {n} paragraphs", n),
-        (Count::Pages, _) => trn("{n} page", "{n} pages", n),
+        Count::Paragraphs => trn("{n} paragraph", "{n} paragraphs", n),
+        Count::Pages => trn("{n} page", "{n} pages", n),
     }
 }
 
@@ -548,11 +537,11 @@ mod tests {
         let selected = statistics(12, 60);
         assert_eq!(
             count_label(Count::Words, &all, Some(&selected), 41),
-            "12 of 26,171 words"
+            "12 words"
         );
         assert_eq!(
             count_label(Count::Characters, &all, Some(&selected), 41),
-            "60 of 150,000 characters"
+            "60 characters"
         );
         assert_eq!(
             count_label(Count::Pages, &all, Some(&selected), 41),

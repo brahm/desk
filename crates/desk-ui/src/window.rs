@@ -1232,6 +1232,7 @@ impl DocumentWindow {
                 this.schedule_autosave();
                 this.refresh();
                 this.search_sidebar.document_changed();
+                this.find.document_changed();
                 this.thumbnails.refresh();
                 this.contents.refresh();
                 this.comments.refresh();
@@ -3890,7 +3891,7 @@ impl DocumentWindow {
     /// or keep tracking.
     fn ask_turn_off_tracking(self: &Rc<Self>) {
         let dialog = adw::AlertDialog::new(
-            Some(&tr("Turn Off Tracking?")),
+            Some(&tr("Turn Off Change Tracking")),
             Some(&tr(
                 "To turn off change tracking, you must accept or reject all changes.",
             )),

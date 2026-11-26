@@ -2662,6 +2662,35 @@ paragraph, and objects on a second page.
   is what the continuous integration runs on each pull request. The
   validation on the Mac is left for the owner.
 
+### 26 November: The validation of W2 on the Mac
+
+- The owner asked for the validation on the Mac of step 17 to be done
+  remotely. A session with control of the screen went through 17 items
+  in Pages 15.4, in scratch documents it discarded, putting back every
+  setting it changed; its notes and captures are in the project folder
+  (`w2-mac/notes-17.md`, `w2-mac/capturas-17/`), not in the repository
+  (D-011).
+- *Verdicts:* in `corpus/mac-review.tsv`, W150 and W155 are the same,
+  W059 is the same and done, and W148, W149 and W151 to W154 differ by
+  decision: Desk keeps what Pages '09 tracked and where it commented
+  (D-003), its proofreader, which Pages 15.4 lacks (with Check grammar
+  on it flagged nothing in "Go to to bed. it works ,fine"), and the list
+  of matches (D-002), with the forms of GNOME (D-008, D-022).
+- *The gaps, closed in the same pull request:* the label of the bar says
+  "2 Comments" and "Comment 2 of 2" without changes, "Comment or Change
+  3 of 3" for every item with them, and "Highlight 1 of 1" on a comment
+  without text; Undo says Add Reply, Edit Comment for a highlight,
+  Delete Comment for Remove Highlights and Comments, and Accept Changes
+  or Reject Changes for several; Find & Replace counts the matches as
+  the field changes ("11 found", "Not Found") and says "10 replaced";
+  the count of a selection has no total ("3 words"), and its menu is in
+  the order of Pages: characters without spaces, characters, words,
+  paragraphs and pages; the alert that turns tracking off is titled Turn
+  Off Change Tracking.
+- *Seen and left as they are:* Pages loses an inline object deleted
+  with its paragraph while tracking, and Reject does not bring it back;
+  Desk tracks the object, as Pages '09 did (D-003).
+
 ## Decisions, with their reasons and consequences
 
 Ids `D-nnn` and `R-nnn` are those of [decisions.md](decisions.md).

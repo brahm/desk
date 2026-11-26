@@ -71,7 +71,7 @@ W048	2026-11-18	Steps only by page	by decision	D-003: Desk keeps the steps by ki
 W051	2026-11-18	Default font in Settings	same	-
 W052	2026-11-21	Gradient and image fills of text, over the lines of a paragraph or the entire page	same	-
 W054	2026-11-18	Capitalization: None, All Caps, Small Caps, Title Case, Start Case	same	-
-W059	2026-11-18	A highlight is a comment on a range	moved	W2 (B-039)
+W059	2026-11-26	A highlight is a comment without text on a range, also over two paragraphs; the bar says "Highlight 1 of 1"; Undo names it Edit Comment, and Remove Highlights and Comments is one Delete Comment	same	Done in W2 (B-039); the label and the names of Undo were a gap, closed on 26 November
 W060	2026-11-18	Drop cap with its styles	same	The artistic border lines in W3 (B-044)
 W061	2026-11-21	Format Fractions Automatically; the first Undo brings back the typed fraction	same	-
 W062	2026-11-21	Smart quotes and dashes, quote styles, Replace in Selection makes em dashes	same	-
@@ -92,3 +92,11 @@ W133	2026-11-18	The functions of 15.4	moved	T2 (B-042)
 W138	2026-11-18	Table title	same	-
 W139	2026-11-18	Right to left table	moved	W6 (B-041)
 W140	2026-11-18	Lock table	same	-
+W148	2026-11-26	Tracks text added and deleted in the body, notes, text boxes and shapes, a replaced word as two changes ("Deleted:", "Added:"); Accept on a selection of several is one step, Accept Changes; Paused text is never marked; Markup Without Deletions and Final keep tracking; the sheet that turns tracking off with changes pending offers Accept All Changes, Reject All Changes and Cancel; not headers, formatting, cells, objects or an inline object deleted with its paragraph	by decision	D-003: Desk also tracks what Pages '09 tracked (formatting, cells, objects moved and deleted, headers); D-022: the alert of GNOME, its buttons in the order of GNOME; the name of the selected step was a gap, closed on 26 November
+W149	2026-11-26	Comments on a word, a range, a footnote, a text box and its text, and a cell, whose bubble has Reply, Delete and < >, in the author colour; none in headers; the bar says "2 Comments" and "Comment 2 of 2", and "Comment or Change 3 of 3" while tracking; Undo names Add Comment, Add Reply and Delete Comment	by decision	D-003: Desk also comments in headers and footers, as Pages '09 tracked there; the label of the bar and Add Reply were a gap, closed on 26 November; printing moved to W5 (B-077)
+W150	2026-11-26	The author colour, one of 10 in the order Yellow, Green, Blue, Pink, Purple, Teal, Orange, Red, Brown, Gray Blue, Yellow for a new document, set for the document; a new colour recolours the comments and changes there	same	-
+W151	2026-11-26	The Spelling and Grammar panel of macOS (Change, Find Next, Ignore, Learn, Define, Guess, the language, Check grammar)	by decision	D-008: a pane of the window with Change, Find Next, Ignore, Learn and Forget, and Check Grammar
+W152	2026-11-26	No proofreader: with Check grammar on, "Go to to bed. it works ,fine" flags nothing	by decision	D-003: Desk keeps the Proofreading of Pages '09, which flags the word written twice, the small letter and the space
+W153	2026-11-26	A floating Find & Replace window with Whole Words and Match Case, the count in the field ("11 found", "Not Found"), Replace All, Replace & Find and Replace, "10 replaced" after Replace All, and Undo Replace All	by decision	D-022: the search bar of GNOME under the header bar; the count was a gap, closed on 26 November
+W154	2026-11-26	No list of the matches, only the count	by decision	D-002: Desk keeps the list of Pages '09, the Search Results page of the sidebar
+W155	2026-11-26	A pill at the foot of the page: characters without spaces, characters with spaces, words, paragraphs or pages, in that order; a selection shows its own count, as "3 words"	same	The count of the selection and the order of the menu were a gap, closed on 26 November

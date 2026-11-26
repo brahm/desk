@@ -391,6 +391,7 @@ impl FindWindow {
             check.connect_toggled(move |_| {
                 if let Some(this) = weak.upgrade() {
                     this.store();
+                    this.count();
                 }
             });
         }
@@ -399,6 +400,7 @@ impl FindWindow {
             entry.connect_changed(move |_| {
                 if let Some(this) = weak.upgrade() {
                     this.store();
+                    this.count();
                 }
             });
         }
@@ -466,7 +468,25 @@ impl FindWindow {
         }
         *self.search.query.borrow_mut() = self.query();
         *self.search.replacement.borrow_mut() = from_field(&self.replace.text());
-        self.status.set_label("");
+    }
+
+    /// Counts the matches again, as the document changed, while the bar
+    /// shows: a replacement, an edit or Undo changes how many there are.
+    pub fn document_changed(&self) {
+        if self.window.is_search_mode() {
+            self.count();
+        }
+    }
+
+    /// Shows how many matches the document has at the end of the field,
+    /// as Find & Replace of Pages 15.4 does.
+    fn count(&self) {
+        let query = self.search.query.borrow().clone();
+        let label = match (self.editor)() {
+            Some(editor) if !query.text.is_empty() => found_label(editor.find(&query).len()),
+            _ => String::new(),
+        };
+        self.status.set_label(&label);
     }
 
     /// Shows the bar with the search of the window, and the keyboard in
@@ -486,6 +506,7 @@ impl FindWindow {
         self.match_case.set_active(query.match_case);
         self.whole_words.set_active(query.whole_words);
         self.updating.set(false);
+        self.count();
         self.window.set_search_mode(true);
         self.find.grab_focus();
     }
@@ -505,7 +526,7 @@ impl FindWindow {
         let text = self.search.query.borrow().text.clone();
         self.search.remember(&text);
         if !find_next(&editor, &self.search, backwards) {
-            self.status.set_label(&tr("Not found"));
+            self.status.set_label(&found_label(0));
         }
     }
 
@@ -529,12 +550,28 @@ impl FindWindow {
         let query = self.search.query.borrow().clone();
         let count = editor.replace_all(&query, &from_field(&self.replace.text()));
         self.status.set_label(&if count == 0 {
-            tr("Not found")
+            found_label(0)
         } else {
-            trn("Replaced {n} match", "Replaced {n} matches", count as u64)
-                .replace("{n}", &count.to_string())
+            replaced_label(count)
         });
     }
+}
+
+/// How many matches there are, in the words of Pages 15.4: "11 found",
+/// or "Not Found".
+pub fn found_label(count: usize) -> String {
+    if count == 0 {
+        tr("Not Found")
+    } else {
+        trn("{n} found", "{n} found", count as u64)
+            .replace("{n}", &crate::document_controls::grouped(count))
+    }
+}
+
+/// How many matches Replace All replaced, as Pages 15.4 says it.
+pub fn replaced_label(count: usize) -> String {
+    trn("{n} replaced", "{n} replaced", count as u64)
+        .replace("{n}", &crate::document_controls::grouped(count))
 }
 
 /// The Search sidebar (TXT-13).
@@ -822,6 +859,15 @@ mod tests {
         assert!(markup.starts_with('\u{2026}'));
         assert!(markup.ends_with('\u{2026}'));
         assert!(markup.contains("<b>cat</b>"));
+    }
+
+    #[test]
+    fn txt_12_the_count_says_how_many_were_found_and_replaced() {
+        assert_eq!(found_label(0), "Not Found");
+        assert_eq!(found_label(1), "1 found");
+        assert_eq!(found_label(11), "11 found");
+        assert_eq!(replaced_label(10), "10 replaced");
+        assert_eq!(found_label(12345), "12,345 found");
     }
 
     #[test]

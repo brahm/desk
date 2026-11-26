@@ -3002,11 +3002,10 @@ def document_controls(work):
         # in the text again.
         area = extents(scroll_pane_of(document))
         click(area.x + area.width // 2, area.y + area.height // 3)
-        press("ctrl+a")
-        wait_for(
-            "the count of the selection",
-            lambda: named_like(app, rf"{words:,} of {words:,} words"),
-        )
+        # The first word selected: its count alone, with no total, as
+        # Pages 15.4 shows it.
+        press("ctrl+Home", "ctrl+shift+Right")
+        wait_for("the count of the selection", lambda: named_like(app, r"1 word"))
         check("with text selected the count is that of the selection (DOC-20)", True)
         press("ctrl+Home")
         wait_for("the count of the document", lambda: named_like(app, rf"{words:,} words"))

@@ -7,7 +7,7 @@
 //! markup shows them: with these marks, without the text deleted, or as
 //! if every change were accepted, without marks.
 
-use desk_model::{ChangeKind, Markup};
+use desk_model::{ChangeKind, Markup, NodeId};
 use gtk::glib;
 
 use super::comments::{Texts, spot_in};
@@ -520,6 +520,16 @@ impl TextEditor {
         done.is_ok() && self.tracking() == desk_model::Tracking::Off && !self.has_changes()
     }
 
+    /// Whether the comment `id` is a highlight: a comment without text
+    /// or replies (PXV-19).
+    pub fn is_highlight(&self, id: NodeId) -> bool {
+        let state = self.state.borrow();
+        Self::main_document(&state)
+            .comments()
+            .get(id)
+            .is_some_and(desk_model::Comment::is_highlight)
+    }
+
     /// Whether any text of the document has tracked changes.
     pub fn has_changes(&self) -> bool {
         let state = self.state.borrow();
@@ -612,10 +622,12 @@ impl TextEditor {
         if visit.is_some() {
             self.leave_story(None);
         }
-        let name = if accept {
-            "Accept Change"
-        } else {
-            "Reject Change"
+        // One change or several, as Undo of Pages 15.4 names them.
+        let name = match (accept, ids.len() > 1) {
+            (true, false) => "Accept Change",
+            (true, true) => "Accept Changes",
+            (false, false) => "Reject Change",
+            (false, true) => "Reject Changes",
         };
         let mut count = 0;
         let counted = &mut count;
