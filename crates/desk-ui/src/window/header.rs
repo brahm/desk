@@ -386,6 +386,7 @@ pub(super) fn insert_menu(objects: bool) -> gio::Menu {
         Some(&tr("_Section Break")),
         Some("win.insert-section-break"),
     );
+    breaks.append(Some(&tr("_Captured Pages…")), Some("win.captured-pages"));
     let fields = gio::Menu::new();
     fields.append(
         Some(&tr("_Auto Page Numbers…")),

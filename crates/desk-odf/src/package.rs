@@ -128,6 +128,33 @@ pub fn read_odt(bytes: &[u8]) -> Result<TextDocument, OdfError> {
             document.pictures.push((href, bytes));
         }
     }
+    // The pages captured to insert again (EST-20), in order.
+    let mut captures: Vec<(usize, String)> = archive
+        .file_names()
+        .filter_map(|name| {
+            let name = name.ok()?;
+            let n = name
+                .strip_prefix(CAPTURES)?
+                .strip_suffix(".odt")?
+                .parse::<usize>()
+                .ok()?;
+            Some((n, name.into_owned()))
+        })
+        .collect();
+    captures.sort();
+    // One that cannot be read is left out, and so are those past the
+    // most a document keeps.
+    for (_, name) in captures.into_iter().take(MAX_CAPTURES) {
+        let Ok(file) = archive.by_name(&name) else {
+            continue;
+        };
+        let mut bytes = Vec::new();
+        if file.take(MAX_STREAM + 1).read_to_end(&mut bytes).is_ok()
+            && bytes.len() as u64 <= MAX_STREAM
+        {
+            document.captures.push(bytes);
+        }
+    }
     // The embedded objects that are not charts are left out.
     let lost = document
         .page_objects
@@ -149,6 +176,12 @@ pub fn read_odt(bytes: &[u8]) -> Result<TextDocument, OdfError> {
 pub fn write_odt(document: &TextDocument) -> Result<Vec<u8>, OdfError> {
     write_odt_with_thumbnail(document, None)
 }
+
+/// The folder of the pages captured to insert again (EST-20).
+const CAPTURES: &str = "Desk/Captures/";
+
+/// The most pages captured that a document keeps (EST-20).
+pub const MAX_CAPTURES: usize = 64;
 
 /// The path of the preview of a package, which file managers show.
 pub const THUMBNAIL: &str = "Thumbnails/thumbnail.png";
@@ -178,6 +211,7 @@ pub fn write_odt_with_thumbnail(
                 streams.settings.is_some(),
                 &document.pictures,
                 &document.charts,
+                document.captures.len(),
             ),
         ),
     ] {
@@ -202,6 +236,11 @@ pub fn write_odt_with_thumbnail(
     for (path, bytes) in &document.pictures {
         // Pictures are compressed already.
         zip.start_file(path.as_str(), stored)?;
+        zip.write_all(bytes)?;
+    }
+    for (n, bytes) in document.captures.iter().enumerate() {
+        // A package is compressed already.
+        zip.start_file(format!("{CAPTURES}{}.odt", n + 1), stored)?;
         zip.write_all(bytes)?;
     }
     if let Some(png) = thumbnail {
@@ -243,6 +282,7 @@ fn manifest(
     settings: bool,
     pictures: &[(String, Vec<u8>)],
     charts: &[(String, crate::chart::ChartDocument)],
+    captures: usize,
 ) -> String {
     let mut w = crate::xml::Writer::new();
     w.start("manifest:manifest")
@@ -287,6 +327,12 @@ fn manifest(
         w.start("manifest:file-entry")
             .attr("manifest:full-path", path)
             .attr("manifest:media-type", picture_type(path))
+            .end();
+    }
+    for n in 1..=captures {
+        w.start("manifest:file-entry")
+            .attr("manifest:full-path", &format!("{CAPTURES}{n}.odt"))
+            .attr("manifest:media-type", MEDIA_TYPE)
             .end();
     }
     w.end();

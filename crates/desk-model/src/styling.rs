@@ -799,6 +799,19 @@ impl Edit {
         }
         // The text that uses it.
         self.replace_style_in_body(id, family, replacement)?;
+        // And the pages captured (EST-20).
+        let captures = self.document().captured_pages().clone();
+        if captures.iter().any(|c| c.pages.uses_style(id)) {
+            let swap = |s: StyleId| if s == id { replacement } else { Some(s) };
+            let captures = captures
+                .iter()
+                .map(|c| crate::CapturedPages {
+                    name: c.name.clone(),
+                    pages: c.pages.map_styles(&swap, replacement),
+                })
+                .collect();
+            self.apply(Op::SetCapturedPages { captures })?;
+        }
         // Tables of contents stop listing it, and their entries that took
         // it take the default style, as the reference machine showed Pages
         // 4.3 do: the tables of contents update at once.

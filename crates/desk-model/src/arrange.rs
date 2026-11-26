@@ -21,16 +21,17 @@ use crate::id::NodeId;
 use crate::note::Note;
 use crate::op::Op;
 use crate::section::{Layout, Section, Start};
+use crate::style::StyleId;
 use crate::text::Paragraph;
 use crate::transaction::Edit;
 
 /// Sections copied, to paste.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SectionsClip {
     sections: Vec<ClipSection>,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 struct ClipSection {
     section: Section,
     layout: Layout,
@@ -52,6 +53,94 @@ impl SectionsClip {
     pub fn is_empty(&self) -> bool {
         self.sections.is_empty()
     }
+
+    /// The text of its sections, the first paragraph of each.
+    pub fn first_paragraphs(&self) -> impl Iterator<Item = &Paragraph> {
+        self.sections.iter().filter_map(|s| s.paragraphs.first())
+    }
+
+    /// The same sections with the styles that `style` gives for theirs,
+    /// as when they come from another document with styles of the same
+    /// names (EST-20).
+    pub fn restyled(&self, style: &dyn Fn(StyleId) -> StyleId) -> Self {
+        self.map_styles(&|id| Some(style(id)), None)
+    }
+
+    /// Whether any of its text uses a style.
+    pub fn uses_style(&self, id: StyleId) -> bool {
+        self.sections.iter().any(|s| {
+            s.paragraphs.iter().any(|p| p.uses_style(id))
+                || s.margins
+                    .as_ref()
+                    .is_some_and(|m| m.paragraphs().any(|p| p.uses_style(id)))
+                || s.notes
+                    .iter()
+                    .any(|n| n.paragraphs.iter().any(|p| p.uses_style(id)))
+        })
+    }
+
+    /// The same sections with the styles that `style` gives for theirs:
+    /// a paragraph whose style it takes away takes `paragraph`, or keeps
+    /// its own without one, and a run or a list loses its style.
+    pub(crate) fn map_styles(
+        &self,
+        style: &dyn Fn(StyleId) -> Option<StyleId>,
+        paragraph: Option<StyleId>,
+    ) -> Self {
+        let restyle = |p: &Paragraph| restyled(p, style, paragraph);
+        Self {
+            sections: self
+                .sections
+                .iter()
+                .map(|s| ClipSection {
+                    section: s.section,
+                    layout: s.layout,
+                    paragraphs: s.paragraphs.iter().map(restyle).collect(),
+                    margins: s.margins.as_ref().map(|m| m.map_paragraphs(&restyle)),
+                    notes: s
+                        .notes
+                        .iter()
+                        .map(|n| Note {
+                            paragraphs: n.paragraphs.iter().map(restyle).collect(),
+                            ..n.clone()
+                        })
+                        .collect(),
+                })
+                .collect(),
+        }
+    }
+}
+
+/// A paragraph with the styles that `style` gives for its own: one it
+/// takes away from the paragraph gives way to `paragraph`.
+fn restyled(
+    paragraph: &Paragraph,
+    style: &dyn Fn(StyleId) -> Option<StyleId>,
+    default: Option<StyleId>,
+) -> Paragraph {
+    let mut attrs = paragraph.attrs().clone();
+    if let Some(Some(list)) = attrs.list_style {
+        attrs.list_style = Some(style(list));
+    }
+    let runs = paragraph.runs().map(|run| {
+        let mut run = run.clone();
+        run.style = run.style.and_then(style);
+        run
+    });
+    let own = style(paragraph.style())
+        .or(default)
+        .unwrap_or(paragraph.style());
+    Paragraph::from_runs(paragraph.id(), own, attrs, runs).unwrap_or_else(|_| paragraph.clone())
+}
+
+/// Pages captured by name, to insert again: Capture Pages of Pages '09,
+/// kept by D-003 (EST-20).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CapturedPages {
+    /// The name they go by.
+    pub name: Arc<str>,
+    /// Their sections.
+    pub pages: SectionsClip,
 }
 
 impl Document {
@@ -534,5 +623,40 @@ mod tests {
             .transact("Paste", |edit| edit.paste_sections(4, &clip))
             .unwrap();
         assert_eq!(texts(&document), ["C", "A", "B", "B", "C", "A"]);
+    }
+
+    #[test]
+    fn est_20_pages_captured_by_name_are_inserted_again() {
+        let mut document = three();
+        document
+            .transact("Capture", |edit| edit.capture_pages("Second", &[1]))
+            .unwrap();
+        assert_eq!(document.captured_pages().len(), 1);
+        // Capturing under the same name replaces them, where they were.
+        document
+            .transact("Capture", |edit| {
+                edit.capture_pages("Other", &[2])?;
+                edit.capture_pages("Second", &[0])
+            })
+            .unwrap();
+        let names: Vec<&str> = document.captured_pages().iter().map(|c| &*c.name).collect();
+        assert_eq!(names, ["Second", "Other"]);
+        document
+            .transact("Insert", |edit| {
+                edit.insert_captured_pages("Other", 0)?;
+                edit.insert_captured_pages("Nothing", 0).map(drop)
+            })
+            .unwrap();
+        assert_eq!(texts(&document), ["C", "A", "B", "C"]);
+        document
+            .transact("Delete", |edit| edit.remove_captured_pages("Second"))
+            .unwrap();
+        assert_eq!(document.captured_pages().len(), 1);
+        // Restyled, as from another document.
+        let clip = document.copy_sections(&[0]);
+        let style = document.styles().default_paragraph();
+        let same = clip.restyled(&|id| id);
+        assert_eq!(same, clip);
+        assert!(clip.first_paragraphs().all(|p| p.style() == style));
     }
 }

@@ -57,6 +57,10 @@ pub struct TextDocument {
     /// The charts of the package that the document's objects link to, by
     /// the path of their folder, as `./Object 1`.
     pub charts: Vec<(String, crate::chart::ChartDocument)>,
+    /// The pages captured to insert again (EST-20), each a text document
+    /// of its own in the package, at `Desk/Captures/n.odt`, whose title
+    /// is their name.
+    pub captures: Vec<Vec<u8>>,
     /// The section styles, common and automatic, which the sections of
     /// the body name.
     pub section_styles: Vec<SectionStyle>,

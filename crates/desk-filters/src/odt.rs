@@ -1289,11 +1289,126 @@ pub fn import(source: &odf::TextDocument) -> Result<Document, FilterError> {
         let mut setup = *document.page_setup();
         setup.layout_pages = Some(pages);
         document.apply(Op::SetPageSetup { page: setup })?;
-        return Ok(document);
+        return import_captures(&source, document);
     }
     let mut document = import_text(source)?;
     changes::prune(&mut document)?;
-    Ok(document)
+    import_captures(source, document)
+}
+
+/// The pages captured in a document to insert again (EST-20), each read
+/// from a text document of its own in the package, whose title is their
+/// name. Their styles are those of the document by name, or come along
+/// when the document has none of that name. One that cannot be read is
+/// left out.
+fn import_captures(
+    source: &odf::TextDocument,
+    document: Document,
+) -> Result<Document, FilterError> {
+    if source.captures.is_empty() {
+        return Ok(document);
+    }
+    let mut read = Vec::new();
+    for bytes in &source.captures {
+        let Ok(mut nested) = odf::read_odt(bytes) else {
+            continue;
+        };
+        // Pages captured in captured pages are not read.
+        nested.captures.clear();
+        if let Ok(captured) = import(&nested) {
+            read.push(captured);
+        }
+    }
+    let mut editor = desk_model::Editor::new(document);
+    for captured in &read {
+        let name = captured.metadata().title.clone();
+        // The first section holds no captured page: it keeps those after
+        // it as they were, with headers and footers of their own.
+        let count = captured.section_ranges().len();
+        let pages = captured.copy_sections(&(1..count).collect::<Vec<_>>());
+        if name.is_empty()
+            || pages.is_empty()
+            || editor
+                .document()
+                .captured_pages()
+                .iter()
+                .any(|c| *c.name == *name)
+        {
+            continue;
+        }
+        // Each on its own: one whose styles cannot come along is left out.
+        let _ = editor.edit("Capture Pages", |edit| {
+            // The styles of the document of the same names, and those it
+            // has not.
+            let mut map: HashMap<StyleId, StyleId> = HashMap::new();
+            let mut missing = Vec::new();
+            for style in captured.styles().iter() {
+                match edit
+                    .document()
+                    .styles()
+                    .by_name(style.family(), style.name())
+                {
+                    Some(own) => {
+                        map.insert(style.id(), own.id());
+                    }
+                    None => missing.push(style.id()),
+                }
+            }
+            let added = edit.import_styles(captured, &missing, false)?;
+            map.extend(missing.into_iter().zip(added));
+            let pages = pages.restyled(&|id| map.get(&id).copied().unwrap_or(id));
+            let mut captures = edit.document().captured_pages().clone();
+            captures.push_back(desk_model::CapturedPages {
+                name: name.as_str().into(),
+                pages,
+            });
+            edit.apply(Op::SetCapturedPages { captures })
+        });
+    }
+    Ok(editor.into_document())
+}
+
+/// The pages captured in a document (EST-20), each as the bytes of a text
+/// document of its own: the document with only those pages, titled with
+/// their name. Those that cannot be written are left out.
+fn export_captures(document: &Document) -> Vec<Vec<u8>> {
+    let mut out = Vec::new();
+    for captured in document.captured_pages() {
+        let mut editor = desk_model::Editor::new(document.clone());
+        let made = editor.edit("Capture Pages", |edit| {
+            edit.apply(Op::SetCapturedPages {
+                captures: Default::default(),
+            })?;
+            // Its objects stay with the document.
+            let objects: Vec<NodeId> = edit.document().objects().iter().map(|o| o.id).collect();
+            for object in objects {
+                edit.apply(Op::RemoveObject { object })?;
+            }
+            // An empty first section, then the pages captured, which keep
+            // their headers and footers as sections after the first.
+            let count = edit.document().section_ranges().len();
+            edit.paste_sections(count, &captured.pages)?;
+            edit.delete_sections(&(1..count).collect::<Vec<_>>())?;
+            let first = edit.document().section_ranges()[0].clone();
+            let body = edit.document().body();
+            if let (Some(start), Some(end)) = (body.get(first.start), body.get(first.end - 1)) {
+                let (start, end) = (
+                    desk_model::Position::new(start.id(), 0),
+                    desk_model::Position::new(end.id(), end.len()),
+                );
+                edit.delete(start, end)?;
+            }
+            let mut metadata = edit.document().metadata().clone();
+            metadata.title = captured.name.to_string();
+            edit.set_metadata(metadata)
+        });
+        if made.is_ok()
+            && let Ok(bytes) = odf::write_odt(&export(editor.document()))
+        {
+            out.push(bytes);
+        }
+    }
+    out
 }
 
 /// A word processing document from its ODF.
@@ -4521,6 +4636,7 @@ pub fn export(document: &Document) -> odf::TextDocument {
     // Last, as it joins paragraphs whose breaks deletions took (W148).
     out.tracked_changes = changes::export_all(&mut out, document);
     out.track_changes = document.text_settings().tracking == desk_model::Tracking::On;
+    out.captures = export_captures(document);
     out
 }
 

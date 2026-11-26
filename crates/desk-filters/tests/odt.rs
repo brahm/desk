@@ -4433,3 +4433,139 @@ fn w094_w098_sections_go_on_in_the_master_page_before() {
     let read = import(&out).unwrap();
     assert_eq!(read.section_at(2).1.number_format, NumberFormat::UpperRoman);
 }
+
+#[test]
+fn est_20_captured_pages_round_trip_and_insert_again() {
+    use desk_model::{Editor, Position, Section, Start};
+    let mut editor = Editor::new(Document::new_word_processing());
+    let start = editor.document().start();
+    editor
+        .edit("Setup", |edit| {
+            let at = edit.insert_text(start, "Cover")?;
+            let at = edit.split_paragraph(at)?;
+            edit.insert_text(at, "Body")?;
+            edit.set_paragraph_attrs(
+                Position::new(at.paragraph, 0),
+                Position::new(at.paragraph, 0),
+                &ParaAttrs {
+                    start: Some(Some(std::sync::Arc::new(Start::Section(
+                        Section::default(),
+                        desk_model::Layout::default(),
+                    )))),
+                    ..ParaAttrs::default()
+                },
+            )?;
+            edit.capture_pages("Cover page", &[0])
+        })
+        .unwrap();
+    let bytes = write_odt(editor.document()).unwrap();
+    keep("est-20-captured-pages.odt", &bytes);
+    // The captured pages are a document of their own in the package.
+    let archive = zip::ZipArchive::new(std::io::Cursor::new(&bytes)).unwrap();
+    assert!(
+        archive
+            .file_names()
+            .any(|n| n.is_ok_and(|n| n == "Desk/Captures/1.odt"))
+    );
+    let read = read_odt(&bytes).unwrap();
+    let captures = read.captured_pages();
+    assert_eq!(captures.len(), 1);
+    assert_eq!(&*captures[0].name, "Cover page");
+    // Inserted at the end, with the style of the document of that name.
+    let mut editor = Editor::new(read);
+    editor
+        .edit("Insert", |edit| {
+            edit.insert_captured_pages("Cover page", 2).map(|_| ())
+        })
+        .unwrap();
+    let document = editor.document();
+    assert_eq!(document.section_ranges().len(), 3);
+    let last = document.body().get(2).unwrap();
+    assert_eq!(last.text(), "Cover");
+    // The style of the document, not one that came along.
+    assert_eq!(last.style(), document.body().get(0).unwrap().style());
+    assert_eq!(
+        document.styles().iter().count(),
+        read_odt(&bytes).unwrap().styles().iter().count()
+    );
+}
+
+#[test]
+fn est_20_captured_pages_keep_their_headers_and_the_styles_they_lose() {
+    use desk_model::{Editor, MarginKind, MarginPages, MarginPlace, Position, Section, Start};
+    let mut editor = Editor::new(Document::new_word_processing());
+    let start = editor.document().start();
+    let place = MarginPlace::new(MarginKind::Header, MarginPages::Default);
+    editor
+        .edit("Setup", |edit| {
+            let at = edit.insert_text(start, "One")?;
+            let at = edit.split_paragraph(at)?;
+            edit.insert_text(at, "Appendix text")?;
+            let mut setup = *edit.document().page_setup();
+            setup.headers = true;
+            edit.set_page_setup(setup)?;
+            edit.set_paragraph_attrs(
+                Position::new(at.paragraph, 0),
+                Position::new(at.paragraph, 0),
+                &ParaAttrs {
+                    start: Some(Some(std::sync::Arc::new(Start::Section(
+                        Section {
+                            own_margins: true,
+                            ..Section::default()
+                        },
+                        desk_model::Layout::default(),
+                    )))),
+                    ..ParaAttrs::default()
+                },
+            )?;
+            let body = edit.document().styles().default_paragraph();
+            let head = Paragraph::from_runs(
+                edit.new_id(),
+                body,
+                ParaAttrs::default(),
+                [Run::new("Appendix")],
+            )?;
+            edit.set_section_header_footer(Some(at.paragraph), place, vec![head])?;
+            edit.capture_pages("Appendix", &[1])
+        })
+        .unwrap();
+    let bytes = write_odt(editor.document()).unwrap();
+    let mut editor = Editor::new(read_odt(&bytes).unwrap());
+    editor
+        .edit("Insert", |edit| {
+            edit.insert_captured_pages("Appendix", 2).map(drop)
+        })
+        .unwrap();
+    let document = editor.document();
+    let (index, section) = document.section_at(2);
+    assert_eq!(index, Some(2));
+    assert!(section.own_margins);
+    assert_eq!(document.body().get(2).unwrap().text(), "Appendix text");
+    let id = document.body().get(2).unwrap().id();
+    assert_eq!(
+        document.section_headers_footers(Some(id)).get(place)[0].text(),
+        "Appendix"
+    );
+    // A style the captured pages use, deleted, gives way to the default.
+    let mut editor = Editor::new(Document::new_word_processing());
+    let start = editor.document().start();
+    editor
+        .edit("Style", |edit| {
+            let body = edit.document().styles().default_paragraph();
+            let id = edit.new_id();
+            let mut title = ParagraphStyle::new(id, "Title");
+            title.parent = Some(body);
+            edit.apply(Op::PutStyle {
+                style: title.into(),
+            })?;
+            edit.insert_text(start, "Cover")?;
+            edit.set_paragraph_style(start, start, id)?;
+            edit.capture_pages("Cover", &[0])?;
+            edit.set_paragraph_style(start, start, body)?;
+            edit.delete_style(id, None)
+        })
+        .unwrap();
+    let body = editor.document().styles().default_paragraph();
+    let captured = &editor.document().captured_pages()[0];
+    assert!(captured.pages.first_paragraphs().all(|p| p.style() == body));
+}
