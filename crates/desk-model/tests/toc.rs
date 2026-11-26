@@ -360,3 +360,38 @@ fn w100_a_table_at_the_start_of_a_section_is_in_it_and_never_joins_another() {
         );
     }
 }
+
+#[test]
+fn w100_a_table_inserted_after_a_page_break_starts_the_new_page() {
+    let mut editor = Editor::new(Document::new_word_processing());
+    let start = editor.document().start();
+    let chapter = editor
+        .edit("Setup", |edit| {
+            let at = edit.insert_text(start, "Cover")?;
+            let at = edit.split_paragraph(at)?;
+            edit.insert_text(at, "Chapter")?;
+            edit.set_paragraph_attrs(
+                at,
+                at,
+                &ParaAttrs {
+                    page_break_before: Some(true),
+                    ..ParaAttrs::default()
+                },
+            )?;
+            edit.insert_table_of_contents(1, TocScope::Document)?;
+            Ok(at.paragraph)
+        })
+        .unwrap();
+    let document = editor.document();
+    let table = document.body().get(1).unwrap();
+    assert!(table.attrs().toc_entry.flatten().is_some());
+    assert_eq!(table.attrs().page_break_before, Some(true));
+    assert_eq!(
+        document
+            .paragraph(chapter)
+            .unwrap()
+            .attrs()
+            .page_break_before,
+        None
+    );
+}

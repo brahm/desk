@@ -522,6 +522,7 @@ fn full_document() -> TextDocument {
             never_hyphenate: vec!["desk".into(), "liberation".into()],
             larger_spacing: Some(true),
             links_inactive: Some(true),
+            bookmark_suggestions: Some(vec!["Heading 2".into(), "Part".into()]),
             tracking_paused: true,
             note_kind: Some("section".into()),
             note_format: Some("symbols".into()),

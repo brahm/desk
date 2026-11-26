@@ -815,7 +815,14 @@ impl Edit {
         // Tables of contents stop listing it, and their entries that took
         // it take the default style, as the reference machine showed Pages
         // 4.3 do: the tables of contents update at once.
+        // Links stop suggesting its paragraphs as bookmarks (W101).
         let mut settings = self.document().text_settings().clone();
+        if let Some(styles) = &mut settings.bookmark_suggestions
+            && styles.contains(&id)
+        {
+            styles.retain(|&s| s != id);
+            self.set_text_settings(settings.clone())?;
+        }
         if settings.toc.uses(id) {
             let default = self.document().styles().default_paragraph();
             settings.toc.levels.retain(|level| level.style != id);

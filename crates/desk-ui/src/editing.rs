@@ -569,6 +569,9 @@ pub struct Format {
     pub link: Option<Arc<str>>,
     /// The names of the bookmarks of the document, in order (EST-26).
     pub bookmarks: Vec<Arc<str>>,
+    /// The paragraph styles whose paragraphs a link to a bookmark
+    /// suggests (W101).
+    pub bookmark_suggestions: Vec<StyleId>,
     /// Which paragraphs the table of contents at the cursor lists, when
     /// the cursor is in one (W100).
     pub toc_scope: Option<desk_model::TocScope>,
@@ -1853,27 +1856,10 @@ impl TextEditor {
     /// Changes where the linked text at the cursor, or the selection,
     /// links to. An empty place takes the link away.
     pub fn set_link(&self, place: &str) {
-        let (start, end) = self.selection().ordered();
         let place = link_target(place);
         let link = (!place.is_empty()).then(|| Arc::<str>::from(place));
-        let range = {
-            let state = self.state.borrow();
-            link_at(state.editor.document(), start)
-        };
-        let (from, to) = match range {
-            Some((_, range))
-                if start == end
-                    || start.paragraph == end.paragraph
-                        && range.start <= start.offset
-                        && end.offset <= range.end =>
-            {
-                (
-                    Spot::new(start.paragraph, range.start),
-                    Spot::new(start.paragraph, range.end),
-                )
-            }
-            _ if start != end => (start, end),
-            _ => return,
+        let Some((from, to)) = self.link_range() else {
+            return;
         };
         let name = if link.is_some() {
             "Link"
@@ -1886,6 +1872,109 @@ impl TextEditor {
             let to = at_spot(document, to)?;
             edit.set_link(from, to, link)
         });
+    }
+
+    /// The text that a link set now goes on: the link at the cursor, or
+    /// the selection.
+    fn link_range(&self) -> Option<(Spot, Spot)> {
+        let (start, end) = self.selection().ordered();
+        let range = {
+            let state = self.state.borrow();
+            link_at(state.editor.document(), start)
+        };
+        Some(match range {
+            Some((_, range))
+                if start == end
+                    || start.paragraph == end.paragraph
+                        && range.start <= start.offset
+                        && end.offset <= range.end =>
+            {
+                (
+                    Spot::new(start.paragraph, range.start),
+                    Spot::new(start.paragraph, range.end),
+                )
+            }
+            _ if start != end => (start, end),
+            _ => return None,
+        })
+    }
+
+    /// The bookmarks of the document, in order, and the paragraphs that a
+    /// link to a bookmark suggests, by index with their text (W101).
+    pub fn bookmark_choices(&self) -> (Vec<Arc<str>>, Vec<(usize, String)>) {
+        let state = self.state.borrow();
+        let document = state.editor.document();
+        let names = bookmarks(document).into_iter().map(|(n, _, _)| n).collect();
+        (names, document.suggested_bookmarks())
+    }
+
+    /// Links the text at the cursor to paragraph `index` of the body,
+    /// which becomes a bookmark named by its text unless it holds one
+    /// already, which the link then goes to: choosing a suggested
+    /// bookmark (W101).
+    pub fn link_to_paragraph(&self, index: usize) {
+        let Some((from, to)) = self.link_range() else {
+            return;
+        };
+        let (text, length, existing) = {
+            let state = self.state.borrow();
+            let document = state.editor.document();
+            let Some(paragraph) = document.body().get(index) else {
+                return;
+            };
+            // A bookmark in the paragraph already, which the link goes
+            // to rather than one written over it.
+            let existing = paragraph
+                .runs()
+                .find_map(|r| r.attrs.bookmark.clone().flatten());
+            (paragraph.text(), paragraph.len(), existing)
+        };
+        let mark = existing.is_none();
+        let name: Arc<str> = existing.unwrap_or_else(|| self.unique_bookmark_name(&text).into());
+        let link: Arc<str> = crate::links::Target::Bookmark(name.to_string())
+            .link()
+            .into();
+        self.format_edit("Link", move |edit| {
+            if mark {
+                let document = edit.document();
+                let start = at_spot(document, Spot::new(index, 0))?;
+                let end = at_spot(document, Spot::new(index, length))?;
+                edit.set_bookmark(start, end, Some(name))?;
+            }
+            let document = edit.document();
+            let from = at_spot(document, from)?;
+            let to = at_spot(document, to)?;
+            edit.set_link(from, to, Some(link))
+        });
+    }
+
+    /// A name for a new bookmark from its text, which no bookmark of the
+    /// document has: the first words, then a number when taken.
+    fn unique_bookmark_name(&self, text: &str) -> String {
+        let base: String = text
+            .split_whitespace()
+            .collect::<Vec<_>>()
+            .join(" ")
+            .chars()
+            .filter(|c| !c.is_control() && *c != FIELD_CHARACTER)
+            .take(40)
+            .collect();
+        let base = if base.is_empty() {
+            tr("Bookmark")
+        } else {
+            base
+        };
+        let names: Vec<Arc<str>> = bookmarks(&self.state.borrow().editor.snapshot())
+            .into_iter()
+            .map(|(n, _, _)| n)
+            .collect();
+        let mut name = base.clone();
+        let mut n = 2;
+        while names.iter().any(|b| **b == *name) {
+            name = format!("{base} {n}");
+            n += 1;
+        }
+        name
     }
 
     /// Follows the link of the text at a spot when the links of the
@@ -2056,29 +2145,7 @@ impl TextEditor {
                 .unwrap_or_default()
                 .to_owned()
         };
-        let base: String = text
-            .split_whitespace()
-            .collect::<Vec<_>>()
-            .join(" ")
-            .chars()
-            .filter(|c| !c.is_control() && *c != FIELD_CHARACTER)
-            .take(40)
-            .collect();
-        let base = if base.is_empty() {
-            tr("Bookmark")
-        } else {
-            base
-        };
-        let names: Vec<Arc<str>> = bookmarks(&self.state.borrow().editor.snapshot())
-            .into_iter()
-            .map(|(n, _, _)| n)
-            .collect();
-        let mut name = base.clone();
-        let mut n = 2;
-        while names.iter().any(|b| **b == *name) {
-            name = format!("{base} {n}");
-            n += 1;
-        }
+        let name = self.unique_bookmark_name(&text);
         self.format_edit("Insert Bookmark", move |edit| {
             let document = edit.document();
             let from = at_spot(document, start)?;
@@ -2187,6 +2254,18 @@ impl TextEditor {
         }
         let before = self.selection();
         let (start, _) = before.ordered();
+        // Not in a table, nor right after one, which it would join: the
+        // bell rings, as for a change of the text of a table.
+        let joins = {
+            let state = self.state.borrow();
+            let document = state.editor.document();
+            let at = |i: usize| document.table_of_contents_at(i).is_some();
+            at(start.paragraph) || (start.paragraph > 0 && at(start.paragraph - 1))
+        };
+        if joins {
+            self.view.area().error_bell();
+            return;
+        }
         let result = {
             let mut state = self.state.borrow_mut();
             state.editor.edit("Insert Table of Contents", |edit| {
@@ -2207,6 +2286,16 @@ impl TextEditor {
     pub fn update_tables_of_contents(&self) {
         self.format_edit("Update Table of Contents", |edit| {
             edit.update_tables_of_contents()
+        });
+    }
+
+    /// Chooses the paragraph styles whose paragraphs a link to a bookmark
+    /// suggests: Manage Bookmark Suggestions (W101).
+    pub fn set_bookmark_suggestions(&self, styles: Vec<StyleId>) {
+        self.format_edit("Bookmark Suggestions", move |edit| {
+            let mut settings = edit.document().text_settings().clone();
+            settings.bookmark_suggestions = Some(styles);
+            edit.set_text_settings(settings)
         });
     }
 
@@ -2948,6 +3037,7 @@ impl TextEditor {
                 .into_iter()
                 .map(|(name, _, _)| name)
                 .collect(),
+            bookmark_suggestions: document.bookmark_suggestion_styles(),
             toc_scope: object_text
                 .is_none()
                 .then(|| body_paragraph.attrs().toc_entry.flatten())

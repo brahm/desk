@@ -2835,6 +2835,25 @@ paragraph, and objects on a second page.
 - *From the review:* a table inserted at the start of a section takes
   the start of the section, and so lists that section; a table is not
   inserted inside another or right after one, which it would join.
+
+### 26 November: the Bookmarks tab (step 7 of W3)
+
+- The bookmarks have a tab of their own in the Document pane, as in
+  Pages 15.4, with Add Bookmark and the list to go to, rename, sort and
+  delete them; the popover of a link no longer holds them.
+- A link to a bookmark chooses from a list of the bookmarks and the
+  paragraphs suggested: those of the styles that the Bookmark
+  Suggestions of the tab choose, Heading 2 and Heading 3 in a new
+  document. Choosing a suggested paragraph makes it a bookmark named
+  by its text and links to it, as one change. Insert > Manage Bookmark
+  Suggestions opens the tab, where Pages has it in the Edit menu.
+- *ODF:* the styles go in the `BookmarkSuggestions` item of
+  `settings.xml`, by name.
+- *From the review:* a suggested paragraph that holds a bookmark
+  already is linked to that one instead of a new one written over it;
+  a table of contents inserted after a page break takes the break; and
+  Insert > Table of Contents rings the bell inside a table or right after
+  one.
 - *Not done:* the text of an empty table, which Pages 15.4 shows when no
   paragraph uses its styles; the empty entry stays blank (EST-22).
 

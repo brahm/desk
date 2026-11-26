@@ -299,6 +299,9 @@ fn write_settings(document: &TextDocument) -> Option<String> {
         if let Some(inactive) = text.links_inactive {
             config_item(&mut w, "LinksInactive", "boolean", boolean(inactive));
         }
+        if let Some(styles) = &text.bookmark_suggestions {
+            config_item(&mut w, "BookmarkSuggestions", "string", &styles.join("\n"));
+        }
         if text.tracking_paused {
             config_item(&mut w, "TrackingPaused", "boolean", "true");
         }

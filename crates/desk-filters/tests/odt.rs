@@ -368,6 +368,7 @@ fn sample() -> Document {
                 notes: Default::default(),
                 toc: Default::default(),
                 links_inactive: true,
+                bookmark_suggestions: None,
                 guides: Vec::new(),
                 // The first of the library deleted, and one saved
                 // after the others (PXV-06).
@@ -4626,4 +4627,44 @@ fn w100_the_range_of_each_table_of_contents_is_kept() {
     text.meta.generator = Some("LibreOffice/25.8".into());
     let other = read_odt(&odf::write_odt(&text).unwrap()).unwrap();
     assert!(scopes(&other).iter().all(|&s| s == TocScope::Document));
+}
+
+#[test]
+fn w101_the_styles_that_links_suggest_as_bookmarks_are_kept() {
+    use desk_model::Editor;
+    let mut editor = Editor::new(Document::new_word_processing());
+    let start = editor.document().start();
+    editor
+        .edit("Setup", |edit| {
+            edit.insert_text(start, "Part")?;
+            let style = edit.new_paragraph_style("Part Title", start, start, false)?;
+            edit.set_paragraph_style(start, start, style)?;
+            let mut settings = edit.document().text_settings().clone();
+            settings.bookmark_suggestions = Some(vec![style]);
+            edit.set_text_settings(settings)
+        })
+        .unwrap();
+    let bytes = write_odt(editor.document()).unwrap();
+    let read = read_odt(&bytes).unwrap();
+    let names: Vec<String> = read
+        .bookmark_suggestion_styles()
+        .iter()
+        .map(|&id| read.styles().get(id).unwrap().name().to_owned())
+        .collect();
+    assert_eq!(names, ["Part Title"]);
+    assert_eq!(read.suggested_bookmarks(), [(0, "Part".to_owned())]);
+
+    // None chosen stays none, and a document that never chose suggests
+    // those of a new one.
+    editor
+        .edit("None", |edit| {
+            let mut settings = edit.document().text_settings().clone();
+            settings.bookmark_suggestions = Some(Vec::new());
+            edit.set_text_settings(settings)
+        })
+        .unwrap();
+    let read = read_odt(&write_odt(editor.document()).unwrap()).unwrap();
+    assert_eq!(read.text_settings().bookmark_suggestions, Some(Vec::new()));
+    let fresh = read_odt(&write_odt(&Document::new_word_processing()).unwrap()).unwrap();
+    assert_eq!(fresh.text_settings().bookmark_suggestions, None);
 }

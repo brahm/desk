@@ -133,6 +133,10 @@ pub struct TextSettings {
     /// Whether links do nothing when clicked, so that their text is edited
     /// as any other (EST-25).
     pub links_inactive: bool,
+    /// The paragraph styles whose paragraphs a link to a bookmark
+    /// suggests, as Manage Bookmark Suggestions of Pages 15.4 chooses
+    /// them (W101); none until chosen, for Heading 2 and Heading 3.
+    pub bookmark_suggestions: Option<Vec<crate::StyleId>>,
     /// The guides fixed on the pages, which objects snap to (OBJ-28).
     pub guides: Vec<FixedGuide>,
     /// The styles of drop caps, in the order of their menu (PXV-06).
@@ -204,6 +208,7 @@ impl Default for TextSettings {
             notes: NoteSettings::default(),
             toc: crate::toc::TocSettings::default(),
             links_inactive: false,
+            bookmark_suggestions: None,
             guides: Vec::new(),
             drop_cap_styles: crate::DropCapStyle::library().to_vec(),
             chart_styles: crate::ChartStyle::library().to_vec(),

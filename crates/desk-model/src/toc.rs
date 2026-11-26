@@ -141,7 +141,7 @@ impl crate::Document {
 
 /// The text of a paragraph as an entry lists it: without its fields,
 /// marks of notes and line breaks.
-fn entry_text(paragraph: &Paragraph) -> String {
+pub(crate) fn entry_text(paragraph: &Paragraph) -> String {
     paragraph
         .runs()
         .filter(|r| r.attrs.field.is_none())
@@ -254,11 +254,13 @@ impl Edit {
             let starts = ParaAttrs {
                 start: attrs.start.clone(),
                 column_break_before: attrs.column_break_before,
+                page_break_before: attrs.page_break_before,
                 ..ParaAttrs::default()
             };
             let rest = ParaAttrs {
                 start: None,
                 column_break_before: None,
+                page_break_before: None,
                 ..attrs.clone()
             };
             (paragraph, starts, rest)
@@ -344,9 +346,11 @@ fn loop_tables(edit: &mut Edit, settings: &TocSettings) -> Result<(), ModelError
                 .collect()
         };
         let first = old.first().expect("a table has an entry");
-        // What starts at the table stays at its first entry.
+        // What starts at the table stays at its first entry, with the
+        // page break before it.
         let structure = ParaAttrs {
             toc_entry: None,
+            page_break_before: first.attrs().page_break_before,
             ..first.attrs().structure()
         };
         let mut built = Vec::new();

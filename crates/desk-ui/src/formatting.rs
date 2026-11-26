@@ -298,7 +298,7 @@ impl Inspector {
         let [font, alignment] = object_text.groups();
         let [character, text_shadow, borders] = effects.groups();
         let [page, layout, section] = layouts.groups();
-        let [link, bookmarks] = links.groups();
+        let [link, bookmarks, suggestions] = links.groups();
         let arrange = || Tab::new("arrange", n_("Arrange"), &[&arrange_group, metrics, wrap]);
         let styles = object_styles.group();
         let style = || Tab::new("style", n_("Style"), &[styles, graphic, shape]);
@@ -408,11 +408,13 @@ impl Inspector {
                 ],
             ),
             Tab::new("section", n_("Section"), &[section]),
+            // The Bookmarks tab of Pages 15.4 (W101).
+            Tab::new("bookmarks", n_("Bookmarks"), &[bookmarks, suggestions]),
             Tab::new("info", n_("Info"), &[&statistics.group]),
         ];
         let levels = Levels::new(contexts, document_tabs);
         levels.set_header(Context::Text, text.header().widget());
-        let link_popover = link_popover(&[link, bookmarks]);
+        let link_popover = link_popover(&[link]);
         text.set_link_popover(&link_popover);
         let root = levels.widget().clone();
         {

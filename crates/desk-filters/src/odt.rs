@@ -2269,6 +2269,13 @@ fn import_text(source: &odf::TextDocument) -> Result<Document, FilterError> {
                 page_links: source.toc_levels.iter().any(|l| l.link),
             },
             links_inactive: text.links_inactive.unwrap_or(false),
+            // The styles suggested, by name (W101).
+            bookmark_suggestions: text.bookmark_suggestions.as_ref().map(|names| {
+                names
+                    .iter()
+                    .filter_map(|name| ids.get(&(odf::Family::Paragraph, name.as_str())).copied())
+                    .collect()
+            }),
             // Paused, the document says it tracks none (W148).
             tracking: if source.track_changes {
                 desk_model::Tracking::On
@@ -4017,6 +4024,12 @@ pub fn export(document: &Document) -> odf::TextDocument {
             // document that does not say takes the sum (FMT-15).
             larger_spacing: Some(settings.spacing == ParagraphSpacing::Larger),
             links_inactive: settings.links_inactive.then_some(true),
+            bookmark_suggestions: settings.bookmark_suggestions.as_ref().map(|styles| {
+                styles
+                    .iter()
+                    .filter_map(|id| names.get(id).cloned())
+                    .collect()
+            }),
             tracking_paused: settings.tracking == desk_model::Tracking::Paused,
             guides: settings
                 .guides

@@ -427,6 +427,12 @@ pub(super) fn insert_menu(objects: bool) -> gio::Menu {
         Some("win.update-toc"),
     );
     structure.append(Some(&tr("_Bookmark")), Some("win.insert-bookmark"));
+    // Edit > Manage Bookmark Suggestions of Pages 15.4, in the Bookmarks
+    // tab of the Document pane (W101).
+    structure.append(
+        Some(&tr("Manage Bookmark _Suggestions")),
+        Some("win.inspector-tab::bookmarks"),
+    );
     structure.append(Some(&tr("_Hyperlink")), Some("win.insert-link"));
     menu.append_section(None, &structure);
     let other = gio::Menu::new();
