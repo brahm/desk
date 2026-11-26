@@ -1576,6 +1576,9 @@ fn import_text(source: &odf::TextDocument) -> Result<Document, FilterError> {
         .and_then(|name| source.masters.iter().find(|(n, _)| n == name))
         .map_or(master, |(_, page)| page);
     setup.section.number_format = number_format(first_master.num_format.as_deref());
+    // How the master page in effect numbers its pages, which a section
+    // that gives no format of its own takes (W094).
+    let mut shown_format = setup.section.number_format;
     let mut current_layout = page_layout;
     // The sections with master pages of their own, by their first
     // paragraph.
@@ -1703,6 +1706,7 @@ fn import_text(source: &odf::TextDocument) -> Result<Document, FilterError> {
                     .find(|(n, _)| n == name)
                     .map(|(_, m)| number_format(m.num_format.as_deref()))
                     .unwrap_or_default();
+                shown_format = format;
                 Some(match start {
                     Some(Start::Section(section, layout)) => Start::Section(
                         Section {
@@ -1729,6 +1733,20 @@ fn import_text(source: &odf::TextDocument) -> Result<Document, FilterError> {
                         )
                     }
                 })
+            }
+            (None, Some(Start::Section(section, layout))) if index > 0 => {
+                // It goes on in the master page before.
+                Some(Start::Section(
+                    Section {
+                        number_format: if section.number_format == NumberFormat::Decimal {
+                            shown_format
+                        } else {
+                            section.number_format
+                        },
+                        ..section
+                    },
+                    layout,
+                ))
             }
             (None, start) => start,
         };
@@ -1885,12 +1903,34 @@ fn import_text(source: &odf::TextDocument) -> Result<Document, FilterError> {
             backgrounds.push((Some(*id), page));
         }
     }
-    for (section, page) in backgrounds {
-        if let Some(fill) = page.background.as_ref().and_then(|f| page_fill(source, f)) {
-            document.apply(Op::SetSectionBackground {
-                section,
-                fill: Some(fill),
-            })?;
+    let fills: HashMap<Option<NodeId>, Fill> = backgrounds
+        .into_iter()
+        .filter_map(|(section, page)| {
+            let fill = page
+                .background
+                .as_ref()
+                .and_then(|f| page_fill(source, f))?;
+            Some((section, fill))
+        })
+        .collect();
+    // A section without a master page of its own goes on in the one
+    // before, with its background.
+    let mut shown = fills.get(&None).cloned();
+    let mut filled = vec![(None, shown.clone())];
+    for paragraph in document.body().iter().skip(1) {
+        if let Some(Some(start)) = &paragraph.attrs().start
+            && matches!(**start, Start::Section(..))
+        {
+            let id = paragraph.id();
+            if section_pages.iter().any(|(s, _)| *s == id) {
+                shown = fills.get(&Some(id)).cloned();
+            }
+            filled.push((Some(id), shown.clone()));
+        }
+    }
+    for (section, fill) in filled {
+        if fill.is_some() {
+            document.apply(Op::SetSectionBackground { section, fill })?;
         }
     }
     let mut parts: Vec<(Option<NodeId>, &odf::MasterPage)> = vec![(None, master)];

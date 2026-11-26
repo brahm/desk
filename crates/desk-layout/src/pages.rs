@@ -254,14 +254,6 @@ pub fn paginate(document: &Document, system: &mut TextSystem) -> DocumentLayout 
                 }
             }
         }
-        let pages_of: std::sync::Arc<HashMap<desk_model::NodeId, u32>> = std::sync::Arc::new(
-            document
-                .body()
-                .iter()
-                .zip(&numbers)
-                .map(|(p, n)| (p.id(), *n))
-                .collect(),
-        );
         // How the numbers of the pages of the section of each paragraph
         // are written (W094).
         let mut format = setup.section.number_format;
@@ -279,6 +271,15 @@ pub fn paginate(document: &Document, system: &mut TextSystem) -> DocumentLayout 
                 format
             })
             .collect();
+        let pages_of: std::sync::Arc<HashMap<desk_model::NodeId, (u32, desk_model::NumberFormat)>> =
+            std::sync::Arc::new(
+                document
+                    .body()
+                    .iter()
+                    .zip(numbers.iter().zip(&formats))
+                    .map(|(p, (n, f))| (p.id(), (*n, *f)))
+                    .collect(),
+            );
         for (i, value) in values.iter_mut().enumerate() {
             *value = FieldValues {
                 page: numbers[i],

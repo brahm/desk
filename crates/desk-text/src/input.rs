@@ -127,8 +127,13 @@ pub struct FieldValues {
     /// The marks of the notes, by note (EST-13).
     pub notes: Option<std::sync::Arc<std::collections::HashMap<desk_model::NodeId, String>>>,
     /// The numbers of the pages that paragraphs of the body start on, by
-    /// paragraph (EST-22).
-    pub pages_of: Option<std::sync::Arc<std::collections::HashMap<desk_model::NodeId, u32>>>,
+    /// paragraph (EST-22), with how the section of each writes them
+    /// (W094).
+    pub pages_of: Option<
+        std::sync::Arc<
+            std::collections::HashMap<desk_model::NodeId, (u32, desk_model::NumberFormat)>,
+        >,
+    >,
     /// The width and height of the objects in the text, by object
     /// (OBJ-01): the mark of one that is not here shows nothing.
     pub objects:
@@ -166,7 +171,7 @@ impl FieldValues {
                 .pages_of
                 .as_ref()
                 .and_then(|p| p.get(paragraph))
-                .map_or_else(|| "1".to_owned(), u32::to_string),
+                .map_or_else(|| "1".to_owned(), |(page, format)| format.write(*page)),
             desk_model::Field::PageNumber {
                 format: desk_model::NumberFormat::Decimal,
             } => self.page_format.write(self.page),
@@ -907,6 +912,18 @@ mod tests {
         };
         assert_eq!(values.text(&own), "l");
         assert_eq!(values.text(&Field::PAGE_COUNT), "1");
+        // The page of a paragraph, in a table of contents, as its section
+        // writes it.
+        let paragraph = desk_model::Document::new_word_processing().new_id();
+        let values = FieldValues {
+            pages_of: Some(std::sync::Arc::new(
+                [(paragraph, (4, NumberFormat::LowerRoman))]
+                    .into_iter()
+                    .collect(),
+            )),
+            ..FieldValues::default()
+        };
+        assert_eq!(values.text(&Field::PageOf { paragraph }), "iv");
     }
 
     #[test]

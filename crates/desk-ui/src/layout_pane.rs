@@ -25,7 +25,6 @@ use crate::i18n::tr;
 use crate::preferences::Units;
 use crate::tab_stops::{self, string_list};
 
-/// The pages a section may start on, in the order of their menu.
 /// The formats of page numbers, in the order of the Format of Page
 /// Numbering of Pages 15.4 (W094).
 const NUMBER_FORMATS: [desk_model::NumberFormat; 5] = [
@@ -36,6 +35,7 @@ const NUMBER_FORMATS: [desk_model::NumberFormat; 5] = [
     desk_model::NumberFormat::UpperAlpha,
 ];
 
+/// The pages a section may start on, in the order of their menu.
 const STARTS: [SectionStart; 3] = [
     SectionStart::AnyPage,
     SectionStart::LeftPage,
