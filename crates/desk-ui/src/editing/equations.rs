@@ -64,12 +64,16 @@ impl TextEditor {
     /// 15.4 when the cursor is in the text of a word processing document;
     /// on the page otherwise.
     pub fn equation_goes_in_line(&self) -> bool {
+        // With an object selected, it goes on the page beside it.
+        if self.has_selected_objects() {
+            return false;
+        }
         match self.story() {
             // A header, a footer or a note takes it in its text, as it
             // takes a picture.
             Some(Story::Margin { .. } | Story::Note(_)) => true,
             Some(Story::TextBox(_)) => false,
-            None => !self.is_page_layout() && !self.has_selected_objects(),
+            None => !self.is_page_layout(),
         }
     }
 
