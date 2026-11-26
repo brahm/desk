@@ -1559,6 +1559,26 @@ fn import_text(source: &odf::TextDocument) -> Result<Document, FilterError> {
     }
     let page_layout = page_layout(source, &setup);
     setup.layout = page_layout;
+    // The master page of the first section: the one its first paragraph
+    // names, when it names one, for its background (W098) and the format
+    // of its page numbers (W094).
+    let first_master = source
+        .body
+        .first()
+        .and_then(|p| p.style.as_deref())
+        .and_then(|name| {
+            source
+                .automatic_styles
+                .iter()
+                .find(|s| s.family == odf::Family::Paragraph && s.name == name)
+        })
+        .and_then(|s| s.master_page.as_deref())
+        .and_then(|name| source.masters.iter().find(|(n, _)| n == name))
+        .map_or(master, |(_, page)| page);
+    setup.section.number_format = number_format(first_master.num_format.as_deref());
+    // How the master page in effect numbers its pages, which a section
+    // that gives no format of its own takes (W094).
+    let mut shown_format = setup.section.number_format;
     let mut current_layout = page_layout;
     // The sections with master pages of their own, by their first
     // paragraph.
@@ -1678,10 +1698,24 @@ fn import_text(source: &odf::TextDocument) -> Result<Document, FilterError> {
                     own_masters.push((built.id(), name.to_owned()));
                 }
                 section_pages.push((built.id(), name.to_owned()));
+                // The format of the numbers of its pages, from its page
+                // layout when the section does not give it (W094).
+                let format = source
+                    .masters
+                    .iter()
+                    .find(|(n, _)| n == name)
+                    .map(|(_, m)| number_format(m.num_format.as_deref()))
+                    .unwrap_or_default();
+                shown_format = format;
                 Some(match start {
                     Some(Start::Section(section, layout)) => Start::Section(
                         Section {
                             own_margins: own,
+                            number_format: if section.number_format == NumberFormat::Decimal {
+                                format
+                            } else {
+                                section.number_format
+                            },
                             ..section
                         },
                         layout,
@@ -1692,6 +1726,7 @@ fn import_text(source: &odf::TextDocument) -> Result<Document, FilterError> {
                             Section {
                                 first_number: page_number.flatten(),
                                 own_margins: own,
+                                number_format: format,
                                 ..Section::default()
                             },
                             layout,
@@ -1699,13 +1734,34 @@ fn import_text(source: &odf::TextDocument) -> Result<Document, FilterError> {
                     }
                 })
             }
+            (None, Some(Start::Section(section, layout))) if index > 0 => {
+                // It goes on in the master page before.
+                Some(Start::Section(
+                    Section {
+                        number_format: if section.number_format == NumberFormat::Decimal {
+                            shown_format
+                        } else {
+                            section.number_format
+                        },
+                        ..section
+                    },
+                    layout,
+                ))
+            }
             (None, start) => start,
         };
         if let Some(start) = start {
             current_layout = *start.layout();
             if index == 0 {
                 if let Start::Section(section, _) = start {
-                    setup.section = section;
+                    setup.section = Section {
+                        number_format: if section.number_format == NumberFormat::Decimal {
+                            setup.section.number_format
+                        } else {
+                            section.number_format
+                        },
+                        ..section
+                    };
                 }
                 setup.layout = current_layout;
             } else {
@@ -1840,33 +1896,41 @@ fn import_text(source: &odf::TextDocument) -> Result<Document, FilterError> {
         fill_images: source.fill_images.clone(),
         ..odf::TextDocument::default()
     };
-    // What fills the pages of each section (W098), the first's from the
-    // master page its first paragraph names, when it names one.
-    let first_master = source
-        .body
-        .first()
-        .and_then(|p| p.style.as_deref())
-        .and_then(|name| {
-            source
-                .automatic_styles
-                .iter()
-                .find(|s| s.family == odf::Family::Paragraph && s.name == name)
-        })
-        .and_then(|s| s.master_page.as_deref())
-        .and_then(|name| source.masters.iter().find(|(n, _)| n == name))
-        .map_or(master, |(_, page)| page);
+    // What fills the pages of each section (W098).
     let mut backgrounds = vec![(None, first_master)];
     for (id, name) in &section_pages {
         if let Some((_, page)) = source.masters.iter().find(|(n, _)| n == name) {
             backgrounds.push((Some(*id), page));
         }
     }
-    for (section, page) in backgrounds {
-        if let Some(fill) = page.background.as_ref().and_then(|f| page_fill(source, f)) {
-            document.apply(Op::SetSectionBackground {
-                section,
-                fill: Some(fill),
-            })?;
+    let fills: HashMap<Option<NodeId>, Fill> = backgrounds
+        .into_iter()
+        .filter_map(|(section, page)| {
+            let fill = page
+                .background
+                .as_ref()
+                .and_then(|f| page_fill(source, f))?;
+            Some((section, fill))
+        })
+        .collect();
+    // A section without a master page of its own goes on in the one
+    // before, with its background.
+    let mut shown = fills.get(&None).cloned();
+    let mut filled = vec![(None, shown.clone())];
+    for paragraph in document.body().iter().skip(1) {
+        if let Some(Some(start)) = &paragraph.attrs().start
+            && matches!(**start, Start::Section(..))
+        {
+            let id = paragraph.id();
+            if section_pages.iter().any(|(s, _)| *s == id) {
+                shown = fills.get(&Some(id)).cloned();
+            }
+            filled.push((Some(id), shown.clone()));
+        }
+    }
+    for (section, fill) in filled {
+        if fill.is_some() {
+            document.apply(Op::SetSectionBackground { section, fill })?;
         }
     }
     let mut parts: Vec<(Option<NodeId>, &odf::MasterPage)> = vec![(None, master)];
@@ -2649,7 +2713,7 @@ fn import_note(
 }
 
 /// How a number of a page is written, from `style:num-format`.
-fn number_format(format: Option<&str>) -> NumberFormat {
+pub(crate) fn number_format(format: Option<&str>) -> NumberFormat {
     match format {
         Some("i") => NumberFormat::LowerRoman,
         Some("I") => NumberFormat::UpperRoman,
@@ -2660,7 +2724,7 @@ fn number_format(format: Option<&str>) -> NumberFormat {
 }
 
 /// The `style:num-format` of a number of a page, unless it is in digits.
-fn num_format(format: NumberFormat) -> Option<String> {
+pub(crate) fn num_format(format: NumberFormat) -> Option<String> {
     let format = match format {
         NumberFormat::Decimal => return None,
         NumberFormat::LowerRoman => "i",
@@ -3477,19 +3541,26 @@ fn page_layout_body(out: &mut odf::TextDocument, automatic: &mut Vec<odf::Style>
 /// The sections that start a master page of their own, in order, each
 /// with the index of the paragraph that starts it and whether it has
 /// headers and footers of its own: those with their own headers and
-/// footers or a background of their own (W098), and those after a
-/// section with a background, which would otherwise show it too.
+/// footers, and those whose pages differ from those of the master page
+/// in effect, by their background (W098) or the format of their numbers
+/// (W094), which other programs would otherwise show.
 fn master_sections(document: &Document) -> Vec<(usize, NodeId, bool)> {
     let mut out = Vec::new();
-    let mut background = document.section_background(None).is_some();
+    let mut shown = (
+        document.section_background(None),
+        document.page_setup().section.number_format,
+    );
     for (index, paragraph) in document.body().iter().enumerate().skip(1) {
         if let Some(Some(start)) = &paragraph.attrs().start
             && let Start::Section(section, _) = &**start
         {
-            let own = document.section_background(Some(paragraph.id())).is_some();
-            if section.own_margins || own || background {
+            let own = (
+                document.section_background(Some(paragraph.id())),
+                section.number_format,
+            );
+            if section.own_margins || own != shown {
                 out.push((index, paragraph.id(), section.own_margins));
-                background = own;
+                shown = own;
             }
         }
     }
@@ -3687,9 +3758,11 @@ fn export_margins(
         objects: Vec::new(),
         background: None,
         match_previous: false,
+        num_format: None,
     };
     out.master = master(document.headers_footers());
     out.master.background = backgrounds.remove(&None);
+    out.master.num_format = num_format(setup.section.number_format);
     let mut masters: Vec<(NodeId, String)> = section_masters(document).into_iter().collect();
     masters.sort_by_key(|(_, name)| name[4..].parse::<usize>().unwrap_or(0));
     let copies = background_masters(document);
@@ -3703,6 +3776,11 @@ fn export_margins(
             let mut page = master(document.section_headers_footers(margins));
             page.match_previous = copied.is_some();
             page.background = backgrounds.remove(&Some(id));
+            page.num_format = document
+                .body()
+                .iter()
+                .position(|p| p.id() == id)
+                .and_then(|index| num_format(document.section_at(index).1.number_format));
             (name, page)
         })
         .collect();

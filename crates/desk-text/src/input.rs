@@ -121,11 +121,19 @@ pub struct FieldValues {
     pub page: u32,
     /// The number of pages of the document.
     pub pages: u32,
+    /// How the numbers of the pages of its section are written, which a
+    /// page number field in digits shows (W094).
+    pub page_format: desk_model::NumberFormat,
     /// The marks of the notes, by note (EST-13).
     pub notes: Option<std::sync::Arc<std::collections::HashMap<desk_model::NodeId, String>>>,
     /// The numbers of the pages that paragraphs of the body start on, by
-    /// paragraph (EST-22).
-    pub pages_of: Option<std::sync::Arc<std::collections::HashMap<desk_model::NodeId, u32>>>,
+    /// paragraph (EST-22), with how the section of each writes them
+    /// (W094).
+    pub pages_of: Option<
+        std::sync::Arc<
+            std::collections::HashMap<desk_model::NodeId, (u32, desk_model::NumberFormat)>,
+        >,
+    >,
     /// The width and height of the objects in the text, by object
     /// (OBJ-01): the mark of one that is not here shows nothing.
     pub objects:
@@ -141,6 +149,7 @@ impl Default for FieldValues {
         Self {
             page: 1,
             pages: 1,
+            page_format: desk_model::NumberFormat::Decimal,
             notes: None,
             pages_of: None,
             objects: None,
@@ -162,7 +171,10 @@ impl FieldValues {
                 .pages_of
                 .as_ref()
                 .and_then(|p| p.get(paragraph))
-                .map_or_else(|| "1".to_owned(), u32::to_string),
+                .map_or_else(|| "1".to_owned(), |(page, format)| format.write(*page)),
+            desk_model::Field::PageNumber {
+                format: desk_model::NumberFormat::Decimal,
+            } => self.page_format.write(self.page),
             desk_model::Field::ObjectMark { object } => {
                 if self.object_size(*object).is_some() {
                     OBJECT_CHARACTER.to_string()
@@ -886,6 +898,35 @@ mod tests {
     }
 
     #[test]
+    fn w094_a_page_number_in_digits_shows_the_format_of_its_section() {
+        use desk_model::{Field, NumberFormat};
+        let values = FieldValues {
+            page: 12,
+            page_format: NumberFormat::UpperRoman,
+            ..FieldValues::default()
+        };
+        assert_eq!(values.text(&Field::PAGE_NUMBER), "XII");
+        // One with a format of its own keeps it.
+        let own = Field::PageNumber {
+            format: NumberFormat::LowerAlpha,
+        };
+        assert_eq!(values.text(&own), "l");
+        assert_eq!(values.text(&Field::PAGE_COUNT), "1");
+        // The page of a paragraph, in a table of contents, as its section
+        // writes it.
+        let paragraph = desk_model::Document::new_word_processing().new_id();
+        let values = FieldValues {
+            pages_of: Some(std::sync::Arc::new(
+                [(paragraph, (4, NumberFormat::LowerRoman))]
+                    .into_iter()
+                    .collect(),
+            )),
+            ..FieldValues::default()
+        };
+        assert_eq!(values.text(&Field::PageOf { paragraph }), "iv");
+    }
+
+    #[test]
     fn est_27_a_field_shows_its_value_whole() {
         let mut field = format(Capitalization::None);
         field.field = Some(desk_model::Field::PAGE_NUMBER);
@@ -894,6 +935,7 @@ mod tests {
             FieldValues {
                 page: 12,
                 pages: 20,
+                page_format: desk_model::NumberFormat::Decimal,
                 notes: None,
                 pages_of: None,
                 objects: None,

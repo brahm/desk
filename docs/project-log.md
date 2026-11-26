@@ -2783,6 +2783,28 @@ paragraph, and objects on a second page.
   page of a page layout document, which Pages 15.4 keeps per page and
   per template.
 
+### 26 November: the Section tab of Pages 15.4 (step 5 of W3, first part)
+
+- Each section writes the numbers of its pages in a format of its own,
+  1, i, I, a or A, as the Format of Page Numbering of the Section tab:
+  a page number field in digits shows it, and one with a format of its
+  own keeps that. A section can hide its headers and footers on its
+  first page, which then has none to edit, and the tab starts a new
+  section at the cursor, as Insert > Section Break does.
+- *ODF:* `desk:page-number-format` and `desk:hide-first-page` on the
+  section style. A section whose format or background differs from those
+  of the master page before it gets a master page of its own, whose page
+  layout has the `style:num-format` other programs number its pages with;
+  Desk reads it from their documents too. Other programs still show the
+  headers on a first page that hides them.
+- *Fixed on the way (#242):* the background of a page goes in the drawing
+  page style of its master page, `style:drawing-page-properties`, since
+  the validator of ODF 1.3 takes no fill on a page layout; a section
+  after one with a background gets a master page without it; and a
+  picture in a header shows on every master page that copies it.
+- *Left for the next pull request of the step:* the captured pages of
+  Pages '09 (EST-20).
+
 ## Decisions, with their reasons and consequences
 
 Ids `D-nnn` and `R-nnn` are those of [decisions.md](decisions.md).

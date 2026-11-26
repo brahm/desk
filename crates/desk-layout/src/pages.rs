@@ -254,18 +254,37 @@ pub fn paginate(document: &Document, system: &mut TextSystem) -> DocumentLayout 
                 }
             }
         }
-        let pages_of: std::sync::Arc<HashMap<desk_model::NodeId, u32>> = std::sync::Arc::new(
-            document
-                .body()
-                .iter()
-                .zip(&numbers)
-                .map(|(p, n)| (p.id(), *n))
-                .collect(),
-        );
+        // How the numbers of the pages of the section of each paragraph
+        // are written (W094).
+        let mut format = setup.section.number_format;
+        let formats: Vec<desk_model::NumberFormat> = document
+            .body()
+            .iter()
+            .enumerate()
+            .map(|(i, paragraph)| {
+                if i > 0
+                    && let Some(Some(start)) = &paragraph.attrs().start
+                    && let Start::Section(section, _) = &**start
+                {
+                    format = section.number_format;
+                }
+                format
+            })
+            .collect();
+        let pages_of: std::sync::Arc<HashMap<desk_model::NodeId, (u32, desk_model::NumberFormat)>> =
+            std::sync::Arc::new(
+                document
+                    .body()
+                    .iter()
+                    .zip(numbers.iter().zip(&formats))
+                    .map(|(p, (n, f))| (p.id(), (*n, *f)))
+                    .collect(),
+            );
         for (i, value) in values.iter_mut().enumerate() {
             *value = FieldValues {
                 page: numbers[i],
                 pages,
+                page_format: formats[i],
                 notes: Some(labels.clone()),
                 pages_of: Some(pages_of.clone()),
                 objects: objects.clone(),
@@ -388,7 +407,7 @@ pub fn place_margins(document: &Document, layout: &mut DocumentLayout, system: &
     for index in 0..layout.pages.len() {
         let mut lines = Vec::new();
         let mut places = Vec::new();
-        if !layout.pages[index].blank {
+        if !layout.pages[index].blank && !hides_margins(layout, index) {
             for (kind, shown) in [
                 (MarginKind::Header, setup.headers),
                 (MarginKind::Footer, setup.footers),
@@ -414,6 +433,17 @@ pub fn place_margins(document: &Document, layout: &mut DocumentLayout, system: &
         page.margin_lines = lines;
         page.margin_places = places;
     }
+}
+
+/// Whether page `index` shows no header and footer, as the first page of
+/// a section that hides them there (W094).
+pub fn hides_margins(layout: &DocumentLayout, index: usize) -> bool {
+    let page = &layout.pages[index];
+    page.first_of_section
+        && layout
+            .sections
+            .get(page.section)
+            .map_or(layout.setup.section.hide_first, |s| s.hide_first)
 }
 
 /// The header or footer that page `index` shows, and the section whose
@@ -480,6 +510,10 @@ pub fn margin_lines_split(
     let values = FieldValues {
         page: page.number,
         pages: layout.pages.len() as u32,
+        page_format: layout
+            .sections
+            .get(page.section)
+            .map_or(setup.section.number_format, |s| s.number_format),
         notes: None,
         pages_of: None,
         // Objects in the lines of headers and footers (EST-12).
@@ -623,7 +657,12 @@ impl MarginRoom {
         section: &Section,
     ) -> (f32, f32) {
         let setup = &self.setup;
+        // The first page of a section that hides them (W094).
+        let hidden = first_of_section && section.hide_first;
         let reach = |kind| {
+            if hidden {
+                return None;
+            }
             let place = MarginPlace::of_page(
                 kind,
                 first_of_section,

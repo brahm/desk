@@ -155,6 +155,9 @@ pub struct MasterPage {
     /// the background of its section, whose headers, footers and master
     /// objects are those of the section before, copied (W098).
     pub match_previous: bool,
+    /// The `style:num-format` of its page layout: how the numbers of its
+    /// pages are written (W094).
+    pub num_format: Option<String>,
 }
 
 /// What fills the pages of a page layout, in its
@@ -275,6 +278,12 @@ pub struct SectionStyle {
     pub first_page_different: Option<bool>,
     /// `desk:left-right-different`.
     pub left_right_different: Option<bool>,
+    /// `desk:page-number-format`: how the numbers of the pages of the
+    /// section are written, as `style:num-format` (W094).
+    pub page_number_format: Option<String>,
+    /// `desk:hide-first-page`: whether the first page of the section
+    /// shows no header and footer (W094).
+    pub hide_first_page: Option<bool>,
 }
 
 /// How a document shows, as the first view of `ooo:view-settings` in

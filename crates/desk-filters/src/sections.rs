@@ -126,6 +126,8 @@ pub fn section_style(
         }),
         first_page_different: section.and_then(|s| s.first_page_different.then_some(true)),
         left_right_different: section.and_then(|s| s.left_right_different.then_some(true)),
+        page_number_format: section.and_then(|s| crate::odt::num_format(s.number_format)),
+        hide_first_page: section.and_then(|s| s.hide_first.then_some(true)),
     }
 }
 
@@ -162,6 +164,8 @@ pub fn section(style: &odf::SectionStyle, first_number: Option<u32>) -> Option<S
         left_right_different: style.left_right_different.unwrap_or(false),
         // A master page of its own says so.
         own_margins: false,
+        number_format: crate::odt::number_format(style.page_number_format.as_deref()),
+        hide_first: style.hide_first_page.unwrap_or(false),
         start: match start {
             odf::SectionStart::Any => SectionStart::AnyPage,
             odf::SectionStart::Left => SectionStart::LeftPage,

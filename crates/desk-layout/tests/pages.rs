@@ -1856,3 +1856,59 @@ fn w098_each_page_has_the_background_of_its_section() {
     editor.undo().unwrap();
     assert_eq!(editor.document().section_background(None), None);
 }
+
+#[test]
+fn w094_a_section_hides_its_headers_on_its_first_page() {
+    use desk_model::{Editor, NumberFormat, Position};
+    let mut system = TextSystem::new();
+    // Three paragraphs, each on a page of its own: the second starts a
+    // section that hides its headers on its first page, and numbers its
+    // pages in lower roman.
+    let document = with_headers(&["One", "Two", "Three"], "Head", &[(1, false, None)]);
+    let mut editor = Editor::new(document);
+    editor
+        .edit("Section", |edit| {
+            let doc = edit.document();
+            let id = doc.body().get(1).unwrap().id();
+            let (_, section) = doc.section_at(1);
+            let (_, layout) = doc.layout_at(1);
+            edit.set_paragraph_attrs(
+                Position::new(id, 0),
+                Position::new(id, 0),
+                &desk_model::ParaAttrs {
+                    start: Some(Some(Arc::new(Start::Section(
+                        Section {
+                            hide_first: true,
+                            number_format: NumberFormat::LowerRoman,
+                            ..section
+                        },
+                        layout,
+                    )))),
+                    ..desk_model::ParaAttrs::default()
+                },
+            )?;
+            let third = edit.document().body().get(2).unwrap().id();
+            edit.set_paragraph_attrs(
+                Position::new(third, 0),
+                Position::new(third, 0),
+                &desk_model::ParaAttrs {
+                    page_break_before: Some(true),
+                    ..desk_model::ParaAttrs::default()
+                },
+            )
+        })
+        .unwrap();
+    let layout = paginate(editor.document(), &mut system);
+    assert_eq!(layout.pages.len(), 3);
+    let shown = headers(&layout);
+    assert!(shown[0] > 0);
+    assert_eq!(shown[1], 0);
+    assert!(shown[2] > 0);
+    // The body of that page starts on its top margin.
+    assert_eq!(
+        layout.pages[1].body.0,
+        layout.setup.margin_top.to_pt() as f32
+    );
+    assert!(desk_layout::hides_margins(&layout, 1));
+    assert!(!desk_layout::hides_margins(&layout, 2));
+}

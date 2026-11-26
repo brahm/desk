@@ -205,3 +205,5 @@ date	kind	id	from	to
 2026-11-25	backlog	B-077	new	open
 2026-11-26	phase	W2	in-progress	done
 2026-11-26	phase	W3	not-started	in-progress
+2026-11-26	feature	W096	partial	done
+2026-11-26	feature	W098	missing	done
