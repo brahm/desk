@@ -137,27 +137,32 @@ pub fn write_streams(document: &TextDocument) -> Streams {
     let masters: Vec<(&str, &MasterPage)> = std::iter::once(("Standard", &document.master))
         .chain(document.masters.iter().map(|(n, m)| (n.as_str(), m)))
         .collect();
-    // A master page with a background has a page layout of its own
-    // (W098).
+    // A master page with a background fills its pages with a drawing
+    // page style, as ODF 1.3 does, and has a page layout of its own with
+    // the color for older programs (W098).
     let mut layouts = Vec::new();
     write_page_layout(&mut w, "pm1", &document.page_layout, None);
     for (_, master) in &masters {
-        let name = match &master.background {
+        let names = match &master.background {
             Some(fill) => {
-                let name = format!("pm{}", layouts.len() + 2);
-                write_page_layout(&mut w, &name, &document.page_layout, Some(fill));
-                name
+                let n = layouts.len() + 2;
+                let layout = format!("pm{n}");
+                write_page_layout(&mut w, &layout, &document.page_layout, Some(fill));
+                let page = format!("Mdp{n}");
+                write_drawing_page_style(&mut w, &page, fill);
+                (layout, Some(page))
             }
-            None => "pm1".to_owned(),
+            None => ("pm1".to_owned(), None),
         };
-        layouts.push(name);
+        layouts.push(names);
     }
     w.end();
     w.start("office:master-styles");
-    for ((name, master), layout) in masters.into_iter().zip(&layouts) {
+    for ((name, master), (layout, page)) in masters.into_iter().zip(&layouts) {
         w.start("style:master-page")
             .attr("style:name", name)
             .attr("style:page-layout-name", layout);
+        w.attr_opt("draw:style-name", page.as_deref());
         if master.match_previous {
             w.attr("desk:match-previous", "true");
         }
@@ -1106,6 +1111,31 @@ fn write_header_footer_style(
     w.end().end();
 }
 
+/// The drawing page style that fills the pages of a master page (W098).
+fn write_drawing_page_style(w: &mut Writer, name: &str, fill: &PageFill) {
+    w.start("style:style")
+        .attr("style:name", name)
+        .attr("style:family", "drawing-page");
+    w.start("style:drawing-page-properties")
+        .attr("draw:fill", &fill.fill);
+    if let Some(color) = fill.color {
+        w.attr("draw:fill-color", &color.to_string());
+    }
+    w.attr_opt("draw:fill-gradient-name", fill.gradient_name.as_deref());
+    w.attr_opt("draw:fill-image-name", fill.image_name.as_deref());
+    w.attr_opt("style:repeat", fill.repeat.as_deref());
+    // The whole page, not only inside its margins.
+    w.attr("draw:background-size", "full");
+    w.attr_opt("desk:fill-image-mode", fill.image_mode.as_deref());
+    if let Some(tint) = fill.tint {
+        w.attr("desk:fill-tint", &tint.to_string());
+    }
+    if let Some(opacity) = fill.tint_opacity {
+        w.attr("desk:fill-tint-opacity", &format!("{}%", decimal(opacity)));
+    }
+    w.end().end();
+}
+
 fn write_page_layout(w: &mut Writer, name: &str, page: &PageLayout, fill: Option<&PageFill>) {
     w.start("style:page-layout").attr("style:name", name);
     if page.mirrored == Some(true) {
@@ -1128,22 +1158,10 @@ fn write_page_layout(w: &mut Writer, name: &str, page: &PageLayout, fill: Option
     len(w, "fo:margin-bottom", page.margin_bottom);
     len(w, "fo:margin-left", page.margin_left);
     len(w, "fo:margin-right", page.margin_right);
-    if let Some(fill) = fill {
-        w.attr("draw:fill", &fill.fill);
-        if let Some(color) = fill.color {
-            w.attr("draw:fill-color", &color.to_string());
-            w.attr("fo:background-color", &color.to_string());
-        }
-        w.attr_opt("draw:fill-gradient-name", fill.gradient_name.as_deref());
-        w.attr_opt("draw:fill-image-name", fill.image_name.as_deref());
-        w.attr_opt("style:repeat", fill.repeat.as_deref());
-        w.attr_opt("desk:fill-image-mode", fill.image_mode.as_deref());
-        if let Some(tint) = fill.tint {
-            w.attr("desk:fill-tint", &tint.to_string());
-        }
-        if let Some(opacity) = fill.tint_opacity {
-            w.attr("desk:fill-tint-opacity", &format!("{}%", decimal(opacity)));
-        }
+    // The color of a background, for programs that do not read the
+    // drawing page style.
+    if let Some(color) = fill.and_then(|f| f.color) {
+        w.attr("fo:background-color", &color.to_string());
     }
     if let Some(columns) = &page.columns {
         write_columns(w, columns);

@@ -954,15 +954,29 @@ fn master_page(styles: &Element) -> Option<&Element> {
         .or_else(|| masters.child(STYLE, "master-page"))
 }
 
-/// What fills the pages of a master page: the `draw:fill` of its page
-/// layout, or its `fo:background-color` (W098).
+/// What fills the pages of a master page (W098): the `draw:fill` of its
+/// drawing page style, as ODF 1.3 gives it, or of its page layout, as
+/// older programs did, or the `fo:background-color` of its page layout.
 fn master_background(styles: &Element, master: &Element) -> Option<PageFill> {
-    let name = master.attr(STYLE, "page-layout-name")?;
-    let layout = styles
-        .child(OFFICE, "automatic-styles")?
-        .children_named(STYLE, "page-layout")
-        .find(|l| l.attr(STYLE, "name") == Some(name))?;
-    let p = layout.child(STYLE, "page-layout-properties")?;
+    let automatic = styles.child(OFFICE, "automatic-styles");
+    let page = master.attr(DRAW, "style-name").and_then(|name| {
+        automatic
+            .into_iter()
+            .chain(styles.child(OFFICE, "styles"))
+            .flat_map(|s| s.children_named(STYLE, "style"))
+            .find(|s| {
+                s.attr(STYLE, "name") == Some(name)
+                    && s.attr(STYLE, "family") == Some("drawing-page")
+            })?
+            .child(STYLE, "drawing-page-properties")
+    });
+    let layout = master.attr(STYLE, "page-layout-name").and_then(|name| {
+        automatic?
+            .children_named(STYLE, "page-layout")
+            .find(|l| l.attr(STYLE, "name") == Some(name))?
+            .child(STYLE, "page-layout-properties")
+    });
+    let p = page.filter(|p| p.attr(DRAW, "fill").is_some()).or(layout)?;
     let text = |ns, name| p.attr(ns, name).map(str::to_owned);
     let color = p
         .attr(DRAW, "fill-color")
