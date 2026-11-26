@@ -38,7 +38,14 @@ fuzz_target!(|data: &[u8]| {
             assert_eq!(row.len(), records.fields.len());
         }
         for record in 0..records.len().min(4) {
-            for field in CONTACT_FIELDS.iter().chain(records.fields.iter().map(|f| f.as_str()).collect::<Vec<_>>().iter()) {
+            for field in CONTACT_FIELDS.iter().chain(
+                records
+                    .fields
+                    .iter()
+                    .map(|f| f.as_str())
+                    .collect::<Vec<_>>()
+                    .iter(),
+            ) {
                 let _ = records.value(record, field);
             }
         }
