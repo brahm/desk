@@ -483,7 +483,9 @@ impl TextEditor {
             replies: Arc::new([]),
         };
         let mut added = None;
-        self.format_edit("Highlight", |edit| {
+        // Undo names it as Pages 15.4 does: a highlight is a comment
+        // being written.
+        self.format_edit("Edit Comment", |edit| {
             let from = at_spot(edit.document(), start)?;
             let to = at_spot(edit.document(), end)?;
             added = Some(edit.add_comment(from, to, highlight)?);
@@ -529,7 +531,8 @@ impl TextEditor {
         if ids.is_empty() {
             return 0;
         }
-        match self.format_edit_quiet("Remove Highlights and Comments", |edit| {
+        // One step named as Pages 15.4 names it.
+        match self.format_edit_quiet("Delete Comment", |edit| {
             ids.iter().try_for_each(|id| edit.remove_comment(*id))
         }) {
             Ok(()) => ids.len(),
@@ -579,7 +582,7 @@ impl TextEditor {
             date: Some(crate::comments_page::now().into()),
             text,
         };
-        self.change_replies("Reply", id, move |replies| replies.push(reply));
+        self.change_replies("Add Reply", id, move |replies| replies.push(reply));
     }
 
     /// Changes the text of a reply, by its place in the thread; emptied,
@@ -1487,7 +1490,7 @@ mod tests {
                 .unwrap();
             assert!(made.is_highlight());
             assert_eq!(&*made.author, "Ana");
-            assert_eq!(editor.undo_name().as_deref(), Some("Highlight"));
+            assert_eq!(editor.undo_name().as_deref(), Some("Edit Comment"));
             // It has no mark in the margin, and is listed with the
             // comments; given text, it is a comment.
             assert!(editor.comment_flags().is_empty());

@@ -136,7 +136,11 @@ impl ReviewBar {
         let (current, total) = editor.review_position();
         let tracked = tracking != desk_model::Tracking::Off;
         self.revealer.set_reveal_child(tracked || total > 0);
-        self.label.set_label(&position_label(current, total));
+        let changes = tracked || editor.has_changes();
+        let highlight =
+            matches!(current, Some((_, ReviewItem::Comment(id))) if editor.is_highlight(id));
+        self.label
+            .set_label(&position_label(current, total, changes, highlight));
         self.track.set_visible(!tracked);
         self.tracking.set_visible(tracked);
         let on = tracking == desk_model::Tracking::On;
@@ -148,18 +152,29 @@ impl ReviewBar {
     }
 }
 
-/// What the label of the bar says: which comment or change is selected,
-/// of how many, or how many there are.
-pub fn position_label(current: Option<(usize, ReviewItem)>, total: usize) -> String {
+/// What the label of the bar says, in the words of Pages 15.4: which
+/// comment, highlight or change is selected, of how many, or how many
+/// there are. While the document tracks or has changes, every item is a
+/// "Comment or Change", as in Pages; otherwise they are comments, and a
+/// selected comment without text is a highlight.
+pub fn position_label(
+    current: Option<(usize, ReviewItem)>,
+    total: usize,
+    changes: bool,
+    highlight: bool,
+) -> String {
     let text = match current {
-        Some((_, ReviewItem::Comment(_))) => tr("Comment {i} of {n}"),
-        Some((_, ReviewItem::Change(_))) => tr("Change {i} of {n}"),
-        None if total == 0 => tr("No Comments or Changes"),
-        None => trn(
+        Some(_) if changes => tr("Comment or Change {i} of {n}"),
+        Some(_) if highlight => tr("Highlight {i} of {n}"),
+        Some(_) => tr("Comment {i} of {n}"),
+        None if total == 0 && changes => tr("No Comments or Changes"),
+        None if total == 0 => tr("No Comments"),
+        None if changes => trn(
             "{n} Comment or Change",
             "{n} Comments & Changes",
             total as u64,
         ),
+        None => trn("{n} Comment", "{n} Comments", total as u64),
     };
     text.replace("{i}", &current.map_or(0, |(i, _)| i).to_string())
         .replace("{n}", &total.to_string())
@@ -210,16 +225,27 @@ mod tests {
     #[test]
     fn rev_02_the_label_says_which_comment_or_change_of_how_many() {
         let id = desk_model::NodeId::new(7).unwrap();
+        let comment = Some((5, ReviewItem::Comment(id)));
+        let change = Some((2, ReviewItem::Change(id)));
+        // While tracking, or with changes, as Pages 15.4 says it.
         assert_eq!(
-            position_label(Some((5, ReviewItem::Comment(id))), 9),
-            "Comment 5 of 9"
+            position_label(comment, 9, true, false),
+            "Comment or Change 5 of 9"
         );
         assert_eq!(
-            position_label(Some((2, ReviewItem::Change(id))), 9),
-            "Change 2 of 9"
+            position_label(change, 9, true, false),
+            "Comment or Change 2 of 9"
         );
-        assert_eq!(position_label(None, 9), "9 Comments & Changes");
-        assert_eq!(position_label(None, 1), "1 Comment or Change");
-        assert_eq!(position_label(None, 0), "No Comments or Changes");
+        assert_eq!(position_label(None, 9, true, false), "9 Comments & Changes");
+        assert_eq!(position_label(None, 1, true, false), "1 Comment or Change");
+        assert_eq!(
+            position_label(None, 0, true, false),
+            "No Comments or Changes"
+        );
+        // Without: comments, and a comment without text is a highlight.
+        assert_eq!(position_label(comment, 9, false, false), "Comment 5 of 9");
+        assert_eq!(position_label(comment, 9, false, true), "Highlight 5 of 9");
+        assert_eq!(position_label(None, 2, false, false), "2 Comments");
+        assert_eq!(position_label(None, 1, false, false), "1 Comment");
     }
 }
