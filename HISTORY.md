@@ -12,7 +12,7 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
   spreadsheet, Add Merge Field, a Preview that steps through the
   records, and Merge, which opens a new document with a letter for each
   record. Insert > Field > Mail Merge Field puts a field, and its menu
-  changes it. (#PR)
+  changes it. (#255)
 
 * Added: The records of a mail merge are read from vCard files and from
   the tables of spreadsheets, ODS or CSV, whose columns fill the merge
