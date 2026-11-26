@@ -3495,7 +3495,11 @@ def tables_and_charts(work):
         def chart_saved():
             try:
                 with zipfile.ZipFile(letter) as package:
-                    return "Object 1/content.xml" in package.namelist()
+                    # A chart is in the folder named after its object.
+                    return any(
+                        name.startswith("Object ") and name.endswith("/content.xml")
+                        for name in package.namelist()
+                    )
             except (zipfile.BadZipFile, OSError):
                 return False
 

@@ -8,6 +8,10 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
 
 ## Changes since 0.7.0 (unreleased)
 
+* Added: Equations are kept in documents as MathML, the formula objects
+  that LibreOffice Math reads and writes, with the LaTeX they were
+  written in. (#250)
+
 * Added: Page templates in the window: Page Templates and Reapply Page
   Template in the Add Page menu, the Page Template of the Section tab, a
   template made from the page in sight, and the Placeholder and Tag of

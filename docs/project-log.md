@@ -2912,6 +2912,18 @@ paragraph, and objects on a second page.
   page under its name. Links to a page of a page layout document
   (B-079), which need a mark that pages keep when they move.
 
+### 26 November: equations in the model and ODF (step 10 of W3, first part)
+
+- An object can be an equation: its MathML, and the LaTeX it was
+  written in when it was, which Edit Equation of Pages 15.4 shows again.
+- *ODF:* the standard place, an embedded object of
+  `application/vnd.oasis.opendocument.formula` with its MathML, as
+  LibreOffice Math writes it, read from other programs as well; the
+  LaTeX is `desk:latex` on its `draw:object`. The MathML read is made
+  again from its MathML elements and attributes alone, so nothing else
+  a file brought goes on to the next one.
+- *Next:* drawing LaTeX and MathML, then the editor in the window.
+
 ## Decisions, with their reasons and consequences
 
 Ids `D-nnn` and `R-nnn` are those of [decisions.md](decisions.md).

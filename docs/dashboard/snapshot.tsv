@@ -78,6 +78,8 @@ backlog	B-074	done
 backlog	B-075	open
 backlog	B-076	open
 backlog	B-077	open
+backlog	B-078	open
+backlog	B-079	open
 feature	S001	done
 feature	S002	done
 feature	S003	done
@@ -564,7 +566,7 @@ feature	W091	done
 feature	W092	done
 feature	W093	done
 feature	W094	done
-feature	W095	partial
+feature	W095	done
 feature	W096	done
 feature	W097	done
 feature	W098	done

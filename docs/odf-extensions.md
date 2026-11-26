@@ -381,6 +381,17 @@ These sit on the `style:graphic-properties` of the graphic style of a
 - **Fallback:** none needed; other programs read the length from the
   file.
 
+#### `desk:latex`
+
+- **Feature:** the LaTeX that an equation was written in, which Edit
+  Equation of Pages 15.4 shows again (W104, PXV-22).
+- **On:** the `draw:object` of an equation, whose object of
+  `application/vnd.oasis.opendocument.formula` holds its MathML, as
+  LibreOffice Math writes it.
+- **Value:** the LaTeX, as written.
+- **Fallback:** the MathML, which other programs show and edit; an
+  equation without the attribute is edited as MathML.
+
 ### Tables (`table:table`)
 
 #### `desk:table`
@@ -1013,7 +1024,6 @@ specified here, by the rules above, in the phase that implements it.
 | Image gallery (several pictures in one frame, with captions) | All | No standard element | The first picture, with its caption |
 | Captions and titles tied to an object | All | ODF captions are free text frames | A text frame grouped with the object |
 | 3D objects (models with a view angle) | All | No standard element for a model with a camera | A rendered picture |
-| Equations entered as LaTeX | All | ODF stores MathML only | MathML, with the LaTeX source as the extension |
 | Text fill with gradient or image, text outline options | All | ODF text properties have a colour only | The main colour |
 | Drop caps beyond the ODF model, automatic fractions, phonetic guide details | Writer | ODF covers part of each | The ODF drop cap, the literal characters, ODF ruby |
 | Placeholder text and media placeholders | All | ODF has a placeholder field for text only | Ordinary content |

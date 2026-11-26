@@ -412,6 +412,8 @@ pub enum ObjectKind {
     Table(Arc<crate::Table>),
     /// A chart, drawn in its frame (GRF-01).
     Chart(Arc<desk_chart::Chart>),
+    /// An equation, drawn in its frame (W104).
+    Equation(Arc<crate::Equation>),
 }
 
 impl From<Shape> for ObjectKind {

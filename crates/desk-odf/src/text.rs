@@ -57,6 +57,10 @@ pub struct TextDocument {
     /// The charts of the package that the document's objects link to, by
     /// the path of their folder, as `./Object 1`.
     pub charts: Vec<(String, crate::chart::ChartDocument)>,
+    /// The formulas of the package that the document's objects link to,
+    /// by the folder of each, as `./Object 2`: their MathML, as
+    /// [`crate::read_formula`] gives it (W104).
+    pub formulas: Vec<(String, String)>,
     /// The pages captured to insert again (EST-20), each a text document
     /// of its own in the package, at `Desk/Captures/n.odt`, whose title
     /// is their name.

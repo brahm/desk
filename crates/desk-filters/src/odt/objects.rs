@@ -931,7 +931,14 @@ fn kind(
             super::comments::import_cell_comments(document, &mut built, table)?;
             ObjectKind::Table(Arc::new(built))
         }
-        odf::DrawKind::Object { href, desk } => {
+        odf::DrawKind::Object { href, desk, latex } => {
+            // An equation (W104).
+            if let Some((_, mathml)) = source.formulas.iter().find(|(h, _)| h == href) {
+                return Ok(Some(ObjectKind::Equation(Arc::new(desk_model::Equation {
+                    mathml: mathml.as_str().into(),
+                    latex: latex.as_deref().map(Arc::from),
+                }))));
+            }
             let chart = source
                 .charts
                 .iter()
@@ -1899,6 +1906,8 @@ pub(super) struct Exporter<'a> {
     pub fill_images: Vec<odf::FillImage>,
     /// The charts, by the folder of each in the package.
     pub charts: Vec<(String, odf::ChartDocument)>,
+    /// The MathML of the equations, by the folder of each (W104).
+    pub formulas: Vec<(String, String)>,
     /// The gradients and pictures that fill letters.
     pub text_fills: &'a mut super::TextFills,
     /// The annotations of the comments on their text (W149).
@@ -2399,12 +2408,29 @@ impl Exporter<'_> {
                 odf::DrawKind::Table(super::tables::export_table(table, &locale, self, document))
             }
             ObjectKind::Chart(chart) => {
-                let href = format!("./Object {}", self.charts.len() + 1);
+                // Named by the object, apart from those of master pages.
+                let href = format!("./Object {}", object.id);
                 self.charts
                     .push((href.clone(), super::tables::export_chart(chart, w, h)));
                 odf::DrawKind::Object {
                     href,
                     desk: serde_json::to_string(&**chart).ok(),
+                    latex: None,
+                }
+            }
+            // MathML in an object of its own, as LibreOffice Math writes
+            // it, named by the object (W104).
+            ObjectKind::Equation(equation) => {
+                let href = format!("./Equation {}", object.id);
+                let mathml = odf::read_formula(&equation.mathml)
+                    .ok()
+                    .flatten()
+                    .unwrap_or_else(|| format!("<math xmlns=\"{}\"/>", odf::MATHML));
+                self.formulas.push((href.clone(), mathml));
+                odf::DrawKind::Object {
+                    href,
+                    desk: None,
+                    latex: equation.latex.as_deref().map(str::to_owned),
                 }
             }
             // A draw:g is not turned: its objects are, about its center.
@@ -2719,6 +2745,7 @@ pub(super) fn export_objects(exporter: &mut Exporter<'_>, out: &mut odf::TextDoc
     out.markers = std::mem::take(&mut exporter.markers);
     out.fill_images = std::mem::take(&mut exporter.fill_images);
     out.charts.append(&mut exporter.charts);
+    out.formulas.append(&mut exporter.formulas);
 }
 
 /// The page templates of a page layout document, with the pages from 1
@@ -2799,6 +2826,7 @@ pub(super) fn export_master_objects(
         markers: std::mem::take(&mut out.markers),
         fill_images: std::mem::take(&mut out.fill_images),
         charts: Vec::new(),
+        formulas: Vec::new(),
         text_fills,
         comments,
         master: true,
@@ -2863,6 +2891,7 @@ pub(super) fn export_master_objects(
     out.markers = std::mem::take(&mut exporter.markers);
     out.fill_images = std::mem::take(&mut exporter.fill_images);
     out.charts.append(&mut exporter.charts);
+    out.formulas.append(&mut exporter.formulas);
     out.master_styles = automatic;
 }
 
@@ -2899,6 +2928,9 @@ pub(super) fn import_master_objects(
             gradients: source.gradients.clone(),
             markers: source.markers.clone(),
             fill_images: source.fill_images.clone(),
+            // The charts and equations that the objects show.
+            charts: source.charts.clone(),
+            formulas: source.formulas.clone(),
             ..odf::TextDocument::default()
         };
     if !master.objects.is_empty() {
