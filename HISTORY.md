@@ -10,7 +10,7 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
 
 * Added: Captured Pages, the Capture Pages of Pages '09: a section
   captured under a name is inserted again from Insert > Break or the Add
-  Page menu, and saved with the document. (#PR)
+  Page menu, and saved with the document. (#244)
 
 * Added: The Section tab of Pages 15.4: each section writes the numbers
   of its pages in its own format, can hide its headers and footers on
