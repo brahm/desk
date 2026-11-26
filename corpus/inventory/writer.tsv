@@ -98,7 +98,7 @@ W094	3.7 Document structure	Sections	Different	15.4, plus what the '09 did	D-001
 W095	3.7 Document structure	Page templates	Different	15.4	D-001	In	Missing	-	W3	Page templates with tags
 W096	3.7 Document structure	Header and footer	Different	15.4, plus what the '09 did	D-001, D-003	In	Partial	the target changed	W3	Free header of the '09 (EST-12); the three quick fields of the 15 are missing
 W097	3.7 Document structure	Master / section layout objects (watermark)	Equal (new name)	Equal in both	-	In	Done	-	done	Section master objects (EST-21, INT-05)
-W098	3.7 Document structure	Page background and border	Different	15.4	D-001	In	Missing	-	W3	Page background and border per page, section or template
+W098	3.7 Document structure	Page background and border	Different	15.4	D-001	In	Missing	-	W3	Page background per section, page or template (PXV-21); 15.4 has no page border, made as a locked section layout shape (W097)
 W099	3.7 Document structure	Footnotes and endnotes	Equal	Equal in both	-	In	Done	-	done	Footnotes and endnotes (EST-13 to EST-15)
 W100	3.7 Document structure	Inserted table of contents	Different	15.4	D-001	In	Partial	-	W3	Several tables of contents, each up to the next one (EST-22); the per-section scope of the 15 is missing
 W101	3.7 Document structure	Bookmarks	Different	15.4	D-001	In	Partial	-	W3	Bookmarks (EST-26); their own tab and the suggestions from styles are missing

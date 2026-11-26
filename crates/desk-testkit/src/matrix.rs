@@ -229,13 +229,13 @@ mod tests {
     fn the_matrix_of_the_corpus_reads() {
         let text = include_str!("../../../corpus/matrix.tsv");
         let rows = parse(text).unwrap();
-        assert_eq!(rows.len(), 330);
+        assert_eq!(rows.len(), 333);
         let count = |prefix: &str| rows.iter().filter(|r| r.id.starts_with(prefix)).count();
         assert_eq!(count("IOP"), 33);
         assert_eq!(count("GNM"), 14);
         assert_eq!(count("VMI"), 4);
         // The features of Pages 15, written from Pages 15.4 (D-020).
-        assert_eq!(count("PXV"), 19);
+        assert_eq!(count("PXV"), 22);
         let survey = rows.len() - count("IOP") - count("GNM") - count("VMI") - count("PXV");
         assert_eq!(survey, 260);
         let roadmap = include_str!("../../../docs/roadmap.md");
@@ -243,10 +243,13 @@ mod tests {
             match &row.phase {
                 Some(Phase::Old(p)) => assert!(*p <= 11, "{}", row.id),
                 Some(Phase::Roadmap(id)) => {
-                    // The features of Pages 15, and the rows of review written
-                    // again from Pages 15.4 (W2).
+                    // The features of Pages 15, and the rows of review (W2),
+                    // of structure and of mail merge (W3) written again from
+                    // Pages 15.4.
                     assert!(
-                        row.id.starts_with("PXV") || row.id.starts_with("REV"),
+                        ["PXV", "REV", "EST", "MAL"]
+                            .iter()
+                            .any(|p| row.id.starts_with(p)),
                         "{}",
                         row.id
                     );

@@ -2730,6 +2730,27 @@ paragraph, and objects on a second page.
 - *How the Mac is used:* one session at the start, now done with control
   of the screen of the Mac from this thread, and one at the end.
 
+### 26 November: structure and templates in Pages 15.4 (step 2 of W3)
+
+- A session on the Mac drove Pages 15.4 in the background, in a scratch
+  document discarded without saving, through the menus and the Document
+  pane of every row of W3: sections, headers and footers, the page
+  background, the table of contents, bookmarks and their suggestions,
+  links, page templates, equations and mail merge.
+- Control in the background could not open pop-up menus, the fields of
+  the header or the Mail Merge popover; those points were read in the
+  Pages User Guide for Mac and are seen again in the validation at the
+  end of the phase. The virtual machine of Pages '09 was not reached, so
+  captured sections, sender fields and MathType keep what the '09 survey
+  says (D-003).
+- *What it changed:* Pages 15.4 has no page border; it makes one from a
+  locked shape without fill, a section layout object, which Desk has had
+  since W1 (W097). W098 is the page background.
+- *The matrix:* `EST-12` and `EST-16` to `EST-26` and `MAL-01` to
+  `MAL-09` were written again for 15.4, with phase W3, and three rows
+  were added: `PXV-20` page templates, `PXV-21` page background and
+  `PXV-22` equations. No task moved to another phase.
+
 ## Decisions, with their reasons and consequences
 
 Ids `D-nnn` and `R-nnn` are those of [decisions.md](decisions.md).
