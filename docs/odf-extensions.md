@@ -873,6 +873,25 @@ other programs paginate it the same way (`sections.rs` in
   `style:header-first` and `style:header-left` hold the headers of
   first and left pages where it has them.
 
+#### `desk:page-number-format`
+
+- **Feature:** how the numbers of the pages of a section are written, the
+  Format of Page Numbering in the Section tab of Pages 15.4 (EST-18,
+  W094): a page number field in digits shows it.
+- **Value:** a `style:num-format`: `1`, `i`, `I`, `a` or `A`.
+- **Fallback:** a section whose format differs from that of the master
+  page before it gets a master page of its own, whose page layout has the
+  same `style:num-format`, which page number fields show in other
+  programs. Desk reads that too, from documents of other programs.
+
+#### `desk:hide-first-page`
+
+- **Feature:** a section whose first page shows no header and footer:
+  Hide on first page of section of Pages 15.4 (EST-19, W094).
+- **Value:** a boolean.
+- **Fallback:** none; other programs show the headers and footers on the
+  first page too.
+
 ## Extensions the new target needs
 
 A first pass over [the inventory](../corpus/inventory/README.md): the

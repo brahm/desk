@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Desk\n"
 "Report-Msgid-Bugs-To: https://github.com/brahm/desk/issues\n"
-"POT-Creation-Date: 2026-11-26 16:12+0000\n"
+"POT-Creation-Date: 2026-11-26 16:40+0000\n"
 "PO-Revision-Date: 2026-11-02 00:54+0000\n"
 "Last-Translator: Desk contributors\n"
 "Language-Team: Brazilian Portuguese\n"
@@ -1150,12 +1150,12 @@ msgstr[0] "{n} página"
 msgstr[1] "{n} páginas"
 
 #: crates/desk-ui/src/document_controls.rs:134
-#: crates/desk-ui/src/layout_pane.rs:228
+#: crates/desk-ui/src/layout_pane.rs:242
 msgid "Page"
 msgstr "Página"
 
 #: crates/desk-ui/src/document_controls.rs:135
-#: crates/desk-ui/src/formatting.rs:410 crates/desk-ui/src/layout_pane.rs:309
+#: crates/desk-ui/src/formatting.rs:410 crates/desk-ui/src/layout_pane.rs:349
 msgid "Section"
 msgstr "Seção"
 
@@ -2479,7 +2479,7 @@ msgstr "Páginas espelhadas"
 msgid "Left and right pages swap their margins, as in a book"
 msgstr "As páginas da esquerda e da direita trocam as margens, como num livro"
 
-#: crates/desk-ui/src/formatting.rs:324 crates/desk-ui/src/layout_pane.rs:261
+#: crates/desk-ui/src/formatting.rs:324 crates/desk-ui/src/layout_pane.rs:275
 msgid "Layout"
 msgstr "Layout"
 
@@ -2806,63 +2806,63 @@ msgstr "Hora"
 msgid "_Apply"
 msgstr "_Aplicar"
 
-#: crates/desk-ui/src/layout_pane.rs:49
+#: crates/desk-ui/src/layout_pane.rs:59
 msgid "US Letter"
 msgstr "Carta (EUA)"
 
-#: crates/desk-ui/src/layout_pane.rs:50
+#: crates/desk-ui/src/layout_pane.rs:60
 msgid "US Legal"
 msgstr "Ofício (EUA)"
 
-#: crates/desk-ui/src/layout_pane.rs:51
+#: crates/desk-ui/src/layout_pane.rs:61
 msgid "Tabloid"
 msgstr "Tabloide"
 
-#: crates/desk-ui/src/layout_pane.rs:52
+#: crates/desk-ui/src/layout_pane.rs:62
 msgid "A3"
 msgstr "A3"
 
-#: crates/desk-ui/src/layout_pane.rs:53
+#: crates/desk-ui/src/layout_pane.rs:63
 msgid "A4"
 msgstr "A4"
 
-#: crates/desk-ui/src/layout_pane.rs:54
+#: crates/desk-ui/src/layout_pane.rs:64
 msgid "A5"
 msgstr "A5"
 
-#: crates/desk-ui/src/layout_pane.rs:55
+#: crates/desk-ui/src/layout_pane.rs:65
 msgid "JIS B5"
 msgstr "JIS B5"
 
-#: crates/desk-ui/src/layout_pane.rs:56
+#: crates/desk-ui/src/layout_pane.rs:66
 msgid "Other Size"
 msgstr "Outro tamanho"
 
-#: crates/desk-ui/src/layout_pane.rs:220
+#: crates/desk-ui/src/layout_pane.rs:234
 msgid "Paper"
 msgstr "Papel"
 
-#: crates/desk-ui/src/layout_pane.rs:223
+#: crates/desk-ui/src/layout_pane.rs:237
 msgid "Landscape"
 msgstr "Paisagem"
 
-#: crates/desk-ui/src/layout_pane.rs:224
+#: crates/desk-ui/src/layout_pane.rs:238
 msgid "Top Margin"
 msgstr "Margem superior"
 
-#: crates/desk-ui/src/layout_pane.rs:225
+#: crates/desk-ui/src/layout_pane.rs:239
 msgid "Bottom Margin"
 msgstr "Margem inferior"
 
-#: crates/desk-ui/src/layout_pane.rs:226 crates/desk-ui/src/layout_pane.rs:553
+#: crates/desk-ui/src/layout_pane.rs:240 crates/desk-ui/src/layout_pane.rs:607
 msgid "Left Page Margin"
 msgstr "Margem esquerda da página"
 
-#: crates/desk-ui/src/layout_pane.rs:227 crates/desk-ui/src/layout_pane.rs:553
+#: crates/desk-ui/src/layout_pane.rs:241 crates/desk-ui/src/layout_pane.rs:607
 msgid "Right Page Margin"
 msgstr "Margem direita da página"
 
-#: crates/desk-ui/src/layout_pane.rs:234 crates/desk-ui/src/objects_pane.rs:300
+#: crates/desk-ui/src/layout_pane.rs:248 crates/desk-ui/src/objects_pane.rs:300
 #: crates/desk-ui/src/ruler.rs:576 crates/desk-ui/src/ruler.rs:598
 #: crates/desk-ui/src/table_pane.rs:282
 #: crates/desk-ui/src/tables/inspector.rs:180
@@ -2870,107 +2870,131 @@ msgstr "Margem direita da página"
 msgid "Columns"
 msgstr "Colunas"
 
-#: crates/desk-ui/src/layout_pane.rs:235
+#: crates/desk-ui/src/layout_pane.rs:249
 msgid "Gap Between Columns"
 msgstr "Medianiz entre colunas"
 
-#: crates/desk-ui/src/layout_pane.rs:237
+#: crates/desk-ui/src/layout_pane.rs:251
 msgid "Equal Column Width"
 msgstr "Colunas de largura igual"
 
-#: crates/desk-ui/src/layout_pane.rs:241
+#: crates/desk-ui/src/layout_pane.rs:255
 msgid "Column Widths"
 msgstr "Larguras das colunas"
 
-#: crates/desk-ui/src/layout_pane.rs:247
+#: crates/desk-ui/src/layout_pane.rs:261
 msgid "Column {n}"
 msgstr "Coluna {n}"
 
-#: crates/desk-ui/src/layout_pane.rs:251
+#: crates/desk-ui/src/layout_pane.rs:265
 msgid "Gap After Column {n}"
 msgstr "Medianiz após a coluna {n}"
 
-#: crates/desk-ui/src/layout_pane.rs:256
+#: crates/desk-ui/src/layout_pane.rs:270
 msgid "Before Layout"
 msgstr "Antes do layout"
 
-#: crates/desk-ui/src/layout_pane.rs:257
+#: crates/desk-ui/src/layout_pane.rs:271
 msgid "After Layout"
 msgstr "Depois do layout"
 
-#: crates/desk-ui/src/layout_pane.rs:258
+#: crates/desk-ui/src/layout_pane.rs:272
 msgid "Left Margin"
 msgstr "Margem esquerda"
 
-#: crates/desk-ui/src/layout_pane.rs:259
+#: crates/desk-ui/src/layout_pane.rs:273
 msgid "Right Margin"
 msgstr "Margem direita"
 
-#: crates/desk-ui/src/layout_pane.rs:262
+#: crates/desk-ui/src/layout_pane.rs:276
 msgid "The columns and margins of the layout at the cursor"
 msgstr "As colunas e as margens do layout no cursor"
 
-#: crates/desk-ui/src/layout_pane.rs:272
+#: crates/desk-ui/src/layout_pane.rs:286
 msgid "Section Starts On"
 msgstr "A seção começa em"
 
-#: crates/desk-ui/src/layout_pane.rs:274
+#: crates/desk-ui/src/layout_pane.rs:288
 msgid "Any Page"
 msgstr "Qualquer página"
 
-#: crates/desk-ui/src/layout_pane.rs:275
+#: crates/desk-ui/src/layout_pane.rs:289
 msgid "Left Page"
 msgstr "Página da esquerda"
 
-#: crates/desk-ui/src/layout_pane.rs:276
+#: crates/desk-ui/src/layout_pane.rs:290
 msgid "Right Page"
 msgstr "Página da direita"
 
-#: crates/desk-ui/src/layout_pane.rs:280
+#: crates/desk-ui/src/layout_pane.rs:294
 msgid "Continue Page Numbers"
 msgstr "Continuar a numeração"
 
-#: crates/desk-ui/src/layout_pane.rs:281
+#: crates/desk-ui/src/layout_pane.rs:295
 msgid "From the section before"
 msgstr "Da seção anterior"
 
-#: crates/desk-ui/src/layout_pane.rs:283
+#: crates/desk-ui/src/layout_pane.rs:297
 msgid "Start Page Numbers At"
 msgstr "Começar a numeração em"
 
-#: crates/desk-ui/src/layout_pane.rs:285
+#: crates/desk-ui/src/layout_pane.rs:299
+msgid "Page Number Format"
+msgstr "Formato da numeração de páginas"
+
+#: crates/desk-ui/src/layout_pane.rs:309
+msgid "Hide on First Page"
+msgstr "Ocultar na primeira página"
+
+#: crates/desk-ui/src/layout_pane.rs:310
+msgid "No header and footer on the first page of the section"
+msgstr "Sem cabeçalho e rodapé na primeira página da seção"
+
+#: crates/desk-ui/src/layout_pane.rs:313
 msgid "Different First Page"
 msgstr "Primeira página diferente"
 
-#: crates/desk-ui/src/layout_pane.rs:286
+#: crates/desk-ui/src/layout_pane.rs:314
 msgid "With a header and footer of its own"
 msgstr "Com cabeçalho e rodapé próprios"
 
-#: crates/desk-ui/src/layout_pane.rs:289
+#: crates/desk-ui/src/layout_pane.rs:317
 msgid "Different Left and Right Pages"
 msgstr "Páginas da esquerda e da direita diferentes"
 
-#: crates/desk-ui/src/layout_pane.rs:290
+#: crates/desk-ui/src/layout_pane.rs:318
 msgid "Left pages have a header and footer of their own"
 msgstr "As páginas da esquerda têm cabeçalho e rodapé próprios"
 
-#: crates/desk-ui/src/layout_pane.rs:293
+#: crates/desk-ui/src/layout_pane.rs:321
 msgid "Use Previous Headers and Footers"
 msgstr "Usar cabeçalhos e rodapés anteriores"
 
-#: crates/desk-ui/src/layout_pane.rs:294
+#: crates/desk-ui/src/layout_pane.rs:322
 msgid "Those of the section before, rather than its own"
 msgstr "Os da seção anterior, em vez dos próprios"
 
-#: crates/desk-ui/src/layout_pane.rs:307
+#: crates/desk-ui/src/layout_pane.rs:335
 msgid "No Fill"
 msgstr "Sem Preenchimento"
 
-#: crates/desk-ui/src/layout_pane.rs:551
+#: crates/desk-ui/src/layout_pane.rs:340
+msgid "New Section"
+msgstr "Nova seção"
+
+#: crates/desk-ui/src/layout_pane.rs:341
+msgid "A section break at the cursor"
+msgstr "Uma quebra de seção no cursor"
+
+#: crates/desk-ui/src/layout_pane.rs:344
+msgid "Create"
+msgstr "Criar"
+
+#: crates/desk-ui/src/layout_pane.rs:605
 msgid "Inside Margin"
 msgstr "Margem interna"
 
-#: crates/desk-ui/src/layout_pane.rs:551
+#: crates/desk-ui/src/layout_pane.rs:605
 msgid "Outside Margin"
 msgstr "Margem externa"
 

@@ -157,6 +157,14 @@ pub struct Section {
     /// footers" unchecked (EST-12, EST-16). The first section always has
     /// its own.
     pub own_margins: bool,
+    /// How the numbers of its pages are written: the Format of Page
+    /// Numbering in the Section tab of Pages 15.4 (EST-18, W094). A page
+    /// number field in digits shows it; one with a format of its own
+    /// keeps that.
+    pub number_format: crate::NumberFormat,
+    /// Whether the first page of the section shows no header and footer:
+    /// Hide on first page of section of Pages 15.4 (EST-19, W094).
+    pub hide_first: bool,
 }
 
 /// Where a new section or layout starts: at the paragraph that holds it.

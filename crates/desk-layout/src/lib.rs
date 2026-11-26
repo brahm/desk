@@ -57,6 +57,6 @@ pub use tables::{
 
 pub use pages::{
     DocumentLayout, NOTE_RULE_LENGTH, NOTE_RULE_WIDTH, Page, PlacedBlock, PlacedLine, field_span,
-    margin_lines, margin_lines_split, margin_of_page, paginate, paginate_texts,
+    hides_margins, margin_lines, margin_lines_split, margin_of_page, paginate, paginate_texts,
     paginate_texts_spaced,
 };

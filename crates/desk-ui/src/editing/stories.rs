@@ -77,7 +77,9 @@ pub fn story_at(layout: &DocumentLayout, page: usize, x: f64, y: f64) -> Option<
             return Some(Story::Note(id));
         }
     }
-    if p.blank {
+    // A blank page, and the first page of a section that hides its
+    // headers and footers there (W094), have none to edit.
+    if p.blank || desk_layout::hides_margins(layout, page) {
         return None;
     }
     let kind = if y < f64::from(p.body.0) && layout.setup.headers {
@@ -350,6 +352,7 @@ pub fn story_pages(layout: &DocumentLayout) -> Vec<(Story, usize)> {
         }
     };
     for (index, page) in layout.pages.iter().enumerate() {
+        let hidden = page.blank || desk_layout::hides_margins(layout, index);
         // Its left field, and the others that show text (W096).
         let margin = |kind| {
             let (place, section) = desk_layout::margin_of_page(layout, index, kind);
@@ -359,7 +362,7 @@ pub fn story_pages(layout: &DocumentLayout) -> Vec<(Story, usize)> {
                 .filter(|f| f.field == MarginField::Left || page.margin_places.contains(f))
                 .map(move |place| Story::Margin { section, place })
         };
-        if !page.blank && layout.setup.headers {
+        if !hidden && layout.setup.headers {
             for story in margin(MarginKind::Header) {
                 add(story, index);
             }
@@ -369,7 +372,7 @@ pub fn story_pages(layout: &DocumentLayout) -> Vec<(Story, usize)> {
                 add(Story::Note(id), index);
             }
         }
-        if !page.blank && layout.setup.footers {
+        if !hidden && layout.setup.footers {
             for story in margin(MarginKind::Footer) {
                 add(story, index);
             }

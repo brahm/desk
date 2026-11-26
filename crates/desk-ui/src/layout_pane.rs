@@ -26,6 +26,16 @@ use crate::preferences::Units;
 use crate::tab_stops::{self, string_list};
 
 /// The pages a section may start on, in the order of their menu.
+/// The formats of page numbers, in the order of the Format of Page
+/// Numbering of Pages 15.4 (W094).
+const NUMBER_FORMATS: [desk_model::NumberFormat; 5] = [
+    desk_model::NumberFormat::Decimal,
+    desk_model::NumberFormat::LowerRoman,
+    desk_model::NumberFormat::UpperRoman,
+    desk_model::NumberFormat::LowerAlpha,
+    desk_model::NumberFormat::UpperAlpha,
+];
+
 const STARTS: [SectionStart; 3] = [
     SectionStart::AnyPage,
     SectionStart::LeftPage,
@@ -192,6 +202,10 @@ pub struct LayoutGroups {
     start: compact::ComboRow,
     continues: compact::SwitchRow,
     first_number: compact::SpinRow,
+    /// How the numbers of the pages are written (W094).
+    number_format: compact::ComboRow,
+    /// Whether the first page shows no header and footer (W094).
+    hide_first: compact::SwitchRow,
     /// Whether the first page has a header and footer of its own (EST-19).
     first_different: compact::SwitchRow,
     /// Whether left pages have a header and footer of their own (EST-19).
@@ -281,6 +295,20 @@ impl LayoutGroups {
             .subtitle(tr("From the section before"))
             .build();
         let first_number = spin(tr("Start Page Numbers At"), 1.0, 9999.0);
+        let number_format = compact::ComboRow::builder()
+            .title(tr("Page Number Format"))
+            .model(&string_list([
+                "1, 2, 3".to_owned(),
+                "i, ii, iii".to_owned(),
+                "I, II, III".to_owned(),
+                "a, b, c".to_owned(),
+                "A, B, C".to_owned(),
+            ]))
+            .build();
+        let hide_first = compact::SwitchRow::builder()
+            .title(tr("Hide on First Page"))
+            .subtitle(tr("No header and footer on the first page of the section"))
+            .build();
         let first_different = compact::SwitchRow::builder()
             .title(tr("Different First Page"))
             .subtitle(tr("With a header and footer of its own"))
@@ -306,13 +334,28 @@ impl LayoutGroups {
             ],
             &tr("No Fill"),
         );
+        // Create a new section, as the Section tab of Pages 15.4 offers
+        // (W094): a section break at the cursor.
+        let new_section = compact::ActionRow::builder()
+            .title(tr("New Section"))
+            .subtitle(tr("A section break at the cursor"))
+            .build();
+        let new_section_button = gtk::Button::builder()
+            .label(tr("Create"))
+            .valign(gtk::Align::Center)
+            .action_name("win.insert-section-break")
+            .build();
+        new_section.add_suffix(&new_section_button);
         let section_group = compact::Group::builder().title(tr("Section")).build();
+        section_group.add(&new_section);
         for row in background.rows() {
             section_group.add(row);
         }
         section_group.add(&start);
         section_group.add(&continues);
         section_group.add(&first_number);
+        section_group.add(&number_format);
+        section_group.add(&hide_first);
         section_group.add(&first_different);
         section_group.add(&left_right_different);
         section_group.add(&previous_margins);
@@ -340,6 +383,8 @@ impl LayoutGroups {
             start,
             continues,
             first_number,
+            number_format,
+            hide_first,
             first_different,
             left_right_different,
             previous_margins,
@@ -448,7 +493,16 @@ impl LayoutGroups {
                 this.section_changed();
             }
         });
+        let weak = Rc::downgrade(self);
+        self.number_format.connect_selected_notify(move |_| {
+            if let Some(this) = weak.upgrade()
+                && !this.updating.get()
+            {
+                this.section_changed();
+            }
+        });
         for row in [
+            &self.hide_first,
             &self.first_different,
             &self.left_right_different,
             &self.previous_margins,
@@ -613,6 +667,16 @@ impl LayoutGroups {
             self.continues.set_active(continues);
         }
         self.first_number.set_sensitive(!continues);
+        let format = NUMBER_FORMATS
+            .iter()
+            .position(|f| *f == section.number_format)
+            .unwrap_or(0) as u32;
+        if self.number_format.selected() != format {
+            self.number_format.set_selected(format);
+        }
+        if self.hide_first.is_active() != section.hide_first {
+            self.hide_first.set_active(section.hide_first);
+        }
         if self.first_different.is_active() != section.first_page_different {
             self.first_different
                 .set_active(section.first_page_different);
@@ -720,6 +784,11 @@ impl LayoutGroups {
             first_page_different: self.first_different.is_active(),
             left_right_different: self.left_right_different.is_active(),
             own_margins: !self.previous_margins.is_active() && self.previous_margins.is_visible(),
+            number_format: NUMBER_FORMATS
+                .get(self.number_format.selected() as usize)
+                .copied()
+                .unwrap_or_default(),
+            hide_first: self.hide_first.is_active(),
         };
         if section != shown
             && let Some(editor) = (self.editor)()

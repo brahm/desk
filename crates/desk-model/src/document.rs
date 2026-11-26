@@ -286,6 +286,8 @@ impl PageSetup {
                 left_right_different: false,
                 start: SectionStart::AnyPage,
                 own_margins: false,
+                number_format: crate::NumberFormat::Decimal,
+                hide_first: false,
             },
             layout: Layout {
                 columns: Columns::ONE,

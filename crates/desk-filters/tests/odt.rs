@@ -4320,3 +4320,58 @@ fn w098_the_first_section_has_the_background_of_the_master_page_it_names() {
     let read = import(&out).unwrap();
     assert_eq!(read.section_background(None), Some(&Fill::Color(blue)));
 }
+
+#[test]
+fn w094_the_format_of_page_numbers_and_hiding_the_first_headers_round_trip() {
+    use desk_model::{Editor, NumberFormat, Position, Section, Start};
+    let mut editor = Editor::new(Document::new_word_processing());
+    let start = editor.document().start();
+    editor
+        .edit("Setup", |edit| {
+            let at = edit.insert_text(start, "One")?;
+            let at = edit.split_paragraph(at)?;
+            edit.insert_text(at, "Two")?;
+            let mut setup = *edit.document().page_setup();
+            setup.section.number_format = NumberFormat::LowerRoman;
+            edit.set_page_setup(setup)?;
+            edit.set_paragraph_attrs(
+                Position::new(at.paragraph, 0),
+                Position::new(at.paragraph, 0),
+                &ParaAttrs {
+                    start: Some(Some(std::sync::Arc::new(Start::Section(
+                        Section {
+                            hide_first: true,
+                            first_number: Some(1),
+                            ..Section::default()
+                        },
+                        desk_model::Layout::default(),
+                    )))),
+                    ..ParaAttrs::default()
+                },
+            )?;
+            Ok(())
+        })
+        .unwrap();
+    let out = export(editor.document());
+    // Other programs number the pages of each section as it does, from
+    // the page layouts of their master pages.
+    assert_eq!(out.master.num_format.as_deref(), Some("i"));
+    assert_eq!(out.masters.len(), 1);
+    assert_eq!(out.masters[0].1.num_format, None);
+    let bytes = write_odt(editor.document()).unwrap();
+    keep("w094-section-numbers.odt", &bytes);
+    let read = read_odt(&bytes).unwrap();
+    assert_eq!(
+        read.page_setup().section.number_format,
+        NumberFormat::LowerRoman
+    );
+    let (_, second) = read.section_at(1);
+    assert!(second.hide_first);
+    assert_eq!(second.number_format, NumberFormat::Decimal);
+    assert_eq!(second.first_number, Some(1));
+    // A section of another program takes the format of its page layout.
+    let mut other = export(editor.document());
+    other.masters[0].1.num_format = Some("I".to_owned());
+    let read = import(&other).unwrap();
+    assert_eq!(read.section_at(1).1.number_format, NumberFormat::UpperRoman);
+}

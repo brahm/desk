@@ -954,6 +954,16 @@ fn master_page(styles: &Element) -> Option<&Element> {
         .or_else(|| masters.child(STYLE, "master-page"))
 }
 
+/// The properties of the page layout of a master page.
+fn master_layout<'a>(styles: &'a Element, master: &Element) -> Option<&'a Element> {
+    let name = master.attr(STYLE, "page-layout-name")?;
+    styles
+        .child(OFFICE, "automatic-styles")?
+        .children_named(STYLE, "page-layout")
+        .find(|l| l.attr(STYLE, "name") == Some(name))?
+        .child(STYLE, "page-layout-properties")
+}
+
 /// What fills the pages of a master page (W098): the `draw:fill` of its
 /// drawing page style, as ODF 1.3 gives it, or of its page layout, as
 /// older programs did, or the `fo:background-color` of its page layout.
@@ -970,12 +980,7 @@ fn master_background(styles: &Element, master: &Element) -> Option<PageFill> {
             })?
             .child(STYLE, "drawing-page-properties")
     });
-    let layout = master.attr(STYLE, "page-layout-name").and_then(|name| {
-        automatic?
-            .children_named(STYLE, "page-layout")
-            .find(|l| l.attr(STYLE, "name") == Some(name))?
-            .child(STYLE, "page-layout-properties")
-    });
+    let layout = master_layout(styles, master);
     let p = page.filter(|p| p.attr(DRAW, "fill").is_some()).or(layout)?;
     let text = |ns, name| p.attr(ns, name).map(str::to_owned);
     let color = p
@@ -1048,6 +1053,9 @@ fn read_master(styles: &Element, master: &Element) -> MasterPage {
         footer_left: part("footer-left"),
         background: master_background(styles, master),
         match_previous: master.attr(DESK, "match-previous") == Some("true"),
+        num_format: master_layout(styles, master)
+            .and_then(|p| p.attr(STYLE, "num-format"))
+            .map(str::to_owned),
         objects: master
             .elements()
             .filter_map(|e| crate::draw::draw_object(e, &paragraph))
@@ -1147,6 +1155,8 @@ fn section_style(e: &Element) -> Option<SectionStyle> {
         });
         style.first_page_different = flag("first-page-different");
         style.left_right_different = flag("left-right-different");
+        style.page_number_format = p.attr(DESK, "page-number-format").map(str::to_owned);
+        style.hide_first_page = flag("hide-first-page");
     }
     Some(style)
 }

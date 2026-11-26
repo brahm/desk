@@ -141,18 +141,26 @@ pub fn write_streams(document: &TextDocument) -> Streams {
     // page style, as ODF 1.3 does, and has a page layout of its own with
     // the color for older programs (W098).
     let mut layouts = Vec::new();
-    write_page_layout(&mut w, "pm1", &document.page_layout, None);
+    write_page_layout(&mut w, "pm1", &document.page_layout, None, None);
     for (_, master) in &masters {
-        let names = match &master.background {
-            Some(fill) => {
-                let n = layouts.len() + 2;
-                let layout = format!("pm{n}");
-                write_page_layout(&mut w, &layout, &document.page_layout, Some(fill));
+        let names = if master.background.is_some() || master.num_format.is_some() {
+            let n = layouts.len() + 2;
+            let layout = format!("pm{n}");
+            write_page_layout(
+                &mut w,
+                &layout,
+                &document.page_layout,
+                master.background.as_ref(),
+                master.num_format.as_deref(),
+            );
+            let page = master.background.as_ref().map(|fill| {
                 let page = format!("Mdp{n}");
                 write_drawing_page_style(&mut w, &page, fill);
-                (layout, Some(page))
-            }
-            None => ("pm1".to_owned(), None),
+                page
+            });
+            (layout, page)
+        } else {
+            ("pm1".to_owned(), None)
         };
         layouts.push(names);
     }
@@ -542,6 +550,11 @@ fn write_section_style(w: &mut Writer, style: &SectionStyle) {
     }
     flag(w, "desk:first-page-different", style.first_page_different);
     flag(w, "desk:left-right-different", style.left_right_different);
+    w.attr_opt(
+        "desk:page-number-format",
+        style.page_number_format.as_deref(),
+    );
+    flag(w, "desk:hide-first-page", style.hide_first_page);
     if let Some(columns) = &style.columns {
         write_columns(w, columns);
     }
@@ -1136,7 +1149,13 @@ fn write_drawing_page_style(w: &mut Writer, name: &str, fill: &PageFill) {
     w.end().end();
 }
 
-fn write_page_layout(w: &mut Writer, name: &str, page: &PageLayout, fill: Option<&PageFill>) {
+fn write_page_layout(
+    w: &mut Writer,
+    name: &str,
+    page: &PageLayout,
+    fill: Option<&PageFill>,
+    num_format: Option<&str>,
+) {
     w.start("style:page-layout").attr("style:name", name);
     if page.mirrored == Some(true) {
         w.attr("style:page-usage", "mirrored");
@@ -1163,6 +1182,8 @@ fn write_page_layout(w: &mut Writer, name: &str, page: &PageLayout, fill: Option
     if let Some(color) = fill.and_then(|f| f.color) {
         w.attr("fo:background-color", &color.to_string());
     }
+    // How the numbers of its pages are written (W094).
+    w.attr_opt("style:num-format", num_format);
     if let Some(columns) = &page.columns {
         write_columns(w, columns);
     }
