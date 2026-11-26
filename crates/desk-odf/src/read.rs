@@ -1564,6 +1564,7 @@ impl SpanBuilder {
                             },
                             |f| f == "true",
                         ),
+                        datum: e.attr(DESK, "datum").map(str::to_owned),
                     };
                     return self.field(style, e, field);
                 }

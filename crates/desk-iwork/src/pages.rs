@@ -817,17 +817,25 @@ impl<'a> BodyReader<'a, '_> {
                         .and_then(|f| f.child(SF, "table-field"))
                         .and_then(|t| t.attr(SFA, "string"))
                         .map_or_else(|| child.text(), str::to_owned);
+                    // Its text is read as any other, line breaks and
+                    // all, and the field takes the style of that text.
+                    let mut held = Vec::new();
+                    self.inline(child, style, &mut held);
+                    let shown: String = held
+                        .iter()
+                        .filter(|r| r.field.is_none())
+                        .map(|r| r.text.as_str())
+                        .collect();
+                    let inner = held
+                        .first()
+                        .map_or(style, |r| r.style.as_deref())
+                        .map(str::to_owned);
                     let field = Field::Merge {
                         name: name.trim().to_owned(),
                         sender: field.and_then(|f| f.attr(SF, "category")) == Some("from"),
-                        shown: child.text(),
+                        shown,
                     };
-                    // The field takes the style of the text it holds.
-                    let inner = child
-                        .child(SF, "span")
-                        .and_then(|s| s.attr(SF, "style"))
-                        .or(style);
-                    self.push_field(runs, inner, field);
+                    self.push_field(runs, inner.as_deref(), field);
                 }
                 Node::Element(child) if child.name.ns == SF => {
                     let Some(child) = self.guard.deref(self.ids, child) else {

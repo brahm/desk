@@ -1155,6 +1155,9 @@ pub enum Field {
         /// `desk:filled`: whether the text is a datum, not the name of
         /// the column.
         filled: bool,
+        /// `desk:datum`: the datum, when the text shows it otherwise, as
+        /// an address on one line.
+        datum: Option<String>,
     },
     /// `text:bookmark-ref` with `text:reference-format="page"`: the
     /// number of the page of a bookmark, by its name.

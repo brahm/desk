@@ -2945,17 +2945,23 @@ fn model_field(field: &odf::Field, shown: &str) -> Field {
             path: matches!(display.as_str(), "full" | "path"),
             extension: matches!(display.as_str(), "full" | "name-and-extension"),
         },
+        // A field of another source keeps its names, for the program
+        // that wrote it.
         odf::Field::Database {
+            database,
+            table,
             column,
             sender,
             single_line,
             filled,
-            ..
+            datum,
         } => Field::Merge {
             name: column.as_str().into(),
             sender: *sender,
             single_line: *single_line,
-            shown: filled.then(|| shown.into()),
+            shown: filled.then(|| datum.as_deref().unwrap_or(shown).into()),
+            origin: (database != MERGE_DATABASE)
+                .then(|| std::sync::Arc::new((database.clone(), table.clone()))),
         },
         // Notes, page references, objects and comments are read on their
         // own.
@@ -3026,17 +3032,33 @@ fn odf_field(field: &Field) -> (odf::Field, String) {
             sender,
             single_line,
             shown,
-        } => (
-            odf::Field::Database {
-                database: MERGE_DATABASE.to_owned(),
-                table: if *sender { "Sender" } else { "Recipients" }.to_owned(),
-                column: name.to_string(),
-                sender: *sender,
-                single_line: *single_line,
-                filled: shown.is_some(),
-            },
-            field.text(1, 1),
-        ),
+            origin,
+        } => {
+            let (database, table) = origin.as_deref().cloned().unwrap_or_else(|| {
+                let table = if *sender { "Sender" } else { "Recipients" };
+                (MERGE_DATABASE.to_owned(), table.to_owned())
+            });
+            // Without data, the name in angle brackets, as LibreOffice
+            // shows a field of a column; a datum that shows otherwise is
+            // kept whole.
+            let text = match shown {
+                None => format!("<{name}>"),
+                Some(_) => field.text(1, 1),
+            };
+            let datum = shown.as_deref().filter(|d| **d != text).map(str::to_owned);
+            (
+                odf::Field::Database {
+                    database,
+                    table,
+                    column: name.to_string(),
+                    sender: *sender,
+                    single_line: *single_line,
+                    filled: shown.is_some(),
+                    datum,
+                },
+                text,
+            )
+        }
         // The body exports notes, page references and objects on their
         // own.
         Field::NoteMark { .. } | Field::PageOf { .. } | Field::ObjectMark { .. } => (

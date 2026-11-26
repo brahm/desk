@@ -1510,6 +1510,7 @@ fn write_field(w: &mut Writer, field: &Field, shown: &str) {
             sender,
             single_line,
             filled,
+            datum,
         } => {
             w.start("text:database-display")
                 .attr("text:table-name", table)
@@ -1525,6 +1526,7 @@ fn write_field(w: &mut Writer, field: &Field, shown: &str) {
             if *filled {
                 w.attr("desk:filled", "true");
             }
+            w.attr_opt("desk:datum", datum.as_deref());
         }
         Field::PageOf { name } => {
             w.start("text:bookmark-ref")

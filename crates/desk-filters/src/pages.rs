@@ -1438,6 +1438,7 @@ fn model_field(field: &iwork::Field) -> Field {
             single_line: false,
             shown: (!shown.trim().is_empty() && shown.trim() != name)
                 .then(|| shown.as_str().into()),
+            origin: None,
         },
         // The importer numbers the notes.
         iwork::Field::Note { .. }

@@ -89,6 +89,9 @@ pub enum Field {
         /// The datum it shows, once a contact or a record filled it; none
         /// shows its name.
         shown: Option<Arc<str>>,
+        /// The source of data and the table that another program named,
+        /// kept for it; none for the source of the document.
+        origin: Option<Arc<(String, String)>>,
     },
     /// The place of an object in the line of the text, as Pages puts an
     /// inline object (OBJ-01): the object, anchored in the text, is drawn
@@ -150,6 +153,7 @@ impl Field {
             sender: false,
             single_line: false,
             shown: None,
+            origin: None,
         }
     }
 }

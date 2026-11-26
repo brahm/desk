@@ -702,7 +702,7 @@ their own setting says.
 - **Fallback:** the text of the field, the date as it was formatted when
   the document was saved; `text:fixed` says whether it updates.
 
-#### `desk:merge-sender`, `desk:single-line`, `desk:filled`
+#### `desk:merge-sender`, `desk:single-line`, `desk:filled`, `desk:datum`
 
 - **Feature:** the merge fields of a mail merge of Pages 15.4 (W105,
   MAL-01, MAL-07, MAL-08). Each is a `text:database-display` of the
@@ -714,11 +714,15 @@ their own setting says.
   filled from the card of the sender, which stays a field after a merge.
   `desk:single-line`: an address written on one line, its lines joined by
   commas. `desk:filled`: the text of the field is a datum, not its name.
+  `desk:datum` (a string, not `true`): the datum whole, when the text
+  shows it otherwise, as an address of several lines on one line.
 - **Fallback:** the field of ODF, which other programs show with the
-  text Desk wrote, the name of the field or the datum, and fill from a
-  source of their own of the same name. Without `desk:filled`, Desk takes
-  a text that is the name of the column, alone or in angle brackets as
-  LibreOffice writes it, for a field without data.
+  text Desk wrote, the datum or, without data, the name in angle
+  brackets as LibreOffice writes it, and fill from a source of their own
+  of the same name. Without `desk:filled`, Desk takes a text that is the
+  name of the column, alone or in angle brackets, for a field without
+  data. A field another program wrote keeps its source and table when
+  Desk saves it again.
 
 #### Source of a mail merge (settings, not an attribute)
 

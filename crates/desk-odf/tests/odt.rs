@@ -1081,6 +1081,7 @@ fn mal_07_a_merge_field_of_libreoffice_shows_its_column_without_data() {
                 sender: false,
                 single_line: false,
                 filled: false,
+                datum: None,
             },
             Field::Database {
                 database: "Addresses".into(),
@@ -1089,6 +1090,7 @@ fn mal_07_a_merge_field_of_libreoffice_shows_its_column_without_data() {
                 sender: false,
                 single_line: false,
                 filled: true,
+                datum: None,
             },
         ]
     );

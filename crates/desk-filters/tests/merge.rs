@@ -30,18 +30,42 @@ fn mal_01_mal_07_mal_08_merge_fields_and_their_source_round_trip() {
             sender: true,
             single_line: false,
             shown: Some("Desk & Co.".into()),
+            origin: None,
         },
         Field::Merge {
             name: "Home Address".into(),
             sender: false,
             single_line: true,
             shown: None,
+            origin: None,
+        },
+        // Filled, an address on one line keeps its lines.
+        Field::Merge {
+            name: "Work Address".into(),
+            sender: false,
+            single_line: true,
+            shown: Some("1 Infinite Loop\nCupertino CA 95014".into()),
+            origin: None,
+        },
+        // A field of LibreOffice keeps its source and its table.
+        Field::Merge {
+            name: "City".into(),
+            sender: false,
+            single_line: false,
+            shown: None,
+            origin: Some(std::sync::Arc::new(("Addresses".into(), "Clients".into()))),
         },
     ];
     editor
         .edit("Fields", |edit| {
             let mut at = edit.document().start();
-            for (text, field) in [("Dear ", 0), (", from ", 1), (" to ", 2)] {
+            for (text, field) in [
+                ("Dear ", 0),
+                (", from ", 1),
+                (" to ", 2),
+                (" at ", 3),
+                (", ", 4),
+            ] {
                 at = edit.insert_text(at, text)?;
                 let end = edit.insert_text(at, &FIELD_CHARACTER.to_string())?;
                 edit.set_character_attrs(
@@ -80,13 +104,19 @@ fn mal_01_mal_07_mal_08_merge_fields_and_their_source_round_trip() {
     // datum.
     assert!(
         content.contains(
-            r#"text:column-name="First Name" text:database-name="Desk Mail Merge">First Name<"#
+            r#"text:column-name="First Name" text:database-name="Desk Mail Merge">&lt;First Name&gt;<"#
         ),
         "{content}"
     );
     assert!(content.contains(r#"desk:merge-sender="true""#));
     assert!(content.contains(r#"desk:filled="true">Desk &amp; Co.<"#));
     assert!(content.contains(r#"desk:single-line="true""#));
+    assert!(content.contains(
+        r#"desk:datum="1 Infinite Loop&#10;Cupertino CA 95014">1 Infinite Loop, Cupertino CA 95014<"#
+    ));
+    assert!(content.contains(
+        r#"text:table-name="Clients" text:table-type="table" text:column-name="City" text:database-name="Addresses">&lt;City&gt;<"#
+    ));
     let read = read_odt(&bytes).unwrap();
     assert_eq!(fields(&read), merge);
     assert_eq!(
@@ -124,6 +154,7 @@ fn mal_01_an_address_on_one_line_and_a_field_without_data() {
         sender: false,
         single_line: true,
         shown: Some("1 Infinite Loop\nCupertino CA 95014\n".into()),
+        origin: None,
     };
     assert_eq!(address.text(1, 1), "1 Infinite Loop, Cupertino CA 95014");
     assert_eq!(Field::merge("Last Name").text(1, 1), "Last Name");

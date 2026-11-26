@@ -32,17 +32,15 @@ use crate::tab_stops;
 /// What separates the paragraphs of a header or footer in its row.
 const PARAGRAPHS: &str = " ¶ ";
 
-/// The text of each field in a row.
-fn token(field: &Field) -> &'static str {
+/// The text of each field in a row; a merge field by its name (W105).
+fn token(field: &Field) -> String {
     match field {
-        Field::PageNumber { .. } => "{page}",
-        Field::PageCount { .. } => "{pages}",
-        Field::DateTime { .. } => "{date}",
-        Field::FileName { .. } => "{file}",
-        Field::NoteMark { .. }
-        | Field::PageOf { .. }
-        | Field::ObjectMark { .. }
-        | Field::Merge { .. } => "",
+        Field::PageNumber { .. } => "{page}".into(),
+        Field::PageCount { .. } => "{pages}".into(),
+        Field::DateTime { .. } => "{date}".into(),
+        Field::FileName { .. } => "{file}".into(),
+        Field::Merge { name, .. } => format!("{{{name}}}"),
+        Field::NoteMark { .. } | Field::PageOf { .. } | Field::ObjectMark { .. } => String::new(),
     }
 }
 
@@ -55,7 +53,7 @@ pub fn text(paragraphs: &[Paragraph]) -> String {
             match &run.attrs.field {
                 Some(Some(field)) => {
                     for _ in run.text().chars() {
-                        line.push_str(token(field));
+                        line.push_str(&token(field));
                     }
                 }
                 _ => line.push_str(&run.text().replace(desk_model::LINE_BREAK, PARAGRAPHS)),
@@ -110,12 +108,19 @@ pub fn paragraphs(
     // Numbers of pages keep their format.
     let page = kept("{page}").unwrap_or(Field::PAGE_NUMBER);
     let pages = kept("{pages}").unwrap_or(Field::PAGE_COUNT);
-    let fields = [
-        ("{page}", page),
-        ("{pages}", pages),
-        ("{date}", date),
-        ("{file}", file),
+    let mut fields: Vec<(String, Field)> = vec![
+        ("{page}".into(), page),
+        ("{pages}".into(), pages),
+        ("{date}".into(), date),
+        ("{file}".into(), file),
     ];
+    // The merge fields that were there stay, by their names.
+    for field in runs.iter().filter_map(|r| r.attrs.field.clone().flatten()) {
+        let name = token(&field);
+        if matches!(field, Field::Merge { .. }) && !fields.iter().any(|(t, _)| *t == name) {
+            fields.push((name, field));
+        }
+    }
     let mut out = Vec::new();
     for piece in text.split('¶') {
         let piece = piece.strip_prefix(' ').unwrap_or(piece);
@@ -125,7 +130,7 @@ pub fn paragraphs(
         while !rest.is_empty() {
             let next = fields
                 .iter()
-                .filter_map(|(t, f)| rest.find(t).map(|at| (at, *t, f)))
+                .filter_map(|(t, f)| rest.find(t.as_str()).map(|at| (at, t.as_str(), f)))
                 .min_by_key(|(at, _, _)| *at);
             let Some((at, name, field)) = next else {
                 runs.push(Run::with_attrs(rest, base.0, base.1.clone()));
@@ -389,5 +394,53 @@ mod tests {
             })
             .unwrap();
         assert!(editor.document().headers_footers().get(place).is_empty());
+    }
+
+    #[test]
+    fn mal_01_a_merge_field_of_a_header_stays_when_its_row_is_edited() {
+        let mut editor = Editor::new(Document::new_word_processing());
+        let place = MarginPlace::new(MarginKind::Header, MarginPages::Default);
+        let company = Field::Merge {
+            name: "Company".into(),
+            sender: true,
+            single_line: false,
+            shown: Some("Desk".into()),
+            origin: None,
+        };
+        editor
+            .edit("Header", |edit| {
+                let paragraph = Paragraph::from_runs(
+                    edit.new_id(),
+                    edit.document().styles().default_paragraph(),
+                    desk_model::ParaAttrs::default(),
+                    [
+                        Run::with_attrs(
+                            &FIELD_CHARACTER.to_string(),
+                            None,
+                            CharAttrs {
+                                field: Some(Some(company.clone())),
+                                ..CharAttrs::default()
+                            },
+                        ),
+                        Run::new(" Brasil"),
+                    ],
+                )?;
+                edit.set_header_footer(place, vec![paragraph])
+            })
+            .unwrap();
+        let header = editor.document().headers_footers().get(place).to_vec();
+        assert_eq!(text(&header), "{Company} Brasil");
+        editor
+            .edit("Header", |edit| {
+                let paragraphs = paragraphs(edit, "{Company} Portugal", &header, "")?;
+                edit.set_header_footer(place, paragraphs)
+            })
+            .unwrap();
+        let header = editor.document().headers_footers().get(place).to_vec();
+        assert_eq!(header[0].text(), "\u{fffc} Portugal");
+        assert_eq!(
+            header[0].runs().next().unwrap().attrs.field,
+            Some(Some(company))
+        );
     }
 }

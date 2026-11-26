@@ -1401,6 +1401,7 @@ fn est_12_doc_22_headers_of_a_template_with_contacts_are_read_as_pages_shows_the
             sender: true,
             single_line: false,
             shown: Some("DM9DDB".into()),
+            origin: None,
         }
     );
     assert_eq!(field.text(1, 1), "DM9DDB");
