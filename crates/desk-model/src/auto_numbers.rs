@@ -9,7 +9,7 @@ use std::sync::Arc;
 
 use crate::error::ModelError;
 use crate::format::{Alignment, ParaAttrs};
-use crate::header::{MarginKind, MarginPages, MarginPlace};
+use crate::header::{MarginField, MarginKind, MarginPages, MarginPlace};
 use crate::id::NodeId;
 use crate::section::{Section, Start};
 use crate::text::{Paragraph, Position};
@@ -128,16 +128,25 @@ impl Edit {
                     MarginPages::Left,
                 ),
             ] {
-                let place = MarginPlace::new(other, pages);
-                let existing = self.document().section_headers_footers(key).get(place);
-                if turned_on && existing.is_empty() {
-                    let default = self
-                        .document()
+                // Each of its three fields (W096).
+                let fields = MarginPlace::new(other, pages).fields();
+                let defaults = MarginPlace::new(other, MarginPages::Default).fields();
+                let empty = fields.iter().all(|&f| {
+                    self.document()
                         .section_headers_footers(key)
-                        .get(MarginPlace::new(other, MarginPages::Default))
-                        .to_vec();
-                    let copy = self.copy_paragraphs(&default, None)?;
-                    self.set_section_header_footer(key, place, copy)?;
+                        .get(f)
+                        .is_empty()
+                });
+                if turned_on && empty {
+                    for (place, from) in fields.into_iter().zip(defaults) {
+                        let default = self
+                            .document()
+                            .section_headers_footers(key)
+                            .get(from)
+                            .to_vec();
+                        let copy = self.copy_paragraphs(&default, None)?;
+                        self.set_section_header_footer(key, place, copy)?;
+                    }
                 }
             }
             self.set_section_of(index, changed)?;
@@ -158,6 +167,21 @@ impl Edit {
                 Vec::new()
             };
             self.set_section_header_footer(key, place(MarginPages::First), first)?;
+            // The numbers are the whole header or footer, as in Pages '09:
+            // its centre and right fields are emptied (W096).
+            for pages in [MarginPages::Default, MarginPages::First, MarginPages::Left] {
+                for field in [MarginField::Centre, MarginField::Right] {
+                    let at = place(pages).with_field(field);
+                    if !self
+                        .document()
+                        .section_headers_footers(key)
+                        .get(at)
+                        .is_empty()
+                    {
+                        self.set_section_header_footer(key, at, Vec::new())?;
+                    }
+                }
+            }
         }
         let mut setup = *self.document().page_setup();
         match numbers.kind {

@@ -114,6 +114,23 @@ fn est_27_auto_page_numbers_fill_the_footers_of_every_section() {
                 [Run::new("Title")],
             )?;
             edit.set_header_footer(header, vec![title])?;
+            // A right field in the header, and a centre one in the
+            // footer, which the numbers replace (W096).
+            for (place, text) in [
+                (header.with_field(desk_model::MarginField::Right), "Draft"),
+                (
+                    footer(MarginPages::Default).with_field(desk_model::MarginField::Centre),
+                    "Old",
+                ),
+            ] {
+                let paragraph = Paragraph::from_runs(
+                    edit.new_id(),
+                    style,
+                    ParaAttrs::default(),
+                    [Run::new(text)],
+                )?;
+                edit.set_header_footer(place, vec![paragraph])?;
+            }
             Ok(at.paragraph)
         })
         .unwrap();
@@ -160,6 +177,11 @@ fn est_27_auto_page_numbers_fill_the_footers_of_every_section() {
     let text = first.get(MarginPlace::new(MarginKind::Header, MarginPages::First));
     assert_eq!(text.len(), 1);
     assert_eq!(text[0].text(), "Title");
+    let right = MarginPlace::new(MarginKind::Header, MarginPages::First)
+        .with_field(desk_model::MarginField::Right);
+    assert_eq!(first.get(right)[0].text(), "Draft");
+    let centre = footer(MarginPages::Default).with_field(desk_model::MarginField::Centre);
+    assert!(first.get(centre).is_empty());
     for index in [0, 1] {
         let section = document.section_at(index).1;
         assert!(section.first_page_different && section.left_right_different);

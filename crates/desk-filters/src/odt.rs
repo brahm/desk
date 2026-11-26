@@ -1749,6 +1749,9 @@ fn import_text(source: &odf::TextDocument) -> Result<Document, FilterError> {
             parts.push((Some(*id), page));
         }
     }
+    // Whether the first section is as other programs make it, before the
+    // headers and footers of first and left pages change it.
+    let default_section = setup.section == Section::default();
     for &(section, master) in &parts {
         for (place, part) in [
             (MarginPages::Default, &master.header, MarginKind::Header),
@@ -1813,7 +1816,7 @@ fn import_text(source: &odf::TextDocument) -> Result<Document, FilterError> {
             }
             // Other programs show the first and left ones whenever they
             // are there; Desk, when the section asks for them.
-            if section.is_none() && setup.section == Section::default() {
+            if section.is_none() && default_section {
                 match place.pages {
                     MarginPages::First => setup.section.first_page_different = true,
                     MarginPages::Left => setup.section.left_right_different = true,
@@ -3501,7 +3504,7 @@ fn export_margins(
             }
         }
         let [mut left, centre, right] = fields;
-        if left.is_empty() {
+        if left.is_empty() && centre.is_empty() && right.is_empty() {
             left.push(odf::Paragraph {
                 style: Some(names[&styles.default_paragraph()].clone()),
                 ..odf::Paragraph::default()

@@ -429,6 +429,24 @@ pub fn margin_lines(
     paragraphs: &[Paragraph],
     system: &mut TextSystem,
 ) -> Vec<PlacedLine> {
+    let section = margin_of_page(layout, index, place.kind).1;
+    let split = document.section_headers_footers(section).is_split(place);
+    margin_lines_split(document, layout, index, place, paragraphs, split, system)
+}
+
+/// The lines of a field of a header or footer, as [`margin_lines`], with
+/// the header or footer split in thirds or not, whatever its fields hold:
+/// to lay out its left field in its third while another is being typed
+/// (W096).
+pub fn margin_lines_split(
+    document: &Document,
+    layout: &DocumentLayout,
+    index: usize,
+    place: MarginPlace,
+    paragraphs: &[Paragraph],
+    split: bool,
+    system: &mut TextSystem,
+) -> Vec<PlacedLine> {
     let kind = place.kind;
     let setup = layout.setup;
     let height = setup.height.to_pt() as f32;
@@ -443,12 +461,7 @@ pub fn margin_lines(
         hidden: crate::hidden_changes(document),
     };
     let width = (setup.width.to_pt() as f32 - page.margins.0 - page.margins.1).max(1.0);
-    let section = margin_of_page(layout, index, kind).1;
-    let (left, width) = field_span(
-        place,
-        document.section_headers_footers(section).is_split(place),
-        width,
-    );
+    let (left, width) = field_span(place, split, width);
     let (mut lines, _) = margin_block(document, paragraphs, width, &values, system);
     for line in &mut lines {
         line.origin.0 = page.margins.0 + left;

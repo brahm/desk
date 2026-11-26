@@ -88,20 +88,39 @@ pub fn story_at(layout: &DocumentLayout, page: usize, x: f64, y: f64) -> Option<
         return None;
     };
     let (margin, section) = desk_layout::margin_of_page(layout, page, kind);
-    // The field under the pointer (W096): the free header of Pages '09,
-    // as wide as the text, takes every click while it is alone with
-    // text; otherwise the third of the width that holds it.
+    // The field under the pointer (W096): a third of the width of the
+    // text each. The free header of Pages '09, the left field alone with
+    // text, as wide as the text, takes the clicks on the thirds that its
+    // text reaches; the others open their field.
     let shown = |field| p.margin_places.contains(&margin.with_field(field));
     let free =
         shown(MarginField::Left) && !shown(MarginField::Centre) && !shown(MarginField::Right);
-    let place = if free {
+    let width = layout.setup.width.to_pt() - f64::from(p.margins.0 + p.margins.1);
+    let third = (width / 3.0).max(1.0);
+    let at = ((x - f64::from(p.margins.0)) / third)
+        .floor()
+        .clamp(0.0, 2.0) as usize;
+    let (from, to) = (
+        f64::from(p.margins.0) + third * at as f64,
+        f64::from(p.margins.0) + third * (at + 1) as f64,
+    );
+    let reached = p
+        .margin_lines
+        .iter()
+        .zip(&p.margin_places)
+        .filter(|(_, place)| **place == margin)
+        .any(|(line, _)| {
+            let xs = line
+                .line
+                .carets
+                .iter()
+                .map(|(_, x)| f64::from(line.origin.0 + *x));
+            let (min, max) = xs.fold((f64::MAX, f64::MIN), |(a, b), x| (a.min(x), b.max(x)));
+            min <= to && max >= from
+        });
+    let place = if free && (at == 0 || reached) {
         margin
     } else {
-        let width = layout.setup.width.to_pt() - f64::from(p.margins.0 + p.margins.1);
-        let third = (width / 3.0).max(1.0);
-        let at = ((x - f64::from(p.margins.0)) / third)
-            .floor()
-            .clamp(0.0, 2.0) as usize;
         margin.with_field(MarginField::ALL[at])
     };
     Some(Story::Margin { section, place })
@@ -170,13 +189,44 @@ fn story_layout_on(
                 }
             }
         }
-        Story::Margin { place, .. } => {
+        Story::Margin { place, section } => {
             let paragraphs: Vec<Paragraph> = copy.body().iter().cloned().collect();
+            // A centre or right field typed beside a free header puts the
+            // left field in its third (W096).
+            let margins = copy.section_headers_footers(section);
+            let free = place.field != MarginField::Left && !margins.is_split(place);
+            let left = place.with_field(MarginField::Left);
             for &page in pages.iter().filter(|&&p| p < main.pages.len()) {
                 let lines = crate::with_text_system(|system| {
                     desk_layout::margin_lines(copy, main, page, place, &paragraphs, system)
                 });
                 layout.pages[page].lines = lines;
+                if free {
+                    let relaid = crate::with_text_system(|system| {
+                        desk_layout::margin_lines_split(
+                            copy,
+                            main,
+                            page,
+                            left,
+                            margins.get(left),
+                            true,
+                            system,
+                        )
+                    });
+                    let on = &mut layout.pages[page];
+                    let mut kept = Vec::new();
+                    let mut places = Vec::new();
+                    for (line, at) in on.margin_lines.drain(..).zip(on.margin_places.drain(..)) {
+                        if at != left {
+                            kept.push(line);
+                            places.push(at);
+                        }
+                    }
+                    places.extend(relaid.iter().map(|_| left));
+                    kept.extend(relaid);
+                    on.margin_lines = kept;
+                    on.margin_places = places;
+                }
             }
         }
         Story::TextBox(id) => {
@@ -746,7 +796,8 @@ mod tests {
         let edited = story_layout(&layout, story, 0, &copy);
         let line = &edited.pages[0].lines[0];
         assert!(line.origin.0 >= (left + width * 2.0 / 3.0 - 0.5) as f32);
-        // A free header, the left field alone with text, takes every click.
+        // A free header, the left field alone with text, takes the clicks
+        // on the thirds its text reaches; the others open their field.
         let style = document.styles().default_paragraph();
         document
             .transact("Header", |edit| {
@@ -755,6 +806,21 @@ mod tests {
                     style,
                     ParaAttrs::default(),
                     [Run::new("Title")],
+                )?;
+                edit.set_header_footer(header, vec![paragraph])
+            })
+            .unwrap();
+        let layout = crate::lay_out(&document);
+        assert_eq!(at(&layout, left + 10.0), MarginField::Left);
+        assert_eq!(at(&layout, left + width - 10.0), MarginField::Right);
+        let long = ["Title"; 30].join(" ");
+        document
+            .transact("Header", |edit| {
+                let paragraph = Paragraph::from_runs(
+                    edit.new_id(),
+                    style,
+                    ParaAttrs::default(),
+                    [Run::new(&long)],
                 )?;
                 edit.set_header_footer(header, vec![paragraph])
             })
