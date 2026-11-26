@@ -239,6 +239,7 @@ The code is one Cargo workspace, with one crate per directory in
 | `desk-table` | Table model shared by the apps |
 | `desk-formula` | Formula parser, dependency graph and functions |
 | `desk-chart` | Chart model and drawing |
+| `desk-math` | Equations: LaTeX to MathML, and the layout of MathML |
 | `desk-anim` | Slide transitions and builds |
 | `desk-contacts` | Contacts for merge fields |
 | `desk-odf` | OpenDocument package reader and writer, with the Desk extensions |

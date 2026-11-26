@@ -56,6 +56,8 @@ pub struct PlacedObject {
     pub table: Option<Arc<crate::TableLayout>>,
     /// A chart laid out, from the top left corner of the frame (GRF-01).
     pub chart: Option<Arc<crate::ChartLayout>>,
+    /// An equation laid out, scaled into the frame (W104).
+    pub equation: Option<Arc<crate::EquationLayout>>,
 }
 
 impl PlacedObject {
@@ -82,6 +84,7 @@ impl PlacedObject {
             wraps: Arc::from([]),
             table: None,
             chart: None,
+            equation: None,
         }
     }
 
@@ -918,6 +921,11 @@ fn lay_out_text(document: &Document, placed: &mut PlacedObject, system: &mut Tex
                 &locale,
             );
             placed.chart = Some(Arc::new(laid));
+            return;
+        }
+        ObjectKind::Equation(equation) => {
+            let laid = crate::lay_out_equation(document, equation, system);
+            placed.equation = Some(Arc::new(laid));
             return;
         }
         _ => {}

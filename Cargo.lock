@@ -279,9 +279,14 @@ dependencies = [
 name = "desk-layout"
 version = "0.1.0"
 dependencies = [
+ "desk-math",
  "desk-model",
  "desk-text",
 ]
+
+[[package]]
+name = "desk-math"
+version = "0.1.0"
 
 [[package]]
 name = "desk-model"
@@ -308,6 +313,7 @@ version = "0.1.0"
 dependencies = [
  "cairo-rs",
  "desk-layout",
+ "desk-math",
  "desk-model",
  "desk-text",
  "freetype-rs",

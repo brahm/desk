@@ -2924,6 +2924,19 @@ paragraph, and objects on a second page.
   a file brought goes on to the next one.
 - *Next:* drawing LaTeX and MathML, then the editor in the window.
 
+### 26 November: equations drawn from LaTeX and MathML (step 10 of W3, second part)
+
+- A new crate, `desk-math`, with no other dependency: the LaTeX of
+  equations turned into MathML (letters, numbers and operators,
+  fractions, roots, scripts, large operators with their limits, fences
+  that grow, accents, fonts of letters, text, matrices and cases), and
+  MathML laid out after the rules of TeX in a simpler form.
+- `desk-layout` sets the text of an equation in Liberation Serif, and
+  `desk-render` draws it scaled into its frame, on the page and in PDF.
+- A fuzz target, `equation`, for LaTeX and MathML.
+- *Next:* the editor in the window, where an equation is written and
+  placed in the line or on the page.
+
 ## Decisions, with their reasons and consequences
 
 Ids `D-nnn` and `R-nnn` are those of [decisions.md](decisions.md).

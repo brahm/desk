@@ -22,6 +22,7 @@
 //! println!("{} pages", layout.pages.len());
 //! ```
 
+mod equations;
 mod joins;
 mod notes;
 mod objects;
@@ -47,6 +48,9 @@ pub(crate) fn hidden_changes(
     (!hidden.is_empty()).then(|| std::sync::Arc::new(hidden))
 }
 
+pub use equations::{
+    EQUATION_FONT, EQUATION_SIZE, EquationLayout, equation_size, lay_out_equation,
+};
 pub use objects::{PlacedObject, flow_text_boxes, object_at, place_object_text, text_box_lines};
 pub use outline::{outline_document, paginate_outline, paginate_view};
 pub use screen::{SCREEN_MARGIN, paginate_screen, screen_document};

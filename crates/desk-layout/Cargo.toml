@@ -9,6 +9,7 @@ repository.workspace = true
 publish.workspace = true
 
 [dependencies]
+desk-math.workspace = true
 desk-model.workspace = true
 desk-text.workspace = true
 
