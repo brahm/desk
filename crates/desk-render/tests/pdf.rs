@@ -1367,10 +1367,20 @@ fn w110_sharpness_and_the_histogram_of_a_picture() {
     let mut png = Vec::new();
     source.write_to_png(&mut png).unwrap();
     let picture = Picture::from_png(png).unwrap();
-    let histogram = desk_render::histogram(&picture).unwrap();
+    let histogram = desk_render::histogram(&picture, Adjustments::default()).unwrap();
     assert_eq!(histogram.count(), 32);
     assert_eq!(histogram.luma[0], 16);
     assert_eq!(histogram.luma[153], 16);
+    // With the levels, as Enhance sees the picture: the gray becomes white.
+    let leveled = desk_render::histogram(
+        &picture,
+        Adjustments {
+            white: 153,
+            ..Adjustments::default()
+        },
+    )
+    .unwrap();
+    assert_eq!(leveled.luma[255], 16);
     let gray = |surface: &mut cairo::ImageSurface, x: usize| {
         let stride = surface.stride() as usize;
         surface.data().unwrap()[stride + x * 4]

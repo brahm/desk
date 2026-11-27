@@ -3208,9 +3208,9 @@ paragraph, and objects on a second page.
   of the picture, and Reset. Adjust Image… opens the full window of
   Pages '09, kept by D-003, now with the levels over the histogram,
   Auto Levels and the sharpness it lacked.
-- The sharpness and the levels are kept in ODF as three more numbers of
-  `desk:image-adjust`, written only when set, so that the files read the
-  same in older versions of Desk.
+- The sharpness and the levels are kept in ODF in two new attributes,
+  `desk:image-sharpness` and `desk:image-levels`, so that older versions
+  of Desk still read the six adjustments of before.
 - Left for the session on the Mac of step 13, still in W4: Auto Crop,
   the names under which Pages '09 keeps the sharpness and the levels,
   and the checks of W107 and W109.

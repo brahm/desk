@@ -262,8 +262,10 @@ impl Adjustments {
         let unit = |v: i8| f32::from(v) / 100.0;
         // The levels first, as the histogram of the window shows the
         // picture as it is.
-        let low = f32::from(self.black) / 255.0;
-        let high = f32::from(self.white.max(self.black.saturating_add(1))) / 255.0;
+        // A black of 255 would leave no room for white.
+        let black = self.black.min(254);
+        let low = f32::from(black) / 255.0;
+        let high = f32::from(self.white.max(black + 1)) / 255.0;
         let level = |v: f32| ((v - low) / (high - low)).clamp(0.0, 1.0);
         let (r, g, b) = (level(r), level(g), level(b));
         let exposure = 2f32.powf(unit(self.exposure) * 2.0);
@@ -1313,6 +1315,12 @@ mod tests {
             ..Adjustments::default()
         };
         assert!(crossed.apply([0.9, 0.5, 0.0]).iter().all(|v| v.is_finite()));
+        let all_black = Adjustments {
+            black: 255,
+            white: 255,
+            ..Adjustments::default()
+        };
+        assert_eq!(all_black.apply([1.0, 0.5, 0.0]), [1.0, 0.0, 0.0]);
         // The sharpness alone changes no pixel by itself.
         let sharp = Adjustments {
             sharpness: 50,

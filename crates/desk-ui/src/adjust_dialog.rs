@@ -142,7 +142,7 @@ pub fn open(
     adjust: Adjustments,
     apply: impl Fn(Adjustments) + 'static,
 ) {
-    let histogram = Rc::new(desk_render::histogram(picture));
+    let histogram = Rc::new(desk_render::histogram(picture, Adjustments::default()));
 
     let levels = compact::Group::builder().title(tr("Levels")).build();
     let area = gtk::DrawingArea::builder()

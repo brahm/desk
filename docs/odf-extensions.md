@@ -113,12 +113,24 @@ These sit on the `style:graphic-properties` of the graphic style of a
 - **Feature:** Adjust Image (OBJ-07).
 - **Value:** six whole numbers from -100 to 100 separated by spaces:
   brightness, contrast, saturation, exposure, temperature and tint. Zero is
-  no change. Three more follow when any is set (W110): the sharpness, from
-  -100 to 100, and the levels, the values from 0 to 255 that become black
-  and white (0 and 255 are no change). Any other count of numbers is
-  ignored.
+  no change. Any other count of numbers is ignored.
 - **Fallback:** `draw:luminance` and `draw:contrast` carry the brightness
   and the contrast; the other four are lost to other programs.
+
+#### `desk:image-sharpness`
+
+- **Feature:** the sharpness of Adjust Image (OBJ-07, W110).
+- **Value:** a whole number from -100 to 100: sharper above zero, softer
+  below. Absent is zero.
+- **Fallback:** none; other programs show the picture as it is.
+
+#### `desk:image-levels`
+
+- **Feature:** the levels of Adjust Image (OBJ-07, W110).
+- **Value:** two whole numbers separated by a space: the value, from 0 to
+  254, that becomes black, and the one above it, up to 255, that becomes
+  white. Absent is `0 255`, no change.
+- **Fallback:** none; other programs show the picture as it is.
 
 #### `desk:instant-alpha`
 

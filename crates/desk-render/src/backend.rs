@@ -961,34 +961,52 @@ pub fn adjusted_surface(
 fn sharpen(data: &mut [u8], w: usize, h: usize, stride: usize, sharpness: i8) {
     let amount = f32::from(sharpness) / 100.0 * if sharpness > 0 { 1.5 } else { 1.0 };
     let source = data.to_vec();
-    let at =
-        |x: usize, y: usize, c: usize| source.get(y * stride + x * 4 + c).copied().unwrap_or(0);
+    // Premultiplied ARGB in a word of the machine's order.
+    let word = |x: usize, y: usize| {
+        source
+            .get(y * stride + x * 4..)
+            .and_then(|p| p.get(..4))
+            .map_or(0, |p| u32::from_ne_bytes([p[0], p[1], p[2], p[3]]))
+    };
+    let channel = |word: u32, shift: u32| ((word >> shift) & 0xFF) as f32;
     for y in 0..h {
         for x in 0..w {
-            let alpha = f32::from(at(x, y, 3));
-            for c in 0..3 {
+            let own = word(x, y);
+            let alpha = channel(own, 24);
+            let mut out = own & 0xFF00_0000;
+            for shift in [16, 8, 0] {
                 let mut sum = 0.0;
                 let mut count = 0.0;
                 for ny in y.saturating_sub(1)..(y + 2).min(h) {
                     for nx in x.saturating_sub(1)..(x + 2).min(w) {
-                        sum += f32::from(at(nx, ny, c));
+                        sum += channel(word(nx, ny), shift);
                         count += 1.0;
                     }
                 }
-                let value = f32::from(at(x, y, c));
-                let out = value + amount * (value - sum / count);
-                if let Some(byte) = data.get_mut(y * stride + x * 4 + c) {
-                    // Premultiplied: no channel above its opacity.
-                    *byte = out.round().clamp(0.0, alpha) as u8;
-                }
+                let value = channel(own, shift);
+                // Premultiplied: no channel above its opacity.
+                let sharp = (value + amount * (value - sum / count))
+                    .round()
+                    .clamp(0.0, alpha);
+                out |= (sharp as u32) << shift;
+            }
+            if let Some(p) = data
+                .get_mut(y * stride + x * 4..)
+                .and_then(|p| p.get_mut(..4))
+            {
+                p.copy_from_slice(&out.to_ne_bytes());
             }
         }
     }
 }
 
-/// The histogram of a picture as it is, from at most about a quarter of
-/// a million of its pixels, for the levels and for Enhance (W110).
-pub fn histogram(picture: &desk_model::Picture) -> Option<desk_model::Histogram> {
+/// The histogram of a picture with the colors of `adjust` applied, from
+/// at most about a quarter of a million of its pixels: as it is for the
+/// levels, and as the other adjustments leave it for Enhance (W110).
+pub fn histogram(
+    picture: &desk_model::Picture,
+    adjust: desk_model::Adjustments,
+) -> Option<desk_model::Histogram> {
     let mut surface = picture_surface(picture)?;
     let (w, h) = (surface.width() as usize, surface.height() as usize);
     let stride = surface.stride() as usize;
@@ -1005,7 +1023,13 @@ pub fn histogram(picture: &desk_model::Picture) -> Option<desk_model::Histogram>
                 continue;
             }
             let straight = |shift: u32| (((word >> shift) & 0xFF) * 255 / a).min(255) as u8;
-            histogram.add([straight(16), straight(8), straight(0)]);
+            let rgb = [straight(16), straight(8), straight(0)];
+            if adjust.changes_colors() {
+                let adjusted = adjust.apply(rgb.map(|v| f32::from(v) / 255.0));
+                histogram.add(adjusted.map(|v| (v * 255.0).round().clamp(0.0, 255.0) as u8));
+            } else {
+                histogram.add(rgb);
+            }
         }
     }
     Some(histogram)

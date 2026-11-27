@@ -335,10 +335,17 @@ impl PictureGroup {
         let enhance_editor = editor.clone();
         this.enhance.connect_clicked(move |_| {
             let Some(this) = weak.upgrade() else { return };
-            let Some((picture, _)) = this.current.borrow().clone() else {
+            let Some((picture, adjust)) = this.current.borrow().clone() else {
                 return;
             };
-            let Some(histogram) = desk_render::histogram(&picture) else {
+            // The picture as the other adjustments leave it, so that
+            // Enhance adds to the levels, brightness and contrast set.
+            let others = Adjustments {
+                exposure: 0,
+                saturation: 0,
+                ..adjust
+            };
+            let Some(histogram) = desk_render::histogram(&picture, others) else {
                 return;
             };
             if let Some(editor) = enhance_editor() {
