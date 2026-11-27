@@ -28,13 +28,31 @@ const CURVE_PIECES: usize = 32;
 /// How many points a line takes, at most, along every part of its path.
 const MAX_SAMPLES: f32 = 20_000.0;
 
+/// Which way the nib of a chisel pen lies on the page: at 45 degrees,
+/// from the bottom left to the top right, the y axis going down.
+pub const NIB: (f32, f32) = (
+    std::f32::consts::FRAC_1_SQRT_2,
+    -std::f32::consts::FRAC_1_SQRT_2,
+);
+
 /// The outline of the line of a brush `width` wide along a path, a shape
 /// to fill with the nonzero rule. Empty when there is nothing to draw.
-pub fn outline(path: &[PathOp], width: f32, brush: Brush) -> Vec<PathOp> {
+///
+/// `nib` is which way the nib of a chisel pen lies in the coordinates of
+/// the path, `(1, -1)` over the square root of 2 where they are those of
+/// the page, so that a turned or flipped object keeps the nib as a hand
+/// holds it.
+pub fn outline(path: &[PathOp], width: f32, brush: Brush, nib: (f32, f32)) -> Vec<PathOp> {
     let mut out = Vec::new();
     if !(width.is_finite() && width > 0.0) {
         return out;
     }
+    let norm = nib.0.hypot(nib.1);
+    let nib = if norm.is_finite() && norm > 1e-6 {
+        (nib.0 / norm, nib.1 / norm)
+    } else {
+        NIB
+    };
     for (part, line) in polylines(path).iter().enumerate() {
         let samples = sample(line, width);
         if samples.len() < 2 {
@@ -48,7 +66,7 @@ pub fn outline(path: &[PathOp], width: f32, brush: Brush) -> Vec<PathOp> {
                 // A closed line has no ends to taper.
                 let length = |total: f32| if line.closed { f32::INFINITY } else { total };
                 let profile =
-                    |s: &Sample, total: f32| profile(brush, s, length(total), width, seed);
+                    |s: &Sample, total: f32| profile(brush, s, length(total), width, seed, nib);
                 let total = samples.last().map_or(0.0, |s| s.at);
                 band(&samples, total, line.closed, &profile, &mut out);
             }
@@ -121,12 +139,16 @@ fn polylines(path: &[PathOp]) -> Vec<Polyline> {
                 }
             }
             PathOp::Close => {
-                if let (Some(&first), Some(&last)) = (current.first(), current.last())
+                let first = current.first().copied();
+                if let (Some(first), Some(&last)) = (first, current.last())
                     && distance(first, last) > 1e-3
                 {
                     current.push(first);
                 }
                 flush(&mut current, true);
+                // As in Cairo, what follows without a move starts where
+                // the closed part started.
+                current.extend(first);
             }
         }
     }
@@ -148,6 +170,9 @@ struct Sample {
     /// The direction of the path, a unit vector.
     dx: f32,
     dy: f32,
+    /// How much farther the edges go out at a corner, so that the line
+    /// keeps its width around it: 1 along a straight stretch.
+    reach: f32,
 }
 
 /// Points evenly along a part of a path, a quarter of the width apart,
@@ -196,6 +221,7 @@ fn sample(line: &Polyline, width: f32) -> Vec<Sample> {
             };
             let (x0, y0, _) = out[before];
             let (x1, y1, _) = out[after];
+            let (x, y, at) = out[i];
             let (mut dx, mut dy) = (x1 - x0, y1 - y0);
             let norm = dx.hypot(dy);
             if norm > 1e-6 {
@@ -204,8 +230,24 @@ fn sample(line: &Polyline, width: f32) -> Vec<Sample> {
             } else {
                 (dx, dy) = (1.0, 0.0);
             }
-            let (x, y, at) = out[i];
-            Sample { x, y, at, dx, dy }
+            // At a corner the direction lies between the two sides; the
+            // edges reach out as a miter does, up to twice as far.
+            let (sx, sy) = (x - x0, y - y0);
+            let side = sx.hypot(sy);
+            let reach = if side > 1e-6 {
+                let cos = (sx * dx + sy * dy) / side;
+                1.0 / cos.max(0.5)
+            } else {
+                1.0
+            };
+            Sample {
+                x,
+                y,
+                at,
+                dx,
+                dy,
+                reach,
+            }
         })
         .collect()
 }
@@ -234,8 +276,15 @@ fn noise(at: f32, scale: f32, seed: u32) -> f32 {
 /// How far each edge of the line is from the path at a point, to its
 /// left and to its right, 0 for none where the ink leaves a gap. The
 /// length is infinite for a closed line.
-fn profile(brush: Brush, s: &Sample, length: f32, width: f32, seed: u32) -> (f32, f32) {
-    let half = width / 2.0;
+fn profile(
+    brush: Brush,
+    s: &Sample,
+    length: f32,
+    width: f32,
+    seed: u32,
+    nib: (f32, f32),
+) -> (f32, f32) {
+    let half = width / 2.0 * s.reach;
     let at = s.at;
     match brush {
         Brush::ThickBrush => {
@@ -245,9 +294,8 @@ fn profile(brush: Brush, s: &Sample, length: f32, width: f32, seed: u32) -> (f32
             (w, w)
         }
         Brush::ChiselPen => {
-            // A nib at 45 degrees, from the bottom left to the top right:
-            // thin along it, thick across it.
-            let across = (s.dx + s.dy).abs() * std::f32::consts::FRAC_1_SQRT_2;
+            // Thin along the nib, thick across it.
+            let across = (s.dx * nib.1 - s.dy * nib.0).abs();
             let w = half * (0.2 + 1.2 * across);
             (w, w)
         }
@@ -255,11 +303,7 @@ fn profile(brush: Brush, s: &Sample, length: f32, width: f32, seed: u32) -> (f32
             let flow = 0.8 + 0.35 * noise(at, (width * 5.0).max(5.0), seed);
             // Here and there the ink pools.
             let pool = noise(at, (width * 2.0).max(2.0), seed ^ 0x77);
-            let pool = if pool > 0.8 {
-                1.0 + (pool - 0.8) * 2.0
-            } else {
-                1.0
-            };
+            let pool = if pool > 0.8 { 1.0 + (pool - 0.8) } else { 1.0 };
             let left = 0.9 + 0.2 * noise(at, (width * 1.5).max(1.5), seed ^ 0x11);
             let right = 0.9 + 0.2 * noise(at, (width * 1.5).max(1.5), seed ^ 0x22);
             (half * flow * pool * left, half * flow * pool * right)
@@ -362,9 +406,9 @@ fn chalk(samples: &[Sample], width: f32, seed: u32, out: &mut Vec<PathOp>) {
             if hash(index, seed ^ 0x0f) < 0.12 {
                 continue;
             }
-            let across = (hash(index, seed) * 2.0 - 1.0) * half * 0.75;
+            let across = (hash(index, seed) * 2.0 - 1.0) * half * 0.55;
             let along = (hash(index, seed ^ 0x33) - 0.5) * spacing;
-            let size = width * (0.18 + 0.14 * hash(index, seed ^ 0x55)) + 0.1 * k as f32;
+            let size = width * (0.16 + 0.12 * hash(index, seed ^ 0x55)) + 0.05 * k as f32;
             let (nx, ny) = (s.dy, -s.dx);
             let cx = s.x + s.dx * along + nx * across;
             let cy = s.y + s.dy * along + ny * across;
@@ -466,9 +510,13 @@ mod tests {
     #[test]
     fn b_044_every_brush_draws_near_the_path_and_the_same_every_time() {
         for brush in Brush::ALL {
-            let once = outline(&square(), 6.0, brush);
+            let once = outline(&square(), 6.0, brush, NIB);
             assert!(!once.is_empty(), "{brush:?} draws");
-            assert_eq!(once, outline(&square(), 6.0, brush), "{brush:?} is steady");
+            assert_eq!(
+                once,
+                outline(&square(), 6.0, brush, NIB),
+                "{brush:?} is steady"
+            );
             assert!(
                 once.iter().all(|op| match *op {
                     PathOp::Move(x, y) | PathOp::Line(x, y) => x.is_finite() && y.is_finite(),
@@ -491,7 +539,7 @@ mod tests {
     fn b_044_the_brushes_differ() {
         let lines: Vec<Vec<PathOp>> = Brush::ALL
             .iter()
-            .map(|b| outline(&square(), 6.0, *b))
+            .map(|b| outline(&square(), 6.0, *b, NIB))
             .collect();
         for (i, a) in lines.iter().enumerate() {
             for b in &lines[i + 1..] {
@@ -503,7 +551,7 @@ mod tests {
     #[test]
     fn b_044_chalk_and_a_dry_brush_leave_gaps() {
         let parts = |brush| {
-            outline(&square(), 6.0, brush)
+            outline(&square(), 6.0, brush, NIB)
                 .iter()
                 .filter(|op| matches!(op, PathOp::Move(..)))
                 .count()
@@ -525,24 +573,66 @@ mod tests {
         // one up to the right goes along it.
         let down = vec![PathOp::Move(0.0, 0.0), PathOp::Line(100.0, 100.0)];
         let up = vec![PathOp::Move(0.0, 100.0), PathOp::Line(100.0, 0.0)];
-        let (w_down, _) = width_of(outline(&down, 10.0, Brush::ChiselPen));
-        let (w_up, _) = width_of(outline(&up, 10.0, Brush::ChiselPen));
+        let (w_down, _) = width_of(outline(&down, 10.0, Brush::ChiselPen, NIB));
+        let (w_up, _) = width_of(outline(&up, 10.0, Brush::ChiselPen, NIB));
         assert!(w_down > w_up + 5.0, "{w_down} {w_up}");
     }
 
     #[test]
     fn b_044_nothing_to_draw() {
         for brush in Brush::ALL {
-            assert!(outline(&square(), 0.0, brush).is_empty());
-            assert!(outline(&square(), f32::NAN, brush).is_empty());
-            assert!(outline(&[PathOp::Move(1.0, 1.0)], 4.0, brush).is_empty());
-            assert!(outline(&[PathOp::Close], 4.0, brush).is_empty());
+            assert!(outline(&square(), 0.0, brush, NIB).is_empty());
+            assert!(outline(&square(), f32::NAN, brush, NIB).is_empty());
+            assert!(outline(&[PathOp::Move(1.0, 1.0)], 4.0, brush, NIB).is_empty());
+            assert!(outline(&[PathOp::Close], 4.0, brush, NIB).is_empty());
             let wild = [PathOp::Move(0.0, 0.0), PathOp::Line(f32::INFINITY, 0.0)];
-            assert!(outline(&wild, 4.0, brush).is_empty());
+            assert!(outline(&wild, 4.0, brush, NIB).is_empty());
         }
         // A huge path keeps to a bounded number of points.
         let huge = [PathOp::Move(0.0, 0.0), PathOp::Line(1.0e7, 0.0)];
-        assert!(outline(&huge, 1.0, Brush::UnevenInk).len() < 50_000);
+        assert!(outline(&huge, 1.0, Brush::UnevenInk, NIB).len() < 50_000);
+    }
+
+    #[test]
+    fn b_044_a_line_after_a_close_starts_where_the_part_started() {
+        let path = [
+            PathOp::Move(0.0, 0.0),
+            PathOp::Line(10.0, 0.0),
+            PathOp::Line(10.0, 10.0),
+            PathOp::Close,
+            PathOp::Line(40.0, 40.0),
+        ];
+        let (_, _, x1, y1) = bounds(&outline(&path, 2.0, Brush::ThickBrush, NIB));
+        assert!(x1 > 39.0 && y1 > 39.0, "{x1} {y1}");
+    }
+
+    #[test]
+    fn b_044_a_line_keeps_its_width_around_a_corner() {
+        // A chisel pen with its nib along the diagonal of the corner is as
+        // wide on both sides; at the corner the edge reaches its miter.
+        let corner = [
+            PathOp::Move(0.0, 50.0),
+            PathOp::Line(50.0, 50.0),
+            PathOp::Line(50.0, 0.0),
+        ];
+        let (_, _, x1, y1) = bounds(&outline(&corner, 10.0, Brush::ChiselPen, (1.0, 0.0)));
+        // The outer corner reaches past the sides as far as the line is
+        // wide there, not cut off.
+        assert!(x1 > 50.0 + 3.0 && y1 > 50.0 + 3.0, "{x1} {y1}");
+    }
+
+    #[test]
+    fn b_044_the_nib_follows_its_direction() {
+        let flat = vec![PathOp::Move(0.0, 0.0), PathOp::Line(100.0, 0.0)];
+        let height = |nib| {
+            let (_, y0, _, y1) = bounds(&outline(&flat, 10.0, Brush::ChiselPen, nib));
+            y1 - y0
+        };
+        // A nib along the line draws it thin, one across it thick.
+        assert!(height((1.0, 0.0)) < 3.0);
+        assert!(height((0.0, 1.0)) > 10.0);
+        // A nib of no direction is the one of the page.
+        assert_eq!(height((0.0, 0.0)), height(NIB));
     }
 
     #[test]
@@ -551,7 +641,7 @@ mod tests {
             PathOp::Move(0.0, 0.0),
             PathOp::Curve(0.0, 50.0, 50.0, 100.0, 100.0, 100.0),
         ];
-        let (x0, y0, x1, y1) = bounds(&outline(&curve, 4.0, Brush::UnevenInk));
+        let (x0, y0, x1, y1) = bounds(&outline(&curve, 4.0, Brush::UnevenInk, NIB));
         assert!(x0 < 3.0 && y0 < 3.0 && x1 > 97.0 && y1 > 97.0);
     }
 }

@@ -108,3 +108,49 @@ fn b_044_a_brush_draws_otherwise_than_a_solid_line() {
         assert_ne!(ink(Some(brush)), solid, "{brush:?}");
     }
 }
+
+/// How many dark pixels a list paints on a white square.
+fn ink_of(items: Vec<Item>) -> usize {
+    let list = DisplayList {
+        width: SIDE as f32,
+        height: SIDE as f32,
+        items,
+    };
+    let mut surface = cairo::ImageSurface::create(cairo::Format::ARgb32, SIDE, SIDE).unwrap();
+    {
+        let cr = cairo::Context::new(&surface).unwrap();
+        cr.set_source_rgb(1.0, 1.0, 1.0);
+        cr.paint().unwrap();
+        Painter::new().unwrap().paint(&cr, &list).unwrap();
+    }
+    let mut count = 0;
+    for y in 0..SIDE {
+        for x in 0..SIDE {
+            count += usize::from(dark(at(&mut surface, x, y)));
+        }
+    }
+    count
+}
+
+#[test]
+fn b_044_the_nib_of_a_chisel_pen_stays_as_on_the_page_when_flipped() {
+    // A line up to the right lies along the nib, and is thin; flipped
+    // across, it goes down to the right on the page, across the nib.
+    let line = || Item::Path {
+        path: vec![PathOp::Move(20.0, 100.0), PathOp::Line(100.0, 20.0)],
+        fill: None,
+        stroke: Some(PathStroke {
+            width: 10.0,
+            color: Rgba::BLACK,
+            dashes: Vec::new(),
+            brush: Some(Brush::ChiselPen),
+        }),
+    };
+    let plain = ink_of(vec![line()]);
+    let flipped = ink_of(vec![Item::Group {
+        transform: [-1.0, 0.0, 0.0, 1.0, SIDE as f32, 0.0],
+        opacity: 1.0,
+        items: vec![line()],
+    }]);
+    assert!(flipped > plain * 3, "{flipped} {plain}");
+}

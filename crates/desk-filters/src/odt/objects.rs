@@ -1253,8 +1253,12 @@ fn model_look(source: &odf::TextDocument, g: &odf::GraphicProperties) -> desk_mo
                     .as_deref()
                     .and_then(desk_model::BorderStyle::from_name),
             ) {
-                (_, Some(style)) if style != desk_model::BorderStyle::Solid => style,
+                // A dotted line is so whatever the dash (OBJ-35).
+                (_, Some(desk_model::BorderStyle::Dotted)) => desk_model::BorderStyle::Dotted,
                 (Some("dash"), _) => desk_model::BorderStyle::Dashed,
+                // An artistic line is solid to other programs: one that
+                // made it dashed or took the line away wins (B-044).
+                (Some("solid") | None, Some(style @ desk_model::BorderStyle::Artistic(_))) => style,
                 _ => desk_model::BorderStyle::Solid,
             },
             start: line_end(g.marker_start.as_deref()),

@@ -386,12 +386,16 @@ impl Painter {
                         .and_then(|s| Some((s, s.brush?)))
                     {
                         // The line of a pen or brush is a shape to fill
-                        // (B-044).
+                        // (B-044), its nib held as on the page however
+                        // the object is turned or flipped.
+                        let nib = nib_here(cr);
+                        cr.save()?;
                         cr.new_path();
-                        trace(cr, &crate::brush::outline(path, stroke.width, brush));
+                        trace(cr, &crate::brush::outline(path, stroke.width, brush, nib));
                         set_color(cr, stroke.color);
                         cr.set_fill_rule(cairo::FillRule::Winding);
                         cr.fill()?;
+                        cr.restore()?;
                     } else if let Some(stroke) = stroke.as_ref().filter(|s| drawn_width(s.width)) {
                         set_color(cr, stroke.color);
                         cr.set_line_width(f64::from(stroke.width));
@@ -801,6 +805,25 @@ fn drawn_width(width: f32) -> bool {
 /// would leave Cairo in an error that stops the rest of the page.
 fn drawn_rect(width: f32, height: f32) -> bool {
     drawn_width(width) && drawn_width(height)
+}
+
+/// Which way the nib of a chisel pen lies in the coordinates the context
+/// draws in now, for it to lie as [`crate::brush::NIB`] on the page.
+fn nib_here(cr: &Context) -> (f32, f32) {
+    let m = cr.matrix();
+    let (a, b, c, d) = (m.xx(), m.yx(), m.xy(), m.yy());
+    let det = a * d - b * c;
+    let (nx, ny) = (
+        f64::from(crate::brush::NIB.0),
+        f64::from(crate::brush::NIB.1),
+    );
+    if !(det.is_finite() && det.abs() > 1e-12) {
+        return crate::brush::NIB;
+    }
+    // The inverse of the linear part of the matrix, applied to the nib.
+    let x = (d * nx - c * ny) / det;
+    let y = (-b * nx + a * ny) / det;
+    (x as f32, y as f32)
 }
 
 /// The dashes of a line as Cairo takes them: none, a solid line, for a

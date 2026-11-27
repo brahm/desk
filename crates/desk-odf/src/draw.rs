@@ -62,7 +62,8 @@ pub struct GraphicProperties {
     /// `svg:stroke-width`.
     pub stroke_width: Option<Length>,
     /// `desk:stroke-style`: how Desk draws a dashed line, `dashed` or
-    /// `dotted`, which `draw:stroke-dash` would need a named style for.
+    /// `dotted`, which `draw:stroke-dash` would need a named style for, or
+    /// the name of an artistic line, as `chalk` (docs/odf-extensions.md).
     pub stroke_style: Option<String>,
     /// `draw:marker-start`: the marker at the start of a line.
     pub marker_start: Option<String>,

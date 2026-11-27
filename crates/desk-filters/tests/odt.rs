@@ -4993,4 +4993,58 @@ fn b_044_artistic_lines_of_objects_and_drop_caps_are_kept() {
         .and_then(|c| c.background)
         .map(|b| b.border_style);
     assert_eq!(read_cap, Some(BorderStyle::Artistic(Brush::ChiselPen)));
+    // A program that made the line of chalk dashed, keeping the name of
+    // Desk, made it dashed.
+    let dashed = content.replacen(
+        "draw:stroke=\"solid\"",
+        "draw:stroke=\"dash\"",
+        content.matches("draw:stroke=\"solid\"").count(),
+    );
+    let read = read_odt(&with_part(&bytes, "content.xml", &dashed)).unwrap();
+    assert!(
+        read.objects()
+            .iter()
+            .filter_map(|o| o.style.stroke)
+            .all(|s| s.style == BorderStyle::Dashed)
+    );
+    // An unknown name of a later Desk is a solid line.
+    let unknown = content.replace(
+        "desk:stroke-style=\"chalk\"",
+        "desk:stroke-style=\"crayon\"",
+    );
+    let read = read_odt(&with_part(&bytes, "content.xml", &unknown)).unwrap();
+    assert_eq!(
+        read.objects()
+            .iter()
+            .filter_map(|o| o.style.stroke)
+            .next()
+            .map(|s| s.style),
+        Some(BorderStyle::Solid)
+    );
+}
+
+/// An ODF package with one of its parts replaced.
+fn with_part(bytes: &[u8], name: &str, text: &str) -> Vec<u8> {
+    use std::io::{Read, Write};
+    let mut zip = zip::ZipArchive::new(std::io::Cursor::new(bytes)).unwrap();
+    let mut out = Vec::new();
+    {
+        let mut writer = zip::ZipWriter::new(std::io::Cursor::new(&mut out));
+        let stored = zip::write::SimpleFileOptions::default()
+            .compression_method(zip::CompressionMethod::Stored);
+        for i in 0..zip.len() {
+            let mut file = zip.by_index(i).unwrap();
+            let part = file.name().unwrap().to_string();
+            let mut data = Vec::new();
+            file.read_to_end(&mut data).unwrap();
+            writer.start_file(part.as_str(), stored).unwrap();
+            if part == name {
+                writer.write_all(text.as_bytes()).unwrap();
+            } else {
+                writer.write_all(&data).unwrap();
+            }
+        }
+        writer.finish().unwrap();
+    }
+    out
 }
