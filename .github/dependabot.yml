@@ -1,11 +1,16 @@
 # The actions of the workflows are pinned by commit (review RV, batch 6);
 # Dependabot proposes new commits when their tags move. The Flathub
-# action has no tags, only a branch, so it is updated by hand.
+# action has no tags, only a branch, so it is updated by hand. The updates
+# come in one pull request a week, so that one review and one run of the
+# CI cover them, and none waits behind the limit of five open requests.
 version: 2
 updates:
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
     ignore:
       - dependency-name: flathub-infra/flatpak-github-actions

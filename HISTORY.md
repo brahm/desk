@@ -8,6 +8,10 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
 
 ## Changes since 0.7.0 (unreleased)
 
+* Changed: The actions of the CI and of the website moved to their
+  versions on Node.js 24, and Dependabot proposes them in one pull
+  request a week (#208 to #212).
+
 * Added: SVG images, drawn sharp at every size, and HEIC photographs
   can be inserted, dragged in and opened from ODT and Pages files; in
   ODT a PNG goes beside them for other programs (#263).
