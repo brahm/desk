@@ -11,6 +11,41 @@
 # finished yet, where the row records what iWork 15.4 does for the second
 # round. The captures stay outside the repository (D-011).
 id	date	iwork_15_4	verdict	note
+S001	2026-11-17	Keynote, File, Edit, Insert, Slide, Format, Arrange, View, Play, Window and Help in the macOS menu bar	by decision	D-008: GNOME menus and command search
+S002	2026-11-17	Toolbar with View, Play, Add Slide, insert buttons, Comment, Zoom, Format, Animate and Document	by decision	D-008: header bar with Play and the insert buttons
+S003	2026-11-17	No format bar; the Slide tab with layout, appearance and background when nothing is selected	same	-
+S004	2026-11-17	Inspector with Format, Animate and Document	same	-
+S005	2026-11-17	Build Order: a floating window with the builds of the slide, Start, Delay and Preview, from the foot of the Animate tab	moved	Build Order to S3 (B-033)
+S006	2026-11-17	Media button, as in Pages	same	The Media button with the Media Browser and Choose File (INT-14)
+S007	2026-11-17	Font pop-ups in the Format pane; the color well opens the Colors window	by decision	D-024: the font pop-ups in the Text tab of the Format pane; the color well opens the Colors popover
+S008	2026-11-17	Show Adjust Image opens a window with levels, exposure, contrast, saturation, highlights, shadows, sharpness, de-noise, temperature and tint	by decision	D-008: Adjust Image in the Image tab of the Inspector
+S009	2026-11-17	Show Arrange Tools opens a window with Back, Front, Backward, Forward, size, position, rotation, lock and group	by decision	D-008: Arrange in the Arrange tab of the Inspector
+S010	2026-11-17	Show Warnings in the View menu	same	Document Warnings in the View menu; it opens once a presentation has warnings, which come with the files of S5
+S011	2026-11-17	No bottom bar; Go To in the Slide menu with Next, Previous, First and Last Slide and Slide…; Zoom with Zoom In, Zoom Out, Actual Size, Fit Slide, Auto-Center, Zoom to Selection and Zoom to Fit Content	gap	Desk has Go to Slide and the first and the last slide, but no Zoom to Selection, Auto-Center or Zoom to Fit Content (B-027); closed by pull request #140
+S012	2026-11-17	Enter Full Screen and Slide Only in the View menu	same	-
+S013	2026-11-17	Show Tab Bar, Show All Tabs, Merge All Windows	same	-
+S014	2026-11-17	Follows the light and dark appearance of macOS	same	-
+S015	2026-11-17	Settings with General, Slideshow, Rulers, Remote and Auto-Correction	moved	The Slideshow and Remote settings to S4 (B-034)
+S016	2026-11-17	Undo and Redo in the Edit menu, with the name of the change (Undo Add Build Effect)	same	The name comes from the editor of Desk Slides
+T001	2026-11-17	An Organize menu with sort, filter, categories and pivot tables, and a Table menu	moved	The Organize menu to T3 (B-030)
+T002	2026-11-17	Toolbar with View, Insert, Table, Chart, Text, Shape, Media, Comment, Zoom, Format and Organize	by decision	D-008: header bar
+T003	2026-11-17	No format bar; Table, Cell, Text and Arrange tabs in the Format pane	same	-
+T004	2026-11-17	No formula bar: the formula editor opens in the cell on typing "="	moved	The formula editor in the cell to T2 (B-031)
+T005	2026-11-17	Inspector with Format, Organize and Document	same	-
+T006	2026-11-17	No sheets pane; sheet tabs under the toolbar with a + button; Show Previous, Next, First and Last Sheet in the Window menu	by decision	D-001 and step 4 of M+: tables and charts in the sidebar, sheets in the switcher of the bottom bar
+T007	2026-11-17	Table styles as thumbnails at the top of the Table tab of the Format pane	moved	Table styles to T1 (B-032)
+T008	2026-11-17	SUM, AVERAGE, MIN, MAX and COUNTA at the foot of the window for the selected cells, with a gear to choose them	moved	Choosing the functions of the bottom bar to T2 (B-031)
+T009	2026-11-17	Organize button: a pane with Categories, Sort and Filter tabs	moved	The Organize pane to T3 (B-030)
+T010	2026-11-17	Typing "=" puts the Functions browser in the sidebar, with categories, search, a description and Insert Function	moved	The Functions browser on typing "=" to T2 (B-035)
+T011	2026-11-17	Media button: Choose Photo or Video, Choose Music, Image Gallery, Web Video, Record Audio, Choose File, and the iPhone camera	moved	The Media button of Desk Tables to T4 (B-036)
+T012	2026-11-17	Font pop-ups in the Format pane; the color well opens the Colors window	moved	Fonts and colors of the cells to T2 (B-035)
+T013	2026-11-17	Show Warnings in the View menu	moved	Document Warnings of Desk Tables to T5 (B-037)
+T014	2026-11-17	Zoom with Zoom In, Zoom Out, Actual Size and Zoom to Selection	gap	No Zoom to Selection (B-027); closed by pull request #140
+T015	2026-11-17	Enter Full Screen in the View menu	same	Fullscreen in the View menu, F11 and Escape (NINT-06)
+T016	2026-11-17	Show Tab Bar, Show All Tabs, Merge All Windows	same	-
+T017	2026-11-17	Follows the light and dark appearance of macOS	same	-
+T018	2026-11-17	Settings with General, Rulers and Auto-Correction	by decision	D-008: one Preferences dialog with Rulers, Auto-Correction, Objects and Window, as in Desk Writer
+T019	2026-11-17	Undo and Redo in the Edit menu, with the name of the change (Undo Typing)	gap	Desk Tables undoes and redoes, but its menus say only Undo and Redo (B-029); closed by pull request #140
 W001	2026-11-17	File, Edit, Insert, Format, Arrange, View, Window and Help in the macOS menu bar	by decision	D-008: the same commands in the Insert menu, the main menu and command search; Share, Content Hub and the generated images stay out (online or AI)
 W002	2026-11-17	Toolbar with View, Insert, Table, Chart, Text, Shape, Media, Comment, Zoom, Format and Document	by decision	D-008: header bar with the same insert buttons, Inspector and Find
 W003	2026-11-17	No format bar; text formatting in the Text tab of the Format pane (Style, Layout, More)	same	The Format pane holds what the format bar held
@@ -19,51 +54,16 @@ W005	2026-11-17	No styles drawer; paragraph styles from the style button at the 
 W006	2026-11-17	Media button and the Photo and Video and Music browsers in the View menu; Content Hub and Image Playground	same	Content Hub and the generated images stay out (online or AI)
 W007	2026-11-17	Font pop-ups in the Format pane; the color well opens the Colors window	by decision	D-024: Fonts popover and the color chooser
 W008	2026-11-17	Show Adjust Image in the View menu opens a window	by decision	D-008: Adjust Image in the Image tab of the Inspector
+W009	2026-11-17	Show Warnings in the View menu; Replace Fonts from the warning of a missing font	same	Document Warnings in the View menu; the Warnings window replaces each missing font (INT-22)
 W010	2026-11-17	No bottom bar; zoom in the toolbar; Show Word Count puts a count over the foot of the page; Go To with Next, Previous, First and Last Page and Page…; Zoom with Zoom In, Zoom Out, Actual Size, Fit Width, Fit Page, Zoom to Selection, One and Two Pages	gap	Desk has the count over the page, Go to Page and the zoom levels, but no First Page and Last Page in the menu (B-028) and no Zoom to Selection (B-027); closed by pull request #140
+W011	2026-11-17	Page Thumbnails, Table of Contents and Document Only in the View button; the table of contents in the sidebar has Edit and Insert Table of Contents; the comments pane is apart	same	Table of Contents in the sidebar, with Edit and Insert; the comments are a page of their own (INT-19)
+W012	2026-11-17	Enter Screen View: one continuous flow, zoom Auto, a notice "Screen View is on"; Enter Full Screen	moved	Screen View to W1 (B-038); Fullscreen in the View menu is there
 W013	2026-11-17	Show Tab Bar, Show All Tabs, Merge All Windows	same	Tabs of AdwTabView with the tab overview
 W014	2026-11-17	Follows the light and dark appearance of macOS	same	-
 W015	2026-11-17	Settings with General, Rulers and Auto-Correction	same	Preferences with General, Rulers and Correction
 W016	2026-11-17	Undo and Redo in the Edit menu, with the name of the change (Undo Typing, Undo Bold, Undo Add Page)	same	-
 W020	2026-11-17	A saved document saves itself; closing a new document asks to keep it, with name, folder, Delete and Save in one sheet	by decision	D-008: Save Changes? with Discard and Save, as GNOME asks
 W022	2026-11-17	Revert To with Last Opened and Browse All Versions, once the document has a file	same	-
-T002	2026-11-17	Toolbar with View, Insert, Table, Chart, Text, Shape, Media, Comment, Zoom, Format and Organize	by decision	D-008: header bar
-T003	2026-11-17	No format bar; Table, Cell, Text and Arrange tabs in the Format pane	same	-
-T005	2026-11-17	Inspector with Format, Organize and Document	same	-
-T006	2026-11-17	No sheets pane; sheet tabs under the toolbar with a + button; Show Previous, Next, First and Last Sheet in the Window menu	by decision	D-001 and step 4 of M+: tables and charts in the sidebar, sheets in the switcher of the bottom bar
-T014	2026-11-17	Zoom with Zoom In, Zoom Out, Actual Size and Zoom to Selection	gap	No Zoom to Selection (B-027); closed by pull request #140
-T016	2026-11-17	Show Tab Bar, Show All Tabs, Merge All Windows	same	-
-T017	2026-11-17	Follows the light and dark appearance of macOS	same	-
-T019	2026-11-17	Undo and Redo in the Edit menu, with the name of the change (Undo Typing)	gap	Desk Tables undoes and redoes, but its menus say only Undo and Redo (B-029); closed by pull request #140
-S001	2026-11-17	Keynote, File, Edit, Insert, Slide, Format, Arrange, View, Play, Window and Help in the macOS menu bar	by decision	D-008: GNOME menus and command search
-S002	2026-11-17	Toolbar with View, Play, Add Slide, insert buttons, Comment, Zoom, Format, Animate and Document	by decision	D-008: header bar with Play and the insert buttons
-S003	2026-11-17	No format bar; the Slide tab with layout, appearance and background when nothing is selected	same	-
-S004	2026-11-17	Inspector with Format, Animate and Document	same	-
-S011	2026-11-17	No bottom bar; Go To in the Slide menu with Next, Previous, First and Last Slide and Slide…; Zoom with Zoom In, Zoom Out, Actual Size, Fit Slide, Auto-Center, Zoom to Selection and Zoom to Fit Content	gap	Desk has Go to Slide and the first and the last slide, but no Zoom to Selection, Auto-Center or Zoom to Fit Content (B-027); closed by pull request #140
-S012	2026-11-17	Enter Full Screen and Slide Only in the View menu	same	-
-S013	2026-11-17	Show Tab Bar, Show All Tabs, Merge All Windows	same	-
-S014	2026-11-17	Follows the light and dark appearance of macOS	same	-
-S016	2026-11-17	Undo and Redo in the Edit menu, with the name of the change (Undo Add Build Effect)	same	The name comes from the editor of Desk Slides
-W009	2026-11-17	Show Warnings in the View menu; Replace Fonts from the warning of a missing font	same	Document Warnings in the View menu; the Warnings window replaces each missing font (INT-22)
-W011	2026-11-17	Page Thumbnails, Table of Contents and Document Only in the View button; the table of contents in the sidebar has Edit and Insert Table of Contents; the comments pane is apart	same	Table of Contents in the sidebar, with Edit and Insert; the comments are a page of their own (INT-19)
-W012	2026-11-17	Enter Screen View: one continuous flow, zoom Auto, a notice "Screen View is on"; Enter Full Screen	moved	Screen View to W1 (B-038); Fullscreen in the View menu is there
-T001	2026-11-17	An Organize menu with sort, filter, categories and pivot tables, and a Table menu	moved	The Organize menu to T3 (B-030)
-T004	2026-11-17	No formula bar: the formula editor opens in the cell on typing "="	moved	The formula editor in the cell to T2 (B-031)
-T007	2026-11-17	Table styles as thumbnails at the top of the Table tab of the Format pane	moved	Table styles to T1 (B-032)
-T008	2026-11-17	SUM, AVERAGE, MIN, MAX and COUNTA at the foot of the window for the selected cells, with a gear to choose them	moved	Choosing the functions of the bottom bar to T2 (B-031)
-T009	2026-11-17	Organize button: a pane with Categories, Sort and Filter tabs	moved	The Organize pane to T3 (B-030)
-T010	2026-11-17	Typing "=" puts the Functions browser in the sidebar, with categories, search, a description and Insert Function	moved	The Functions browser on typing "=" to T2 (B-035)
-T011	2026-11-17	Media button: Choose Photo or Video, Choose Music, Image Gallery, Web Video, Record Audio, Choose File, and the iPhone camera	moved	The Media button of Desk Tables to T4 (B-036)
-T012	2026-11-17	Font pop-ups in the Format pane; the color well opens the Colors window	moved	Fonts and colors of the cells to T2 (B-035)
-T013	2026-11-17	Show Warnings in the View menu	moved	Document Warnings of Desk Tables to T5 (B-037)
-T015	2026-11-17	Enter Full Screen in the View menu	same	Fullscreen in the View menu, F11 and Escape (NINT-06)
-T018	2026-11-17	Settings with General, Rulers and Auto-Correction	by decision	D-008: one Preferences dialog with Rulers, Auto-Correction, Objects and Window, as in Desk Writer
-S005	2026-11-17	Build Order: a floating window with the builds of the slide, Start, Delay and Preview, from the foot of the Animate tab	moved	Build Order to S3 (B-033)
-S006	2026-11-17	Media button, as in Pages	same	The Media button with the Media Browser and Choose File (INT-14)
-S007	2026-11-17	Font pop-ups in the Format pane; the color well opens the Colors window	by decision	D-024: the font pop-ups in the Text tab of the Format pane; the color well opens the Colors popover
-S008	2026-11-17	Show Adjust Image opens a window with levels, exposure, contrast, saturation, highlights, shadows, sharpness, de-noise, temperature and tint	by decision	D-008: Adjust Image in the Image tab of the Inspector
-S009	2026-11-17	Show Arrange Tools opens a window with Back, Front, Backward, Forward, size, position, rotation, lock and group	by decision	D-008: Arrange in the Arrange tab of the Inspector
-S010	2026-11-17	Show Warnings in the View menu	same	Document Warnings in the View menu; it opens once a presentation has warnings, which come with the files of S5
-S015	2026-11-17	Settings with General, Slideshow, Rulers, Remote and Auto-Correction	moved	The Slideshow and Remote settings to S4 (B-034)
 W041	2026-11-18	The table of contents of the sidebar follows the headings as they are typed	same	-
 W043	2026-11-22	Screen View: notice, Text Size 80% to 310%, objects by placement, the column, sizes, spacing, lists and tabs measured in rounds 19e to 19o	same	Measured to the exact rule in step 19 of W1
 W047	2026-11-18	Go to page from the View menu (Ctrl+Cmd+G)	same	-
@@ -72,7 +72,7 @@ W051	2026-11-18	Default font in Settings	same	-
 W052	2026-11-21	Gradient and image fills of text, over the lines of a paragraph or the entire page	same	-
 W054	2026-11-18	Capitalization: None, All Caps, Small Caps, Title Case, Start Case	same	-
 W059	2026-11-26	A highlight is a comment without text on a range, also over two paragraphs; the bar says "Highlight 1 of 1"; Undo names it Edit Comment, and Remove Highlights and Comments is one Delete Comment	same	Done in W2 (B-039); the label and the names of Undo were a gap, closed on 26 November
-W060	2026-11-18	Drop cap with its styles	same	The artistic border lines in W3 (B-044)
+W060	2026-11-27	Drop cap with its styles; the Line of a border offers ten styles as pictures, the last five chalk, thick brush, chisel pen, dry brush and uneven ink	by decision	D-011: Desk draws the five artistic lines its own way (B-044, closed in W3)
 W061	2026-11-21	Format Fractions Automatically; the first Undo brings back the typed fraction	same	-
 W062	2026-11-21	Smart quotes and dashes, quote styles, Replace in Selection makes em dashes	same	-
 W064	2026-11-22	A replacement list of its own beside that of macOS; capitals do not count; space, punctuation or Return; one Undo	same	Desk's list stands for both, since GNOME has no system list
@@ -84,6 +84,16 @@ W081	2026-11-21	Set as Default Text Box Appearance, for that document	same	-
 W088	2026-11-18	Reorder list items by dragging the bullet	same	-
 W089	2026-11-18	Columns on the selection	same	-
 W091	2026-11-18	Threads of linked text boxes	same	-
+W094	2026-11-26	The Section tab: Background, Headers & Footers (Hide on first page of section, Match previous section), Page Numbering, Create a new section	same	-
+W095	2026-11-27	Convert to Page Layout warns that the body text and inline objects go; Edit Page Templates warns and shows a bar with Done; Insert ▸ Page in page layout	same	-
+W096	2026-11-27	Three fields, left, centre and right, show as the pointer is over the header; a field offers Insert Page Number with 1, 1 of 1, Page 1 and Page 1 of 1	by decision	D-003: the same four forms come from Auto Page Numbers of Pages '09 and from Insert ▸ Field
+W098	2026-11-26	The Background of a section, a fill pop-up with No Fill by default; no border of the page	by decision	D-003: Desk keeps the page border of Pages '09
+W100	2026-11-26	Insert ▸ Table of Contents ▸ Document, Section, To Next Occurrence; Range and Customize Styles in the Format pane; the text of an empty table	same	-
+W101	2026-11-26	The Bookmarks tab and Edit ▸ Manage Bookmark Suggestions, Heading 2 and 3 on in Blank	same	-
+W102	2026-11-27	Format ▸ Add Link ▸ Webpage, Email, Phone Number (Display, Link to, Number; Remove and Call) and Bookmark, on text and on a selected shape	same	-
+W104	2026-11-27	Edit Equation with LaTeX or MathML and a live preview; in the line in word processing, floating in the middle of the page in page layout	same	-
+W105	2026-11-27	A Mail Merge pane with the fields and their pages, Use as sender field and Add Merge Field (Add from Spreadsheet, Full Name, First Name, Last Name, Address (Home), Address (Work), Phone (Mobile), Email (Home), Job Title, Company, More Fields); Merge… is a sheet with Contacts or Spreadsheet, the List, Populate With for each field, Substitute closest match, the count, Preview and Merge	gap	D-008: a group of the Document tab; the menu of fields was aligned on 27 November; choosing the data of each field, Populate With, moved to W5 (B-080)
+W120	2026-11-27	The Line of a border offers ten styles as pictures: solid, square dots, dashes, long dashes, round dots, chalk, thick brush, chisel pen, dry brush and uneven ink	by decision	D-011: Desk draws the five artistic lines its own way (B-044)
 W127	2026-11-18	Insert a table from the styles in view	same	-
 W130	2026-11-21	A table from dragged cells, with the title setting of its source	same	-
 W131	2026-11-21	Merging joins with a tab across and a line break down	same	Since the close of W1

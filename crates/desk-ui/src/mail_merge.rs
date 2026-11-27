@@ -26,20 +26,46 @@ use crate::editing::{Format, MergePreview, TextEditor};
 use crate::formatting::EditorOf;
 use crate::i18n::tr;
 
-/// The fields of a contact that the menus offer first, as Pages does
-/// before More Fields.
-pub const COMMON_FIELDS: [&str; 10] = [
+/// The fields of a contact that the menus offer first, in the order of
+/// Pages 15.4, before More Fields: Name is its Full Name.
+pub const COMMON_FIELDS: [&str; 9] = [
+    "Name",
     "First Name",
     "Last Name",
-    "Name",
+    "Home Address",
+    "Work Address",
+    "Mobile Phone",
+    "Home Email",
     "Job Title",
     "Company",
-    "Address",
-    "City",
-    "Email",
-    "Phone",
-    "Birthday",
 ];
+
+/// The fields of a contact in a menu for an action that takes the name
+/// of a field: the common ones, then the others under More Fields, as
+/// Pages 15.4 has them, Name shown as its Full Name.
+pub fn contact_items(menu: &gio::Menu, action: &str) {
+    let item = |menu: &gio::Menu, name: &str| {
+        let label = if name == "Name" {
+            tr("Full Name")
+        } else {
+            name.replace('_', "__")
+        };
+        let item = gio::MenuItem::new(Some(&label), None);
+        item.set_action_and_target_value(Some(action), Some(&name.to_variant()));
+        menu.append_item(&item);
+    };
+    for name in COMMON_FIELDS {
+        item(menu, name);
+    }
+    let others = gio::Menu::new();
+    for name in desk_contacts::CONTACT_FIELDS
+        .iter()
+        .filter(|n| !COMMON_FIELDS.contains(n))
+    {
+        item(&others, name);
+    }
+    menu.append_submenu(Some(&tr("_More Fields")), &others);
+}
 
 /// The records of a source: those of a file, read now, or the contacts
 /// that the desktop gave last ([`crate::desktop_contacts::with_cards`]).
@@ -124,13 +150,12 @@ fn field_items(menu: &gio::Menu, names: &[String], sender: bool) {
 /// The Mail Merge field menu of Insert ▸ Field (MAL-07): the common
 /// fields of a contact, and those of the sender.
 pub fn insert_menu() -> gio::Menu {
-    let names: Vec<String> = COMMON_FIELDS.iter().map(|n| (*n).to_owned()).collect();
     let menu = gio::Menu::new();
     let recipients = gio::Menu::new();
-    field_items(&recipients, &names, false);
+    contact_items(&recipients, "win.insert-merge-field");
     menu.append_section(None, &recipients);
     let sender = gio::Menu::new();
-    field_items(&sender, &names, true);
+    contact_items(&sender, "win.insert-sender-field");
     menu.append_submenu(Some(&tr("_Sender Field")), &sender);
     menu
 }
@@ -504,16 +529,12 @@ impl MailMergeGroup {
     /// contact, and those of the sender (MAL-07).
     fn fields_menu(&self) -> gio::Menu {
         let spreadsheet = matches!(&*self.shown.borrow(), Some(MergeSource::Spreadsheet { .. }));
-        let names: Vec<String> = if spreadsheet {
-            // The columns as the file has them now.
-            *self.records.borrow_mut() = None;
-            self.current().map(|r| r.fields.clone()).unwrap_or_default()
-        } else {
-            desk_contacts::CONTACT_FIELDS
-                .iter()
-                .map(|n| (*n).to_owned())
-                .collect()
-        };
+        if !spreadsheet {
+            return insert_menu();
+        }
+        // The columns as the file has them now.
+        *self.records.borrow_mut() = None;
+        let names = self.current().map(|r| r.fields.clone()).unwrap_or_default();
         let menu = gio::Menu::new();
         let recipients = gio::Menu::new();
         field_items(&recipients, &names, false);
@@ -644,6 +665,26 @@ fn source_menu(groups: &[String]) -> gio::Menu {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn mal_07_the_menu_of_fields_is_that_of_pages() {
+        let menu = insert_menu();
+        let recipients = menu.item_link(0, gio::MENU_LINK_SECTION).unwrap();
+        // The common fields, then More Fields with every other field.
+        assert_eq!(recipients.n_items(), COMMON_FIELDS.len() as i32 + 1);
+        let more = recipients
+            .item_link(COMMON_FIELDS.len() as i32, gio::MENU_LINK_SUBMENU)
+            .unwrap();
+        assert_eq!(
+            more.n_items() as usize + COMMON_FIELDS.len(),
+            desk_contacts::CONTACT_FIELDS.len()
+        );
+        assert!(
+            COMMON_FIELDS
+                .iter()
+                .all(|f| desk_contacts::CONTACT_FIELDS.contains(f))
+        );
+    }
 
     #[test]
     fn mal_04_a_source_is_named_by_its_file() {

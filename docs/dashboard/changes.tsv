@@ -219,3 +219,6 @@ date	kind	id	from	to
 2026-11-26	feature	W104	partial	done
 2026-11-26	feature	W105	missing	partial
 2026-11-26	feature	W105	partial	done
+2026-11-26	backlog	B-044	open	done
+2026-11-26	phase	W3	in-progress	done
+2026-11-26	backlog	B-080	new	open
