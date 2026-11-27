@@ -3129,6 +3129,36 @@ paragraph, and objects on a second page.
   and W149 stay partial, since comments and changes in print wait for
   W5 (B-077).
 
+### 27 November: objects and charts in Pages 15.4 (step 2 of W4)
+
+- The session on the Mac looked at Pages 15.4 in the background, then
+  with the whole screen for the file dialog, the Content Hub and the
+  pop-up menus. Its notes are in the project folder
+  (`w4-mac/notes-02.md`).
+- *What it found:* Insert > Chart has 26 types; the donut, radar and
+  bubble are 2D only, and the interactive chart comes in column, bar,
+  scatter and bubble. The donut has an Inner Radius (75%), columns have
+  Rounded Corners with Outside Corners Only, and reference lines are in
+  the Value axis of the Axis tab. Images, shapes, movies and charts have
+  a Title and a Caption; an image gallery has a caption per image or one
+  for all. The Image tab has Exposure, Saturation and Enhance before the
+  full adjustments, and movies have Trim and Poster Frame. Insert >
+  Record Audio opens a small panel with a record button.
+- *What changed the plan:* the shape library of 15.4 lives in the
+  Content Hub, a window of its own, beside the photos, videos and
+  graphics of Apple Creator Studio, which are online and paid and stay
+  out (D-004); Desk builds the shapes, by category and searched by
+  name, with My Shapes. Auto Crop, in the Image tab, was in no row; the
+  end of the phase checks whether it uses AI.
+- *The matrix:* the rows of objects and charts of W4 are written again
+  for 15.4 with the phase W4, and nine new rows, `PXV-23` to `PXV-31`,
+  test the gallery, titles and captions, 3D objects, drawings,
+  combining shapes, the donut, radar and bubble, interactive charts,
+  rounded corners and reference lines.
+- Drawings and 3D objects were not seen, for want of a drawing made on
+  an iPad and of a 3D model; their rows follow the Pages User Guide and
+  are seen in the validation at the end.
+
 ## Decisions, with their reasons and consequences
 
 Ids `D-nnn` and `R-nnn` are those of [decisions.md](decisions.md).
