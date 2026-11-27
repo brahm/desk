@@ -66,7 +66,7 @@ W2 resumed the same day.
 | **W1** Writer: to the behaviour of 15 | Text, styles, paragraphs, view and table features that exist as in '09 and now follow 15.4, keeping what the '09 did (D-003) | 28 | 4 |
 | **W2** Writer: review | Comment threads with replies, tracking of changes including format and table cells, markup views, the review pane | 8 | 3 |
 | **W3** Writer: structure and templates | Page templates, placeholders, live table of contents, bookmarks, mail merge with preview, text and page layout documents | 9 | 3 |
-| **W4** Writer: objects and charts of 15 | Shape library, combining and drawing shapes, image gallery, captions, 3D objects, audio recording, new chart types, interactive charts | 21 | 4 |
+| **W4** Writer: objects and charts of 15 | Shape library, combining and drawing shapes, image gallery, captions, 3D objects, audio recording, new chart types, interactive charts | 20 | 4 |
 | **W5** Writer: files | Open `.docx`, current `.pages` (D-011) and LibreOffice ODT in full; export `.docx`, PDF and EPUB from the window; print; password | 21 | 6 |
 | **W6** Writer: finish | Help, right-to-left and vertical text, accessibility pass, translations | 1 | 2 |
 | **T1** Tables: sheets and files of its own | ODS read and written; cells connected to the table, formula and chart engines; several tables on a sheet | 33 | 4 |

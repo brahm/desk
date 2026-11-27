@@ -663,7 +663,7 @@ phase	T5	not-started
 phase	W1	done
 phase	W2	done
 phase	W3	done
-phase	W4	not-started
+phase	W4	in-progress
 phase	W5	not-started
 phase	W6	not-started
 phase	X1	not-started
