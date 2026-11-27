@@ -51,7 +51,7 @@ mod auto_numbers;
 mod autocorrect;
 mod captions;
 pub use captions::{CAPTION_STYLE, Caption, Captions};
-pub use combine::Combine;
+pub use combine::{Combine, MAX_SHAPE_PARTS};
 pub use gallery::{Gallery, GalleryImage};
 mod case_change;
 mod change;

@@ -376,17 +376,18 @@ pub(crate) fn arrange_menu() -> gio::Menu {
     // Format > Shapes and Lines of Pages 15.4 (W113).
     let combine = gio::Menu::new();
     for (label, value) in [
-        (tr("_Unite Shapes"), "unite"),
-        (tr("_Intersect Shapes"), "intersect"),
-        (tr("_Subtract Shapes"), "subtract"),
-        (tr("_Exclude Shapes"), "exclude"),
+        // Without mnemonics: every letter of them is taken in the menu.
+        (tr("Unite Shapes"), "unite"),
+        (tr("Intersect Shapes"), "intersect"),
+        (tr("Subtract Shapes"), "subtract"),
+        (tr("Exclude Shapes"), "exclude"),
     ] {
         combine.append(
             Some(&label),
             Some(&format!("win.combine-shapes('{value}')")),
         );
     }
-    combine.append(Some(&tr("_Break Apart")), Some("win.break-apart"));
+    combine.append(Some(&tr("Break Apart")), Some("win.break-apart"));
     shape.append_section(None, &combine);
     let grouping = gio::Menu::new();
     // A copy a little lower and to the right (OBJ-22).

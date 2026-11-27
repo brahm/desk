@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Desk\n"
 "Report-Msgid-Bugs-To: https://github.com/brahm/desk/issues\n"
-"POT-Creation-Date: 2026-11-27 19:27+0000\n"
+"POT-Creation-Date: 2026-11-27 20:02+0000\n"
 "PO-Revision-Date: 2026-11-02 00:54+0000\n"
 "Last-Translator: Desk contributors\n"
 "Language-Team: Brazilian Portuguese\n"
@@ -2588,18 +2588,18 @@ msgid "Un_mask"
 msgstr "Re_mover máscara"
 
 #: crates/desk-ui/src/format_pane.rs:397
-#: crates/desk-ui/src/window/objects.rs:391
+#: crates/desk-ui/src/window/objects.rs:395
 msgctxt "Arrange"
 msgid "Dupl_icate"
 msgstr "Dupl_icar"
 
 #: crates/desk-ui/src/format_pane.rs:400
-#: crates/desk-ui/src/window/objects.rs:396
+#: crates/desk-ui/src/window/objects.rs:400
 msgid "_Lock"
 msgstr "T_ravar"
 
 #: crates/desk-ui/src/format_pane.rs:401
-#: crates/desk-ui/src/window/objects.rs:397
+#: crates/desk-ui/src/window/objects.rs:401
 msgid "U_nlock"
 msgstr "Destra_var"
 
@@ -6702,7 +6702,7 @@ msgstr "Subtrair"
 msgid "Exclude"
 msgstr "Excluir"
 
-#: crates/desk-ui/src/undo_names.rs:95
+#: crates/desk-ui/src/undo_names.rs:95 crates/desk-ui/src/window/objects.rs:390
 msgid "Break Apart"
 msgstr "Separar"
 
@@ -7741,47 +7741,43 @@ msgstr "_Redefinir texto e alças do objeto"
 msgid "Mask with S_hape"
 msgstr "Máscara com _forma"
 
-#: crates/desk-ui/src/window/objects.rs:379
-msgid "_Unite Shapes"
-msgstr "_Unir formas"
-
 #: crates/desk-ui/src/window/objects.rs:380
-msgid "_Intersect Shapes"
-msgstr "_Interseção de formas"
+msgid "Unite Shapes"
+msgstr "Unir formas"
 
 #: crates/desk-ui/src/window/objects.rs:381
-msgid "_Subtract Shapes"
-msgstr "_Subtrair formas"
+msgid "Intersect Shapes"
+msgstr "Interseção de formas"
 
 #: crates/desk-ui/src/window/objects.rs:382
-msgid "_Exclude Shapes"
-msgstr "_Excluir formas"
+msgid "Subtract Shapes"
+msgstr "Subtrair formas"
 
-#: crates/desk-ui/src/window/objects.rs:386
-msgid "_Break Apart"
-msgstr "_Separar"
+#: crates/desk-ui/src/window/objects.rs:383
+msgid "Exclude Shapes"
+msgstr "Excluir formas"
 
-#: crates/desk-ui/src/window/objects.rs:394
+#: crates/desk-ui/src/window/objects.rs:398
 msgid "_Group"
 msgstr "A_grupar"
 
-#: crates/desk-ui/src/window/objects.rs:395
+#: crates/desk-ui/src/window/objects.rs:399
 msgid "_Ungroup"
 msgstr "Desagr_upar"
 
-#: crates/desk-ui/src/window/objects.rs:401
+#: crates/desk-ui/src/window/objects.rs:405
 msgid "Move to Section _Master"
 msgstr "Mover para o mestre da _seção"
 
-#: crates/desk-ui/src/window/objects.rs:404
+#: crates/desk-ui/src/window/objects.rs:408
 msgid "Move to _Page"
 msgstr "Mover para a _página"
 
-#: crates/desk-ui/src/window/objects.rs:406
+#: crates/desk-ui/src/window/objects.rs:410
 msgid "Make Background Objects _Selectable"
 msgstr "Tornar objetos de fundo se_lecionáveis"
 
-#: crates/desk-ui/src/window/objects.rs:410
+#: crates/desk-ui/src/window/objects.rs:414
 msgid "Make Master _Objects Selectable"
 msgstr "Tornar objetos mestres selecio_náveis"
 
@@ -8109,6 +8105,9 @@ msgid "Left out {what}, in {n} paragraph."
 msgid_plural "Left out {what}, in {n} paragraphs."
 msgstr[0] "Não importado: {what}, em {n} parágrafo."
 msgstr[1] "Não importado: {what}, em {n} parágrafos."
+
+#~ msgid "_Break Apart"
+#~ msgstr "_Separar"
 
 #~ msgid "White"
 #~ msgstr "Branco"

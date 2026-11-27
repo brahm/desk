@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Desk\n"
 "Report-Msgid-Bugs-To: https://github.com/brahm/desk/issues\n"
-"POT-Creation-Date: 2026-11-27 19:27+0000\n"
+"POT-Creation-Date: 2026-11-27 20:02+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -2582,18 +2582,18 @@ msgid "Un_mask"
 msgstr ""
 
 #: crates/desk-ui/src/format_pane.rs:397
-#: crates/desk-ui/src/window/objects.rs:391
+#: crates/desk-ui/src/window/objects.rs:395
 msgctxt "Arrange"
 msgid "Dupl_icate"
 msgstr ""
 
 #: crates/desk-ui/src/format_pane.rs:400
-#: crates/desk-ui/src/window/objects.rs:396
+#: crates/desk-ui/src/window/objects.rs:400
 msgid "_Lock"
 msgstr ""
 
 #: crates/desk-ui/src/format_pane.rs:401
-#: crates/desk-ui/src/window/objects.rs:397
+#: crates/desk-ui/src/window/objects.rs:401
 msgid "U_nlock"
 msgstr ""
 
@@ -6660,7 +6660,7 @@ msgstr ""
 msgid "Exclude"
 msgstr ""
 
-#: crates/desk-ui/src/undo_names.rs:95
+#: crates/desk-ui/src/undo_names.rs:95 crates/desk-ui/src/window/objects.rs:390
 msgid "Break Apart"
 msgstr ""
 
@@ -7674,47 +7674,43 @@ msgstr ""
 msgid "Mask with S_hape"
 msgstr ""
 
-#: crates/desk-ui/src/window/objects.rs:379
-msgid "_Unite Shapes"
-msgstr ""
-
 #: crates/desk-ui/src/window/objects.rs:380
-msgid "_Intersect Shapes"
+msgid "Unite Shapes"
 msgstr ""
 
 #: crates/desk-ui/src/window/objects.rs:381
-msgid "_Subtract Shapes"
+msgid "Intersect Shapes"
 msgstr ""
 
 #: crates/desk-ui/src/window/objects.rs:382
-msgid "_Exclude Shapes"
+msgid "Subtract Shapes"
 msgstr ""
 
-#: crates/desk-ui/src/window/objects.rs:386
-msgid "_Break Apart"
+#: crates/desk-ui/src/window/objects.rs:383
+msgid "Exclude Shapes"
 msgstr ""
 
-#: crates/desk-ui/src/window/objects.rs:394
+#: crates/desk-ui/src/window/objects.rs:398
 msgid "_Group"
 msgstr ""
 
-#: crates/desk-ui/src/window/objects.rs:395
+#: crates/desk-ui/src/window/objects.rs:399
 msgid "_Ungroup"
 msgstr ""
 
-#: crates/desk-ui/src/window/objects.rs:401
+#: crates/desk-ui/src/window/objects.rs:405
 msgid "Move to Section _Master"
 msgstr ""
 
-#: crates/desk-ui/src/window/objects.rs:404
+#: crates/desk-ui/src/window/objects.rs:408
 msgid "Move to _Page"
 msgstr ""
 
-#: crates/desk-ui/src/window/objects.rs:406
+#: crates/desk-ui/src/window/objects.rs:410
 msgid "Make Background Objects _Selectable"
 msgstr ""
 
-#: crates/desk-ui/src/window/objects.rs:410
+#: crates/desk-ui/src/window/objects.rs:414
 msgid "Make Master _Objects Selectable"
 msgstr ""
 

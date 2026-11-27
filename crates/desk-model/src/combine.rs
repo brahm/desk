@@ -30,6 +30,10 @@ pub enum Combine {
     Exclude,
 }
 
+/// The most parts of a shape: those of a combination, and those read
+/// from a file.
+pub const MAX_SHAPE_PARTS: usize = 4096;
+
 /// How many straight lines stand for a curve of an outline.
 const CURVE_STEPS: usize = 16;
 
@@ -132,6 +136,8 @@ fn shape_of(contours: &[Vec<[f64; 2]>]) -> Option<(Frame, Shape)> {
     };
     let shape = match &parts[..] {
         [] => return None,
+        // As many as ODF keeps.
+        _ if parts.len() > MAX_SHAPE_PARTS => return None,
         // One part is a shape drawn with the pen, whose points edit.
         [one] => Shape::Path {
             points: one.clone(),
@@ -145,6 +151,8 @@ fn shape_of(contours: &[Vec<[f64; 2]>]) -> Option<(Frame, Shape)> {
 /// Whether an object is a shape that combines: one with an inside.
 fn combinable(object: &Object) -> Option<&Shape> {
     match &object.kind {
+        // An open path has no inside either.
+        ObjectKind::Shape(Shape::Path { closed: false, .. }) => None,
         ObjectKind::Shape(shape) if !shape.is_line() => Some(shape),
         _ => None,
     }
@@ -198,18 +206,20 @@ impl Edit {
                     result = flat(result.overlay(other, OverlayRule::Xor, FillRule::NonZero));
                 }
             }
-            Combine::Unite | Combine::Subtract => {
-                // The others first make one, which is then joined or taken
-                // out.
-                let others: Contours = rest.iter().flatten().cloned().collect();
-                let others =
-                    flat(others.overlay(&Contours::new(), OverlayRule::Subject, FillRule::NonZero));
-                let rule = if how == Combine::Unite {
-                    OverlayRule::Union
-                } else {
-                    OverlayRule::Difference
-                };
-                result = flat(result.overlay(&others, rule, FillRule::NonZero));
+            Combine::Unite => {
+                for other in rest {
+                    result = flat(result.overlay(other, OverlayRule::Union, FillRule::NonZero));
+                }
+            }
+            Combine::Subtract => {
+                // Those in front first make one, each on its own rule, so
+                // that one flipped, which goes the other way around, still
+                // covers what it covers; then it is taken out.
+                let mut front: Contours = Contours::new();
+                for other in rest {
+                    front = flat(front.overlay(other, OverlayRule::Union, FillRule::NonZero));
+                }
+                result = flat(result.overlay(&front, OverlayRule::Difference, FillRule::NonZero));
             }
         }
         let Some((frame, shape)) = shape_of(&result) else {
@@ -225,6 +235,12 @@ impl Edit {
         combined.object_style = back.object_style;
         combined.wrap = back.wrap;
         combined.wrap_margin = back.wrap_margin;
+        combined.wrap_threshold = back.wrap_threshold;
+        // The text, link and captions of the one at the back stay; those of
+        // the others go with them, as in Pages.
+        combined.text = back.text.clone();
+        combined.link = back.link.clone();
+        combined.captions = back.captions.clone();
         let index = back_at.min(self.document().objects().len());
         self.insert_object(index, combined)?;
         Ok(Some(id))
@@ -257,6 +273,10 @@ impl Edit {
                     pieces.push((frame, piece));
                 }
             }
+            // A shape none of whose parts makes one stays as it is.
+            if pieces.is_empty() {
+                continue;
+            }
             self.remove_object(id)?;
             for (i, (frame, piece)) in pieces.into_iter().enumerate() {
                 let new = self.new_id();
@@ -266,6 +286,13 @@ impl Edit {
                 part.object_style = object.object_style;
                 part.wrap = object.wrap;
                 part.wrap_margin = object.wrap_margin;
+                part.wrap_threshold = object.wrap_threshold;
+                // The first part keeps the text, link and captions.
+                if i == 0 {
+                    part.text = object.text.clone();
+                    part.link = object.link.clone();
+                    part.captions = object.captions.clone();
+                }
                 self.insert_object(index + i, part)?;
                 made.push(new);
             }
@@ -401,6 +428,69 @@ mod tests {
         assert!(editor.document().objects().get(id).is_some());
         editor.undo().unwrap();
         assert_eq!(editor.document().objects().len(), 2);
+    }
+
+    #[test]
+    fn w113_a_flipped_shape_in_front_still_covers_what_it_covers() {
+        let mut editor = Editor::new(Document::new_word_processing());
+        let id = editor
+            .edit("Unite", |edit| {
+                let back = square(edit, 0.0, 0.0, 100.0)?;
+                let a = square(edit, 150.0, 0.0, 100.0)?;
+                let b = square(edit, 200.0, 0.0, 100.0)?;
+                // A pen shape that goes the other way around.
+                let mut flipped = edit.document().objects().get(b).cloned().unwrap();
+                flipped.kind = ObjectKind::Shape(Shape::Path {
+                    points: [(0, 0), (0, 10_000), (10_000, 10_000), (10_000, 0)]
+                        .map(|(x, y)| PathPoint::corner(x, y))
+                        .as_slice()
+                        .into(),
+                    closed: true,
+                });
+                flipped.flip_horizontal = true;
+                edit.replace_object(flipped)?;
+                edit.combine_shapes(&[back, a, b], Combine::Unite)
+            })
+            .unwrap()
+            .unwrap();
+        let united = editor.document().objects().get(id).unwrap();
+        // No hole where the two in front overlap.
+        assert!((area(united) - 25_000.0).abs() < 400.0, "{}", area(united));
+    }
+
+    #[test]
+    fn w113_open_paths_and_text_are_kept_apart() {
+        let mut editor = Editor::new(Document::new_word_processing());
+        let id = editor
+            .edit("Unite", |edit| {
+                let back = square(edit, 0.0, 0.0, 100.0)?;
+                let front = square(edit, 50.0, 0.0, 100.0)?;
+                let mut labeled = edit.document().objects().get(back).cloned().unwrap();
+                labeled.link = Some(Arc::from("https://example.com"));
+                edit.replace_object(labeled)?;
+                let open = edit.new_id();
+                let mut stroke = Object::new(
+                    open,
+                    ObjectKind::Shape(Shape::Path {
+                        points: [PathPoint::corner(0, 0), PathPoint::corner(10_000, 10_000)]
+                            .as_slice()
+                            .into(),
+                        closed: false,
+                    }),
+                    Frame::from_pt(0.0, 200.0, 50.0, 50.0),
+                );
+                stroke.anchor = Anchor::Page(0);
+                edit.add_object(stroke)?;
+                edit.combine_shapes(&[back, front, open], Combine::Unite)
+            })
+            .unwrap()
+            .unwrap();
+        let document = editor.document();
+        // The open stroke stays; the link of the one at the back too.
+        assert_eq!(document.objects().len(), 2);
+        let united = document.objects().get(id).unwrap();
+        assert_eq!(united.link.as_deref(), Some("https://example.com"));
+        assert_eq!(united.frame, Frame::from_pt(0.0, 0.0, 150.0, 100.0));
     }
 
     #[test]

@@ -693,6 +693,19 @@ pub(crate) fn path_shape(path: &str, view_box: Option<(f64, f64, f64, f64)>) -> 
     // Each part, with whether it is closed.
     let mut parts: Vec<(Vec<desk_model::PathPoint>, bool)> = vec![(Vec::new(), false)];
     for (command, v) in &flat {
+        // A part drawn on after it closed starts again where it started.
+        if *command != 'M'
+            && *command != 'Z'
+            && let Some((points, true)) = parts.last()
+        {
+            let start = points
+                .first()
+                .map(|p| desk_model::PathPoint::corner(p.at.0, p.at.1));
+            parts.push((start.into_iter().collect(), false));
+        }
+        if parts.len() > desk_model::MAX_SHAPE_PARTS {
+            break;
+        }
         let (points, closed) = parts.last_mut()?;
         match command {
             'M' if !points.is_empty() => {
@@ -739,7 +752,7 @@ pub(crate) fn path_shape(path: &str, view_box: Option<(f64, f64, f64, f64)>) -> 
         return Some(Shape::Compound(
             parts
                 .into_iter()
-                .take(MAX_PATH_PARTS)
+                .take(desk_model::MAX_SHAPE_PARTS)
                 .map(|(p, _)| Arc::from(p))
                 .collect(),
         ));
@@ -750,9 +763,6 @@ pub(crate) fn path_shape(path: &str, view_box: Option<(f64, f64, f64, f64)>) -> 
         closed,
     })
 }
-
-/// The most parts of a shape that are read, against hostile files.
-const MAX_PATH_PARTS: usize = 4096;
 
 /// The shape that `desk:shape` gives, or none when it is not one.
 fn desk_shape_of(settings: &str) -> Option<Shape> {
@@ -3596,6 +3606,25 @@ fn alpha_kept(value: &str) -> Option<desk_model::AlphaOutline> {
 
 #[cfg(test)]
 mod tests {
+
+    #[test]
+    fn w113_the_parts_of_a_path_are_read_each_from_its_start() {
+        let ring = path_shape(
+            "M 0 0 L 100 0 L 100 100 L 0 100 Z M 25 25 L 25 75 L 75 75 L 75 25 Z",
+            Some((0.0, 0.0, 100.0, 100.0)),
+        );
+        assert!(matches!(ring, Some(Shape::Compound(parts)) if parts.len() == 2));
+        // Drawn on after it closes, a part starts again where it started.
+        let Some(Shape::Compound(parts)) = path_shape(
+            "M 0 0 L 100 0 L 100 100 Z L 50 0 L 0 50 Z",
+            Some((0.0, 0.0, 100.0, 100.0)),
+        ) else {
+            panic!("two parts");
+        };
+        assert_eq!(parts[1][0].at, (0, 0));
+        assert_eq!(parts[1].len(), 3);
+    }
+
     use super::*;
 
     #[test]
