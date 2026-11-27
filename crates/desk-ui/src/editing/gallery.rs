@@ -13,7 +13,7 @@ use desk_model::{Anchor, Edit, Gallery, ModelError, NodeId, Object, ObjectKind, 
 use gtk::gio;
 
 use super::TextEditor;
-use super::objects::{REACH, find, hit};
+use super::objects::{REACH, find, handles, hit};
 
 /// How large a new gallery is, in points, as in Pages.
 const NEW_GALLERY: (f64, f64) = (320.0, 240.0);
@@ -167,6 +167,13 @@ impl TextEditor {
                 return false;
             };
             if on != page || placed.object.locked {
+                return false;
+            }
+            // A handle under the press is the handle's.
+            let handle_reach = (REACH / self.view.scale()) as f32;
+            if handles(placed).iter().any(|(_, (hx, hy))| {
+                (hx - x).abs() <= handle_reach && (hy - y).abs() <= handle_reach
+            }) {
                 return false;
             }
             gallery_arrows(placed)

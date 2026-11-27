@@ -1019,31 +1019,41 @@ fn draw_object_at(
                 DrawKind::Table(crate::table::read_table(table, paragraph))
             } else if let Some(gallery) = e.child(DESK, "gallery") {
                 // docs/odf-extensions.md: desk:gallery.
-                let images: Vec<GalleryImage> = gallery
+                let written = gallery
+                    .attr(DESK, "shown")
+                    .and_then(|s| s.trim().parse::<usize>().ok())
+                    .unwrap_or(0);
+                // The index of the picture shown among those kept: the
+                // first when it is not one of them.
+                let mut shown = 0;
+                let mut images = Vec::new();
+                for (at, i) in gallery
                     .children_named(DESK, "gallery-image")
                     .take(MAX_GALLERY_IMAGES)
-                    .filter_map(|i| {
-                        Some(GalleryImage {
-                            href: i.attr(XLINK, "href")?.to_owned(),
-                            description: i.attr(DESK, "description").unwrap_or_default().to_owned(),
-                            caption: i
-                                .elements()
-                                .filter(|p| p.name.is(TEXT, "p") || p.name.is(TEXT, "h"))
-                                .map(paragraph)
-                                .collect(),
-                        })
-                    })
-                    .collect();
+                    .enumerate()
+                {
+                    let Some(href) = i.attr(XLINK, "href") else {
+                        continue;
+                    };
+                    if at == written {
+                        shown = images.len();
+                    }
+                    images.push(GalleryImage {
+                        href: href.to_owned(),
+                        description: i.attr(DESK, "description").unwrap_or_default().to_owned(),
+                        caption: i
+                            .elements()
+                            .filter(|p| p.name.is(TEXT, "p") || p.name.is(TEXT, "h"))
+                            .map(paragraph)
+                            .collect(),
+                    });
+                }
                 DrawKind::Gallery {
                     poster: e
                         .child(DRAW, "image")
                         .and_then(|i| i.attr(XLINK, "href"))
                         .map(str::to_owned),
-                    shown: gallery
-                        .attr(DESK, "shown")
-                        .and_then(|s| s.trim().parse::<usize>().ok())
-                        .unwrap_or(0)
-                        .min(images.len().saturating_sub(1)),
+                    shown,
                     each_caption: gallery.attr(DESK, "each-caption") == Some("true"),
                     images,
                 }

@@ -21,6 +21,9 @@ use crate::i18n::tr;
 /// The side of the pictures of the list, in pixels.
 const THUMBNAIL: i32 = 40;
 
+/// The pictures of a list with their descriptions, and the one shown.
+type Listed = (Vec<(Picture, String)>, usize);
+
 /// The Gallery group of the Inspector.
 pub struct GalleryGroup {
     group: compact::Group,
@@ -28,9 +31,9 @@ pub struct GalleryGroup {
     list: gtk::Box,
     description: compact::EntryRow,
     editor: EditorOf,
-    /// The pictures the list shows and the one shown, so that it is made
-    /// again only when they change.
-    listed: RefCell<Option<(Vec<Picture>, usize)>>,
+    /// The pictures the list shows with their descriptions, and the one
+    /// shown, so that it is made again only when they change.
+    listed: RefCell<Option<Listed>>,
     updating: Cell<bool>,
 }
 
@@ -187,7 +190,11 @@ impl GalleryGroup {
 
     /// Makes the list of pictures again.
     fn list(self: &Rc<Self>, gallery: &Gallery) {
-        let pictures: Vec<Picture> = gallery.images.iter().map(|i| i.picture.clone()).collect();
+        let pictures: Vec<(Picture, String)> = gallery
+            .images
+            .iter()
+            .map(|i| (i.picture.clone(), i.description.clone()))
+            .collect();
         let key = (pictures, gallery.shown_index());
         if self.listed.borrow().as_ref() == Some(&key) {
             return;

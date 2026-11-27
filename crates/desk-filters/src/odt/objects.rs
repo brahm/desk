@@ -896,7 +896,10 @@ fn kind(
         } => {
             // docs/odf-extensions.md: desk:gallery (W111).
             let mut built = Vec::with_capacity(images.len());
-            for image in images {
+            // The picture shown among those Desk reads: the first when it
+            // cannot read that one.
+            let mut kept_shown = 0;
+            for (at, image) in images.iter().enumerate() {
                 let path = image.href.strip_prefix("./").unwrap_or(&image.href);
                 let Some(picture) = source
                     .pictures
@@ -910,6 +913,9 @@ fn kind(
                 for p in &image.caption {
                     caption.push(paragraph(document, p)?);
                 }
+                if at == *shown {
+                    kept_shown = built.len();
+                }
                 built.push(desk_model::GalleryImage {
                     picture,
                     description: image.description.clone(),
@@ -917,7 +923,7 @@ fn kind(
                 });
             }
             let gallery = desk_model::Gallery {
-                shown: (*shown).min(built.len().saturating_sub(1)),
+                shown: kept_shown,
                 images: Arc::from(built),
                 each_caption: *each_caption,
             };

@@ -5564,3 +5564,51 @@ fn w111_a_gallery_keeps_its_pictures_descriptions_and_captions() {
         .unwrap();
     assert_eq!(editor.document().story_paragraphs(story)[0].text(), "First");
 }
+
+#[test]
+fn w111_the_picture_shown_stays_shown_when_one_before_it_cannot_be_read() {
+    use desk_model::{Frame, Object, ObjectKind, Picture};
+    let png = |w: u32| {
+        let mut bytes = Vec::new();
+        {
+            let mut encoder = png::Encoder::new(&mut bytes, w, 1);
+            encoder.set_color(png::ColorType::Rgba);
+            let mut writer = encoder.write_header().unwrap();
+            writer.write_image_data(&vec![10; w as usize * 4]).unwrap();
+        }
+        Picture::from_png(bytes).unwrap()
+    };
+    let mut editor = desk_model::Editor::new(Document::new_word_processing());
+    editor
+        .edit("Gallery", |edit| {
+            let id = edit.new_id();
+            edit.add_object(Object::new(
+                id,
+                ObjectKind::Gallery(Default::default()),
+                Frame::from_pt(0.0, 0.0, 160.0, 120.0),
+            ))?;
+            edit.add_gallery_images(id, vec![png(1), png(2), png(3)])?;
+            edit.show_gallery_image(id, 1)
+        })
+        .unwrap();
+    let bytes = write_odt(editor.document()).unwrap();
+    // The first picture of the gallery is one the package does not have.
+    let bytes = with_stream(&bytes, "content.xml", |content| {
+        content.replacen(
+            "<desk:gallery-image xlink:href=\"",
+            "<desk:gallery-image xlink:href=\"Pictures/missing.png\" desk:was=\"",
+            1,
+        )
+    });
+    let read = read_odt(&bytes).unwrap();
+    let gallery = read
+        .objects()
+        .iter()
+        .next()
+        .unwrap()
+        .gallery()
+        .unwrap()
+        .clone();
+    assert_eq!(gallery.images.len(), 2);
+    assert_eq!(gallery.shown_image().unwrap().picture.width(), 2);
+}

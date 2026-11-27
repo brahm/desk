@@ -103,12 +103,20 @@ impl Edit {
         gallery.shown = gallery.shown_index();
         // Then the caption of the picture shown now comes out, when each
         // has its own and it has one.
+        // A picture with no caption yet shows an empty one, never that of
+        // the picture before.
         if gallery.each_caption
             && let Some(image) = gallery.shown_image()
-            && !image.caption.is_empty()
+            && (!image.caption.is_empty() || object.captions.is_some())
         {
+            let paragraphs = if image.caption.is_empty() {
+                let style = self.document().styles().default_paragraph();
+                Arc::from([Paragraph::new(self.new_id(), style)])
+            } else {
+                image.caption.clone()
+            };
             let mut captions = object.captions.as_deref().cloned().unwrap_or_default();
-            captions.caption.paragraphs = image.caption.clone();
+            captions.caption.paragraphs = paragraphs;
             object.captions = Some(Arc::new(captions));
         }
         object.kind = ObjectKind::Gallery(Arc::new(gallery));
@@ -211,6 +219,25 @@ impl Edit {
         })
     }
 
+    /// Copies of paragraphs with identifiers of their own.
+    pub(crate) fn fresh_paragraphs(
+        &mut self,
+        paragraphs: &[Paragraph],
+    ) -> Result<Arc<[Paragraph]>, ModelError> {
+        paragraphs
+            .iter()
+            .map(|p| {
+                Paragraph::from_runs(
+                    self.new_id(),
+                    p.style(),
+                    p.attrs().clone(),
+                    p.runs().cloned(),
+                )
+            })
+            .collect::<Result<Vec<_>, _>>()
+            .map(Arc::from)
+    }
+
     /// Gives each picture of a gallery a caption of its own, or one for
     /// all of them. Each starts with the caption shown; one for all keeps
     /// the caption of the picture shown.
@@ -222,21 +249,32 @@ impl Edit {
             .and_then(|o| o.captions.as_deref())
             .map(|c| c.caption.paragraphs.clone())
             .unwrap_or_else(|| Arc::from([]));
+        // Each picture starts with a copy of its own, with paragraphs of
+        // its own.
+        let count = self
+            .document()
+            .objects()
+            .get(id)
+            .and_then(Object::gallery)
+            .map_or(0, |g| g.images.len());
+        let mut copies = Vec::with_capacity(count);
+        if each {
+            for _ in 0..count {
+                copies.push(self.fresh_paragraphs(&shown_caption)?);
+            }
+        }
         self.change_gallery(id, |gallery| {
             if gallery.each_caption == each {
                 return Ok(());
             }
             gallery.each_caption = each;
+            let mut copies = copies.into_iter();
             let images: Vec<GalleryImage> = gallery
                 .images
                 .iter()
                 .cloned()
                 .map(|mut image| {
-                    image.caption = if each {
-                        shown_caption.clone()
-                    } else {
-                        Arc::from([])
-                    };
+                    image.caption = copies.next().unwrap_or_else(|| Arc::from([]));
                     image
                 })
                 .collect();
@@ -390,6 +428,18 @@ mod tests {
         );
         editor
             .edit("Next", |edit| edit.show_gallery_image(id, 1))
+            .unwrap();
+        assert_eq!(
+            editor.document().story_paragraphs(story)[0].text(),
+            "The second"
+        );
+        // A picture added later starts with an empty caption.
+        editor
+            .edit("Add", |edit| edit.add_gallery_images(id, vec![picture(3)]))
+            .unwrap();
+        assert_eq!(editor.document().story_paragraphs(story)[0].text(), "");
+        editor
+            .edit("Back", |edit| edit.show_gallery_image(id, 1))
             .unwrap();
         assert_eq!(
             editor.document().story_paragraphs(story)[0].text(),

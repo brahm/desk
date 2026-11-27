@@ -324,6 +324,16 @@ impl Edit {
             line.start = None;
             line.end = None;
         }
+        // And the captions of the pictures of a gallery (W111).
+        if let crate::ObjectKind::Gallery(gallery) = &copy.kind {
+            let mut gallery = (**gallery).clone();
+            let mut images = gallery.images.to_vec();
+            for image in &mut images {
+                image.caption = self.fresh_paragraphs(&image.caption)?;
+            }
+            gallery.images = images.into();
+            copy.kind = crate::ObjectKind::Gallery(std::sync::Arc::new(gallery));
+        }
         if let crate::ObjectKind::Group(members) = &copy.kind {
             let members = members
                 .iter()
