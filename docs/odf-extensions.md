@@ -395,6 +395,25 @@ These sit on the `style:graphic-properties` of the graphic style of a
 - **Fallback:** the MathML, which other programs show and edit; an
   equation without the attribute is edited as MathML.
 
+#### `desk:captions`
+
+- **Feature:** the title and the caption of an object, which the Style
+  tab of Pages 15.4 turns on, above or below it (W122, PXV-24).
+- **On:** a `draw:frame` with a `draw:text-box` that Desk writes around
+  the object, as LibreOffice writes a caption: the paragraphs of the
+  title, a paragraph that holds the object as a character (`as-char`),
+  then those of the caption. The frame takes the anchor, the place and
+  the wrap of the object; the object keeps its size, its style and its
+  `draw:transform` when it is rotated.
+- **Value:** the parts of the text of the frame, in order, separated by
+  spaces: `title=N`, `object` and `caption=N`, where N is the number of
+  paragraphs. `object title=1` is a title below the object. A value that
+  does not match the paragraphs, or a paragraph of the object with other
+  than one object, makes the frame an ordinary text box. A title or a
+  caption that is turned off is not written.
+- **Fallback:** the frame, with the title, the object and the caption in
+  its text, as a caption made in LibreOffice shows.
+
 ### Tables (`table:table`)
 
 #### `desk:table`
@@ -1061,7 +1080,7 @@ specified here, by the rules above, in the phase that implements it.
 | Object, table and chart styles as named presets of the template | All | ODF styles have no "preset gallery" order or thumbnails | Ordinary automatic styles |
 | Shape library entries, combined shapes, editable freehand drawings | All | ODF keeps the resulting path, not the operation | The resulting path |
 | Image gallery (several pictures in one frame, with captions) | All | No standard element | The first picture, with its caption |
-| Captions and titles tied to an object | All | ODF captions are free text frames | A text frame grouped with the object |
+| Captions and titles tied to an object | All | ODF captions are free text frames | A text frame around the object (`desk:captions`, above, for Writer) |
 | 3D objects (models with a view angle) | All | No standard element for a model with a camera | A rendered picture |
 | Text fill with gradient or image, text outline options | All | ODF text properties have a colour only | The main colour |
 | Drop caps beyond the ODF model, automatic fractions, phonetic guide details | Writer | ODF covers part of each | The ODF drop cap, the literal characters, ODF ruby |

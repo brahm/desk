@@ -227,7 +227,7 @@ pub fn paginate(document: &Document, system: &mut TextSystem) -> DocumentLayout 
     let sum = settings.spacing == ParagraphSpacing::Sum;
     let plan = crate::notes::NotePlan::new(document);
     let labels = plan.labels(document, None);
-    let objects = crate::objects::inline_sizes(document);
+    let objects = crate::objects::inline_sizes(document, system);
     let hidden = crate::hidden_changes(document);
     let mut values: Vec<FieldValues> = vec![
         FieldValues {
@@ -294,12 +294,12 @@ pub fn paginate(document: &Document, system: &mut TextSystem) -> DocumentLayout 
         layout = plan.paginate(document, &values, &labels, system, setup, sum);
     }
     if let Some(count) = setup.layout_pages {
-        layout_pages(document, &mut layout, count);
+        layout_pages(document, &mut layout, count, system);
     }
     place_margins(document, &mut layout, system);
     place_backgrounds(document, &mut layout);
     crate::objects::place_master_objects(document, &mut layout);
-    crate::objects::place_inline_objects(document, &mut layout);
+    crate::objects::place_inline_objects(document, &mut layout, system);
     crate::objects::place_object_text(document, &mut layout, system);
     layout.field_values = values;
     layout.notes = plan.note_ids();
@@ -332,7 +332,12 @@ fn place_backgrounds(document: &Document, layout: &mut DocumentLayout) {
 /// text of the body, each with the objects fixed on it, from back to
 /// front (INT-03). Objects on pages past the last go on the last, and
 /// those that move with a paragraph on the first.
-fn layout_pages(document: &Document, layout: &mut DocumentLayout, count: u32) {
+fn layout_pages(
+    document: &Document,
+    layout: &mut DocumentLayout,
+    count: u32,
+    system: &mut TextSystem,
+) {
     let count = count.max(1) as usize;
     let setup = layout.setup;
     let body = layout.pages.first().map_or(
@@ -346,7 +351,7 @@ fn layout_pages(document: &Document, layout: &mut DocumentLayout, count: u32) {
         setup.margin_left.to_pt() as f32,
         setup.margin_right.to_pt() as f32,
     );
-    let floats = crate::objects::floating(document);
+    let floats = crate::objects::floating(document, system);
     layout.pages = (0..count)
         .map(|index| {
             let facing_left = setup.facing_pages && index % 2 == 1;
@@ -356,7 +361,7 @@ fn layout_pages(document: &Document, layout: &mut DocumentLayout, count: u32) {
                     Place::Page(page) => page.min(count - 1) == index,
                     Place::Paragraph(_) => index == 0,
                 })
-                .map(|f| PlacedObject::new(&f.object, None, 0.0))
+                .map(|f| f.place(None, 0.0))
                 .collect();
             Page {
                 number: index as u32 + 1,
@@ -517,7 +522,7 @@ pub fn margin_lines_split(
         notes: None,
         pages_of: None,
         // Objects in the lines of headers and footers (EST-12).
-        objects: crate::objects::inline_sizes(document),
+        objects: crate::objects::inline_sizes(document, system),
         hidden: crate::hidden_changes(document),
     };
     let width = (setup.width.to_pt() as f32 - page.margins.0 - page.margins.1).max(1.0);
@@ -595,7 +600,7 @@ impl MarginRoom {
         let mut heights = HashMap::new();
         let width = setup.body_width().to_pt() as f32;
         let values = FieldValues {
-            objects: crate::objects::inline_sizes(document),
+            objects: crate::objects::inline_sizes(document, system),
             hidden: crate::hidden_changes(document),
             ..FieldValues::default()
         };
@@ -631,7 +636,7 @@ impl MarginRoom {
             setup,
             keys,
             heights,
-            floats: crate::objects::floating(document),
+            floats: crate::objects::floating(document, system),
             toc,
         }
     }
@@ -688,7 +693,7 @@ impl MarginRoom {
 
 /// The lines of a header or a footer from the top of its first line, and
 /// the bottom of its last line.
-fn margin_block(
+pub(crate) fn margin_block(
     document: &Document,
     paragraphs: &[Paragraph],
     width: f32,
@@ -1248,12 +1253,13 @@ impl Paginator<'_> {
             .filter(|f| f.anchor == Place::Paragraph(paragraph))
             .map(|f| {
                 if !crate::objects::floats_in_text(&f.object) {
-                    return PlacedObject::new(&f.object, Some(paragraph), top);
+                    return f.place(Some(paragraph), top);
                 }
-                let mut placed = PlacedObject::new(&f.object, Some(paragraph), 0.0);
+                let mut placed = f.place(Some(paragraph), 0.0);
                 placed.x = (left + (width - placed.width) / 2.0).floor();
                 let margin = f.object.wrap_margin.to_pt() as f32;
-                placed.y = above.map_or(top, |a| top.max(a + margin));
+                // Its title goes between it and the text above (W122).
+                placed.y = above.map_or(top, |a| top.max(a + margin)) + placed.room.above;
                 placed
             })
             .collect()
@@ -1299,7 +1305,7 @@ impl Paginator<'_> {
             .floats
             .iter()
             .filter(|f| f.anchor == Place::Page(index))
-            .map(|f| PlacedObject::new(&f.object, None, 0.0))
+            .map(|f| f.place(None, 0.0))
             .collect();
         self.pages.push(Page {
             number,
@@ -1498,7 +1504,7 @@ impl Paginator<'_> {
             .floats
             .iter()
             .filter(|f| matches!(f.anchor, Place::Page(p) if p >= count))
-            .map(|f| PlacedObject::new(&f.object, None, 0.0))
+            .map(|f| f.place(None, 0.0))
             .collect();
         if let Some(last) = self.pages.last_mut() {
             last.objects.extend(past);

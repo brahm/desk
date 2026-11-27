@@ -2035,3 +2035,124 @@ fn w106_a_loop_of_objects_in_texts_is_laid_out_to_an_end() {
     }
     assert!((1..=16).contains(&depth), "{depth}");
 }
+
+#[test]
+fn w122_a_title_and_a_caption_stand_above_and_below_their_object_and_the_text_goes_around() {
+    use desk_model::{Anchor, Editor, Frame, Object, ObjectKind, Shape, Wrap};
+    let mut system = TextSystem::new();
+    let mut editor = Editor::new(Document::new_word_processing());
+    let text = "Words of the body go around the shape and its caption. ".repeat(40);
+    let square = editor
+        .edit("Square", |edit| {
+            let start = edit.document().start();
+            edit.insert_text(start, &text)?;
+            let mut square = Object::new(
+                edit.new_id(),
+                ObjectKind::Shape(Shape::Rectangle),
+                Frame::from_pt(72.0, 200.0, 200.0, 100.0),
+            );
+            square.anchor = Anchor::Page(0);
+            square.wrap = Wrap::Both;
+            let id = square.id;
+            edit.add_object(square)?;
+            edit.show_caption(id, true, true)?;
+            edit.show_caption(id, false, true)?;
+            Ok(id)
+        })
+        .unwrap();
+    let layout = paginate(editor.document(), &mut system);
+    let page = &layout.pages[0];
+    let placed = page.objects.iter().find(|o| o.object.id == square).unwrap();
+    assert_eq!(placed.title.len(), 1);
+    assert_eq!(placed.caption.len(), 1);
+    let (title, caption) = (&placed.title[0], &placed.caption[0]);
+    assert!(
+        title.bottom() <= placed.y + 0.01,
+        "{} {}",
+        title.bottom(),
+        placed.y
+    );
+    assert!(caption.top() >= placed.y + placed.height - 0.01);
+    assert!(placed.room.above > 0.0 && placed.room.below > 0.0);
+    // Centered under the object, in its width.
+    let left = caption.origin.0 + caption.line.caret_x(0);
+    let right = caption.origin.0 + caption.line.caret_x("Caption".len());
+    assert!(left > placed.x && right < placed.x + placed.width);
+    assert!(((left + right) / 2.0 - (placed.x + placed.width / 2.0)).abs() < 1.0);
+    // No line of the body runs through the shape or its title or caption.
+    let (top, bottom) = (title.top(), caption.bottom());
+    for line in &page.lines {
+        if line.bottom() > top && line.top() < bottom {
+            let x0 = line.origin.0 + line.line.caret_x(line.line.range.start);
+            let x1 = line.origin.0 + line.line.caret_x(line.line.range.end);
+            assert!(
+                x1 <= placed.x + 0.5 || x0 >= placed.x + placed.width - 0.5,
+                "a line from {x0} to {x1} at {} crosses the shape",
+                line.top()
+            );
+        }
+    }
+    // Turned off, the caption takes no room.
+    editor
+        .edit("Off", |edit| {
+            edit.show_caption(square, true, false)?;
+            edit.show_caption(square, false, false)
+        })
+        .unwrap();
+    let layout = paginate(editor.document(), &mut system);
+    let placed = layout.pages[0]
+        .objects
+        .iter()
+        .find(|o| o.object.id == square)
+        .unwrap();
+    assert!(placed.title.is_empty() && placed.caption.is_empty());
+    assert_eq!(placed.room, desk_layout::CaptionRoom::default());
+}
+
+#[test]
+fn w122_an_object_in_the_text_makes_its_line_as_tall_as_it_with_its_caption() {
+    use desk_model::{Editor, Frame, Object, Shape};
+    let mut system = TextSystem::new();
+    let mut editor = Editor::new(Document::new_word_processing());
+    let circle = editor
+        .edit("Circle", |edit| {
+            let start = edit.document().start();
+            let at = edit.insert_text(start, "Before after")?;
+            let circle = Object::new(
+                edit.new_id(),
+                Shape::Ellipse.into(),
+                Frame::from_pt(0.0, 0.0, 40.0, 40.0),
+            );
+            let id = circle.id;
+            edit.insert_object_in_text(desk_model::Position::new(at.paragraph, 7), circle)?;
+            Ok(id)
+        })
+        .unwrap();
+    let height = |editor: &Editor, system: &mut TextSystem| {
+        let layout = paginate(editor.document(), system);
+        let line = layout.pages[0].lines[0].clone();
+        let placed = layout.pages[0]
+            .objects
+            .iter()
+            .find(|o| o.object.id == circle)
+            .cloned()
+            .unwrap();
+        (line, placed)
+    };
+    let (plain, _) = height(&editor, &mut system);
+    editor
+        .edit("Caption", |edit| edit.show_caption(circle, false, true))
+        .unwrap();
+    let (line, placed) = height(&editor, &mut system);
+    assert!(placed.room.below > 0.0);
+    let grown = (line.line.baseline - line.line.top) - (plain.line.baseline - plain.line.top);
+    assert!(
+        (grown - placed.room.below).abs() < 0.5,
+        "{grown} {:?}",
+        placed.room
+    );
+    // The caption stands on the baseline, the circle on it.
+    let caption = placed.caption.last().unwrap();
+    assert!(caption.bottom() <= line.baseline() + 0.5);
+    assert!((placed.y + placed.height + placed.room.below - line.baseline()).abs() < 0.01);
+}

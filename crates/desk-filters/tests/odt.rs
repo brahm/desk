@@ -5200,3 +5200,121 @@ fn w106_a_loop_of_objects_in_texts_is_written_once_with_the_equations() {
         .count();
     assert_eq!(equations, 1);
 }
+
+#[test]
+fn w122_titles_and_captions_round_trip_in_frames_around_their_objects() {
+    use desk_model::{Anchor, Editor, Frame, Object, ObjectKind, Position, Shape, Story};
+    let mut editor = Editor::new(Document::new_word_processing());
+    // A rotated square on the page with a title above and a caption, and
+    // a circle in the text with a title below it.
+    let (square, circle) = editor
+        .edit("Objects", |edit| {
+            let mut square = Object::new(
+                edit.new_id(),
+                ObjectKind::Shape(Shape::Rectangle),
+                Frame::from_pt(100.0, 150.0, 120.0, 80.0),
+            );
+            square.anchor = Anchor::Page(0);
+            square.rotation = 1500;
+            let square_id = square.id;
+            edit.add_object(square)?;
+            edit.show_caption(square_id, true, true)?;
+            edit.show_caption(square_id, false, true)?;
+            edit.edit_story(
+                Story::Caption {
+                    object: square_id,
+                    title: false,
+                },
+                |edit| {
+                    let start = edit.document().start();
+                    let end = Position::new(start.paragraph, "Caption".len());
+                    edit.delete(start, end)?;
+                    edit.insert_text(start, "A square, turned")?;
+                    Ok(())
+                },
+            )?;
+            let start = edit.document().start();
+            let circle = Object::new(
+                edit.new_id(),
+                ObjectKind::Shape(Shape::Ellipse),
+                Frame::from_pt(0.0, 0.0, 30.0, 30.0),
+            );
+            let circle_id = circle.id;
+            edit.insert_object_in_text(start, circle)?;
+            edit.show_caption(circle_id, true, true)?;
+            edit.set_title_below(circle_id, true)?;
+            Ok((square_id, circle_id))
+        })
+        .unwrap();
+    let bytes = write_odt(editor.document()).unwrap();
+    keep("w122-titles-and-captions.odt", &bytes);
+    let mut archive = zip::ZipArchive::new(std::io::Cursor::new(&bytes)).unwrap();
+    let mut content = String::new();
+    std::io::Read::read_to_string(&mut archive.by_name("content.xml").unwrap(), &mut content)
+        .unwrap();
+    assert!(
+        content.contains(r#"desk:captions="title=1 object caption=1""#),
+        "{content}"
+    );
+    assert!(
+        content.contains(r#"desk:captions="object title=1""#),
+        "{content}"
+    );
+    let again = read_odt(&bytes).unwrap();
+    let shape = |kind: Shape| {
+        again
+            .objects()
+            .iter()
+            .find(|o| o.kind == ObjectKind::Shape(kind.clone()))
+            .unwrap()
+    };
+    let shapes = [shape(Shape::Rectangle), shape(Shape::Ellipse)];
+    assert_eq!(again.objects().len(), 2, "{:?}", again.objects());
+    let before = editor.document();
+    for (id, read) in [(square, shapes[0]), (circle, shapes[1])] {
+        let was = before.objects().get(id).unwrap();
+        assert_eq!(read.kind, was.kind);
+        assert_eq!(read.anchor == Anchor::InText, was.anchor == Anchor::InText);
+        assert_eq!(read.rotation, was.rotation);
+        let (a, b) = (
+            read.captions.as_deref().unwrap(),
+            was.captions.as_deref().unwrap(),
+        );
+        assert_eq!(a.title_below, b.title_below);
+        for title in [true, false] {
+            let text = |c: &desk_model::Captions| {
+                let c = c.get(title);
+                (
+                    c.shown,
+                    c.paragraphs.iter().map(|p| p.text()).collect::<Vec<_>>(),
+                )
+            };
+            if b.get(title).shown {
+                assert_eq!(text(a), text(b));
+            } else {
+                assert!(!a.get(title).shown);
+            }
+        }
+    }
+    let frame = |o: &Object| {
+        let f = o.frame;
+        [f.x, f.y, f.width, f.height].map(|l| (l.to_pt() * 10.0).round())
+    };
+    assert_eq!(
+        frame(shapes[0]),
+        frame(before.objects().get(square).unwrap())
+    );
+    // The caption keeps the style of captions.
+    let style = again
+        .styles()
+        .by_name(
+            desk_model::StyleFamily::Paragraph,
+            desk_model::CAPTION_STYLE,
+        )
+        .unwrap()
+        .id();
+    assert_eq!(
+        shapes[0].shown_caption(false).unwrap().paragraphs[0].style(),
+        style
+    );
+}

@@ -76,6 +76,10 @@ pub struct GraphicGroup {
     reflection: compact::SwitchRow,
     reflection_opacity: compact::SpinRow,
     opacity: compact::SpinRow,
+    /// The title above or below the object, and its caption (W122).
+    title: compact::SwitchRow,
+    title_position: compact::ComboRow,
+    caption: compact::SwitchRow,
     updating: Cell<bool>,
 }
 
@@ -149,6 +153,10 @@ impl GraphicGroup {
         reflection_opacity.set_subtitle(&tr("Percent"));
         let opacity = spin(&tr("Opacity"), 0.0, 100.0, 1.0);
         opacity.set_subtitle(&tr("Percent"));
+        // A title and a caption of its own, as in Pages 15.4 (W122).
+        let title = compact::SwitchRow::builder().title(tr("Title")).build();
+        let title_position = combo(&tr("Title Position"), &[tr("Top"), tr("Bottom")]);
+        let caption = compact::SwitchRow::builder().title(tr("Caption")).build();
         let group = compact::Group::builder().title(tr("Graphic")).build();
         for row in fill.rows() {
             group.add(row);
@@ -170,6 +178,9 @@ impl GraphicGroup {
             reflection.upcast_ref(),
             reflection_opacity.upcast_ref(),
             opacity.upcast_ref(),
+            title.upcast_ref(),
+            title_position.upcast_ref(),
+            caption.upcast_ref(),
         ] {
             group.add(row);
         }
@@ -194,9 +205,41 @@ impl GraphicGroup {
             reflection,
             reflection_opacity,
             opacity,
+            title,
+            title_position,
+            caption,
             updating: Cell::new(false),
         });
         this.show(None);
+        {
+            let caption_change = |part: CaptionPart| {
+                let weak = Rc::downgrade(&this);
+                let editor = editor.clone();
+                move || {
+                    let Some(this) = weak.upgrade() else { return };
+                    if this.updating.get() {
+                        return;
+                    }
+                    let Some(editor) = editor() else { return };
+                    match part {
+                        CaptionPart::Title => editor.show_captions(true, this.title.is_active()),
+                        CaptionPart::Caption => {
+                            editor.show_captions(false, this.caption.is_active());
+                        }
+                        CaptionPart::Position => {
+                            editor.set_titles_below(this.title_position.selected() == 1);
+                        }
+                    }
+                    this.show_rows();
+                }
+            };
+            let on = caption_change(CaptionPart::Title);
+            this.title.connect_active_notify(move |_| on());
+            let on = caption_change(CaptionPart::Caption);
+            this.caption.connect_active_notify(move |_| on());
+            let on = caption_change(CaptionPart::Position);
+            this.title_position.connect_selected_notify(move |_| on());
+        }
 
         // Every row sets the part of the style it shows, from all the rows
         // of that part.
@@ -372,6 +415,7 @@ impl GraphicGroup {
         }
         self.reflection_opacity
             .set_visible(self.reflection.is_active());
+        self.title_position.set_visible(self.title.is_active());
     }
 
     /// Shows the style of the selected objects, or hides the group when
@@ -447,9 +491,26 @@ impl GraphicGroup {
             f64::from(style.reflection.unwrap_or(GraphicStyle::REFLECTION)),
         );
         set(&self.opacity, f64::from(style.opacity));
+        let shown = |title| info.object.shown_caption(title).is_some();
+        if self.title.is_active() != shown(true) {
+            self.title.set_active(shown(true));
+        }
+        if self.caption.is_active() != shown(false) {
+            self.caption.set_active(shown(false));
+        }
+        let below = info.object.captions.as_ref().is_some_and(|c| c.title_below);
+        select(&self.title_position, u32::from(below));
         self.show_rows();
         self.updating.set(false);
     }
+}
+
+/// The part of the title and caption that a row sets (W122).
+#[derive(Clone, Copy)]
+enum CaptionPart {
+    Title,
+    Caption,
+    Position,
 }
 
 /// The part of the style that a row sets.

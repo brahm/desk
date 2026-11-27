@@ -72,7 +72,7 @@ impl TextEditor {
             // A header, a footer or a note takes it in its text, as it
             // takes a picture.
             Some(Story::Margin { .. } | Story::Note(_)) => true,
-            Some(Story::TextBox(_)) => false,
+            Some(Story::TextBox(_) | Story::Caption { .. }) => false,
             None => !self.is_page_layout(),
         }
     }

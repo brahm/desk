@@ -1306,6 +1306,43 @@ fn import_one(
     paragraph: &mut dyn FnMut(&mut Document, &odf::Paragraph) -> Result<Paragraph, FilterError>,
     depth: usize,
 ) -> Result<Option<Object>, FilterError> {
+    // The frame that Desk writes around an object with a title or a
+    // caption (W122).
+    if let Some((inner, parts)) = captioned_parts(object) {
+        let Some(mut built) =
+            import_one(source, document, &inner, anchor, setup, paragraph, depth)?
+        else {
+            return Ok(None);
+        };
+        let odf::DrawKind::TextBox { paragraphs, .. } = &object.kind else {
+            return Ok(Some(built));
+        };
+        let mut captions = desk_model::Captions::default();
+        let mut at = 0;
+        for (part, count) in parts {
+            let Some((title, count)) = part.zip(count) else {
+                at += 1;
+                continue;
+            };
+            let mut read = Vec::with_capacity(count);
+            for p in &paragraphs[at..at + count] {
+                read.push(paragraph(document, p)?);
+            }
+            at += count;
+            // Only text: a title or a caption holds no objects or notes.
+            let read: Vec<Paragraph> = read
+                .into_iter()
+                .map(|p| without_marks(&p))
+                .collect::<Result<_, _>>()?;
+            let caption = captions.get_mut(title);
+            caption.shown = true;
+            caption.paragraphs = Arc::from(read);
+        }
+        // The object comes before the title when the title is below it.
+        captions.title_below = title_after_object(object);
+        built.captions = Some(Arc::new(captions));
+        return Ok(Some(built));
+    }
     let g = graphic(source, object.style.as_deref());
     let Some(mut kind) = kind(source, document, object, paragraph, g.padding, setup, depth)? else {
         return Ok(None);
@@ -1505,6 +1542,127 @@ fn import_one(
 /// Adds the objects in the text of the body, each with the identifier
 /// that its mark names, and takes out the marks of those that Desk cannot
 /// hold (OBJ-01).
+/// The object in a frame that Desk wrote around it for its title and
+/// caption, standing where the frame stands, and the parts of the text
+/// of the frame in order: a title (`Some(true)`) or a caption
+/// (`Some(false)`) with its number of paragraphs, and the object (`None`).
+/// None for any other frame, or one whose parts do not match its text
+/// (W122).
+#[allow(clippy::type_complexity)]
+fn captioned_parts(
+    object: &odf::DrawObject,
+) -> Option<(odf::DrawObject, Vec<(Option<bool>, Option<usize>)>)> {
+    let (held, parts) = captioned_held(object)?;
+    let mut inner = held.clone();
+    inner.anchor.clone_from(&object.anchor);
+    inner.anchor_page = object.anchor_page;
+    inner.z_index = object.z_index;
+    if inner.transform.is_none() {
+        inner.x = object.x;
+        inner.y = object.y;
+    }
+    Some((inner, parts))
+}
+
+/// The object in a frame that Desk wrote around it for its title and
+/// caption, as written there, and the parts of the text of the frame
+/// (W122).
+#[allow(clippy::type_complexity)]
+fn captioned_held(
+    object: &odf::DrawObject,
+) -> Option<(&odf::DrawObject, Vec<(Option<bool>, Option<usize>)>)> {
+    let value = object.captions.as_deref()?;
+    let odf::DrawKind::TextBox { paragraphs, .. } = &object.kind else {
+        return None;
+    };
+    let mut parts = Vec::new();
+    let mut seen = (false, false, false);
+    for token in value.split_whitespace() {
+        if token == "object" {
+            if seen.2 {
+                return None;
+            }
+            seen.2 = true;
+            parts.push((None, None));
+            continue;
+        }
+        let (name, count) = token.split_once('=')?;
+        let count: usize = count.parse().ok()?;
+        let title = match name {
+            "title" if !seen.0 => {
+                seen.0 = true;
+                true
+            }
+            "caption" if !seen.1 => {
+                seen.1 = true;
+                false
+            }
+            _ => return None,
+        };
+        parts.push((Some(title), Some(count)));
+    }
+    let total: usize = parts
+        .iter()
+        .filter_map(|(_, c)| *c)
+        .sum::<usize>()
+        .checked_add(1)?;
+    if !seen.2 || total != paragraphs.len() {
+        return None;
+    }
+    let before: usize = parts
+        .iter()
+        .take_while(|(p, _)| p.is_some())
+        .filter_map(|(_, c)| *c)
+        .sum();
+    let held = &paragraphs[before];
+    let mut objects = held.spans.iter().filter_map(|s| match &s.field {
+        Some(odf::Field::Object(o)) => Some(&**o),
+        _ => None,
+    });
+    let inner = objects.next()?;
+    if objects.next().is_some() {
+        return None;
+    }
+    Some((inner, parts))
+}
+
+/// The object in a frame that Desk wrote around it for its title and
+/// caption, as written there (W122).
+fn captioned_inner(object: &odf::DrawObject) -> Option<&odf::DrawObject> {
+    captioned_held(object).map(|(inner, _)| inner)
+}
+
+/// Whether the title comes after the object in the parts of a captioned
+/// frame (W122).
+fn title_after_object(object: &odf::DrawObject) -> bool {
+    let value = object.captions.as_deref().unwrap_or_default();
+    let object_at = value.split_whitespace().position(|t| t == "object");
+    let title_at = value
+        .split_whitespace()
+        .position(|t| t.starts_with("title="));
+    matches!((object_at, title_at), (Some(o), Some(t)) if t > o)
+}
+
+/// A paragraph without the marks of objects and notes.
+fn without_marks(paragraph: &Paragraph) -> Result<Paragraph, FilterError> {
+    let runs: Vec<desk_model::Run> = paragraph
+        .runs()
+        .filter(|r| {
+            !matches!(
+                r.attrs.field,
+                Some(Some(Field::ObjectMark { .. } | Field::NoteMark { .. }))
+            )
+        })
+        .cloned()
+        .collect();
+    Ok(Paragraph::from_runs(
+        paragraph.id(),
+        paragraph.style(),
+        paragraph.attrs().clone(),
+        runs,
+    )?)
+}
+
 fn import_inline_objects(
     source: &odf::TextDocument,
     document: &mut Document,
@@ -1750,6 +1908,9 @@ pub(super) fn import_objects<'a>(
     for (object, anchor) in found {
         if let Some(mut built) = import_one(source, document, object, anchor, &setup, paragraph, 0)?
         {
+            // What names an object with a title or a caption is on it, in
+            // the frame around it (W122).
+            let object = captioned_inner(object).unwrap_or(object);
             // The object of the page template that it copies (W095).
             built.template_object = object
                 .template_object
@@ -2596,6 +2757,124 @@ impl Exporter<'_> {
         }
         out
     }
+
+    /// An object with a title or a caption that shows, written as
+    /// LibreOffice writes a caption: in a frame of text around it, with
+    /// the paragraphs of its title before the object, as a character, and
+    /// those of its caption after (W122). The frame stands where the
+    /// object does, as it moves, and `desk:captions` says which
+    /// paragraphs are which; the object keeps its size and rotation.
+    pub(super) fn captioned(
+        &mut self,
+        object: &Object,
+        mut inner: odf::DrawObject,
+    ) -> odf::DrawObject {
+        let Some(captions) = object.captions.as_deref() else {
+            return inner;
+        };
+        let (above, below) = captions.shown();
+        if above.is_none() && below.is_empty() {
+            return inner;
+        }
+        let mut track = super::Track::new(self.document);
+        let mut paragraphs: Vec<odf::Paragraph> = Vec::new();
+        let mut parts: Vec<String> = Vec::new();
+        if let Some(title) = above {
+            self.caption_part(title, true, &mut track, &mut paragraphs, &mut parts);
+        }
+        let anchor = inner.anchor.take();
+        let anchor_page = inner.anchor_page.take();
+        let z_index = inner.z_index.take();
+        let rotated = inner.transform.is_some();
+        let frame = |l: desk_model::Length| rotated.then(|| odf::Length(l.to_pt()));
+        let x = inner.x.take().or_else(|| frame(object.frame.x));
+        let y = inner.y.take().or_else(|| frame(object.frame.y));
+        let width = inner.width;
+        inner.anchor = Some("as-char".into());
+        let style = paragraphs.first().and_then(|p| p.style.clone());
+        paragraphs.push(odf::Paragraph {
+            style,
+            spans: vec![odf::Span {
+                field: Some(odf::Field::Object(Box::new(inner))),
+                ..odf::Span::default()
+            }],
+            ..odf::Paragraph::default()
+        });
+        parts.push("object".into());
+        for caption in below {
+            let title = std::ptr::eq(caption, &captions.title);
+            self.caption_part(caption, title, &mut track, &mut paragraphs, &mut parts);
+        }
+        // As high as the object and a line of each paragraph, for the
+        // programs that keep the frame at its height.
+        let lines = paragraphs.len().saturating_sub(1) as f64;
+        let height = object.frame.height.to_pt() + lines * 14.0 + 4.0;
+        let mut g = odf::GraphicProperties {
+            fill: Some("none".into()),
+            stroke: Some("none".into()),
+            padding: Some(odf::Length(0.0)),
+            ..odf::GraphicProperties::default()
+        };
+        let (wrap, through) = odf_wrap(object.wrap);
+        g.wrap = Some(wrap.into());
+        g.run_through = through.map(Into::into);
+        g.margin = Some(odf_length(object.wrap_margin));
+        if anchor.as_deref() == Some("as-char") {
+            g.vertical_pos = Some("top".into());
+            g.vertical_rel = Some("baseline".into());
+        } else {
+            let rel = if anchor.as_deref() == Some("page") {
+                "page"
+            } else {
+                "paragraph"
+            };
+            g.horizontal_pos = Some("from-left".into());
+            g.horizontal_rel = Some(rel.into());
+            g.vertical_pos = Some("from-top".into());
+            g.vertical_rel = Some(rel.into());
+        }
+        let style = self.style(
+            "gr",
+            odf::Family::Graphic,
+            None,
+            odf::Properties {
+                graphic: g,
+                ..Default::default()
+            },
+        );
+        let mut outer = odf::DrawObject::new(odf::DrawKind::TextBox {
+            paragraphs,
+            chain_next: None,
+            thread: false,
+        });
+        outer.style = Some(style);
+        outer.anchor = anchor;
+        outer.anchor_page = anchor_page;
+        outer.z_index = z_index;
+        outer.x = x;
+        outer.y = y;
+        outer.width = width;
+        outer.height = Some(odf::Length(height));
+        outer.captions = Some(parts.join(" "));
+        outer
+    }
+
+    /// Writes the paragraphs of a title or a caption, and its part of
+    /// `desk:captions`.
+    fn caption_part(
+        &mut self,
+        caption: &desk_model::Caption,
+        title: bool,
+        track: &mut super::Track,
+        paragraphs: &mut Vec<odf::Paragraph>,
+        parts: &mut Vec<String>,
+    ) {
+        let name = if title { "title" } else { "caption" };
+        parts.push(format!("{name}={}", caption.paragraphs.len()));
+        for p in caption.paragraphs.iter() {
+            paragraphs.push(self.paragraph(p, track));
+        }
+    }
 }
 
 /// An object of a group as it shows when the group is turned: turned as
@@ -2714,6 +2993,7 @@ impl Nested {
         self.within.push(name.to_owned());
         self.fill(exporter, &mut drawn);
         self.within.pop();
+        let drawn = exporter.captioned(object, drawn);
         self.drawn.insert(name.to_owned(), drawn.clone());
         Some(drawn)
     }
@@ -2874,6 +3154,7 @@ pub(super) fn export_objects(exporter: &mut Exporter<'_>, out: &mut odf::TextDoc
         };
         drawn.z_index = Some(z as u32);
         nested.fill(exporter, &mut drawn);
+        let drawn = exporter.captioned(object, drawn);
         match at.and_then(|i| out.body.get_mut(i)) {
             Some(paragraph) => paragraph.frames.push(drawn),
             None => out.page_objects.push(drawn),

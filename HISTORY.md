@@ -8,6 +8,9 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
 
 ## Changes since 0.7.0 (unreleased)
 
+* Added: Objects have a title, above or below them, and a caption,
+  turned on in the Style tab, edited in place and kept in ODF (#262).
+
 * Added: Pictures, shapes and equations pasted into the text of a text
   box or a shape go in its lines, and are kept in ODF (#261).
 

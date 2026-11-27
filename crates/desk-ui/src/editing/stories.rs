@@ -50,6 +50,8 @@ impl StoryMode {
                 MarginKind::Footer => "Edit Footer",
             },
             Story::TextBox(_) => "Edit Text Box",
+            Story::Caption { title: true, .. } => "Edit Title",
+            Story::Caption { title: false, .. } => "Edit Caption",
         }
     }
 }
@@ -59,6 +61,10 @@ impl StoryMode {
 /// the body of a page that shows headers or footers.
 pub fn story_at(layout: &DocumentLayout, page: usize, x: f64, y: f64) -> Option<Story> {
     let p = layout.pages.get(page)?;
+    // The title or the caption of an object (W122).
+    if let Some((object, title)) = desk_layout::caption_at(&p.objects, x as f32, y as f32) {
+        return Some(Story::Caption { object, title });
+    }
     if let Some(index) = desk_layout::object_at(&p.objects, x as f32, y as f32, 0.0, true)
         && p.objects[index].object.holds_text()
         // The text of the masters is not typed in on the pages.
@@ -149,7 +155,9 @@ pub(super) fn story_layout_everywhere(
 ) -> DocumentLayout {
     let pages: Vec<usize> = match story {
         Story::Note(_) => Vec::new(),
-        Story::TextBox(id) => text_box_page(main, id).into_iter().collect(),
+        Story::TextBox(id) | Story::Caption { object: id, .. } => {
+            text_box_page(main, id).into_iter().collect()
+        }
         Story::Margin { section, place } => (0..main.pages.len())
             .filter(|&i| {
                 let page = &main.pages[i];
@@ -253,6 +261,27 @@ fn story_layout_on(
             });
             for ((page, _), lines) in boxes.iter().zip(flowed) {
                 layout.pages[*page].lines.extend(lines);
+            }
+        }
+        Story::Caption { object, title } => {
+            // Its lines as the copy has them, in the place of those the
+            // object shows (W122).
+            let paragraphs: Vec<Paragraph> = copy.body().iter().cloned().collect();
+            for (p, page) in main.pages.iter().enumerate() {
+                let Some(i) = page.objects.iter().position(|o| o.object.id == object) else {
+                    continue;
+                };
+                let lines = crate::with_text_system(|system| {
+                    desk_layout::caption_lines(copy, &page.objects[i], title, &paragraphs, system)
+                });
+                let placed = &mut layout.pages[p].objects[i];
+                if title {
+                    placed.title.clear();
+                } else {
+                    placed.caption.clear();
+                }
+                layout.pages[p].lines = lines;
+                break;
             }
         }
     }
@@ -383,6 +412,13 @@ pub fn story_pages(layout: &DocumentLayout) -> Vec<(Story, usize)> {
                     Story::TextBox(text_box_head(layout, object.object.id)),
                     index,
                 );
+            }
+            // Its title and caption (W122).
+            for (lines, title) in [(&object.title, true), (&object.caption, false)] {
+                if !lines.is_empty() {
+                    let id = object.object.id;
+                    add(Story::Caption { object: id, title }, index);
+                }
             }
         }
     }
@@ -531,7 +567,7 @@ impl TextEditor {
                 self.leave_story(back.map(Selection::cursor));
                 true
             }
-            Some(Story::Margin { .. } | Story::TextBox(_)) => false,
+            Some(Story::Margin { .. } | Story::TextBox(_) | Story::Caption { .. }) => false,
         }
     }
 
@@ -708,6 +744,10 @@ fn story_copy_ok(document: &Document, story: Story) -> bool {
         Story::Note(id) => document.notes().get(id).is_some(),
         Story::Margin { .. } => true,
         Story::TextBox(id) => document.objects().get(id).is_some_and(Object::holds_text),
+        Story::Caption { object, title } => document
+            .objects()
+            .get(object)
+            .is_some_and(|o| o.shown_caption(title).is_some()),
     }
 }
 
@@ -830,6 +870,56 @@ mod tests {
             .unwrap();
         let layout = crate::lay_out(&document);
         assert_eq!(at(&layout, left + width - 10.0), MarginField::Left);
+    }
+
+    #[test]
+    fn w122_a_click_on_a_caption_edits_it_in_its_place() {
+        use desk_model::{Anchor, Frame, Object, Shape};
+        let mut editor = Editor::new(Document::new_word_processing());
+        let id = editor
+            .edit("Insert Shape", |edit| {
+                let mut shape = Object::new(
+                    edit.new_id(),
+                    ObjectKind::Shape(Shape::Rectangle),
+                    Frame::from_pt(200.0, 300.0, 160.0, 80.0),
+                );
+                shape.anchor = Anchor::Page(0);
+                let id = shape.id;
+                edit.add_object(shape)?;
+                edit.show_caption(id, false, true)?;
+                Ok(id)
+            })
+            .unwrap();
+        let document = editor.document().clone();
+        let layout = crate::lay_out(&document);
+        let placed = layout.pages[0]
+            .objects
+            .iter()
+            .find(|o| o.object.id == id)
+            .unwrap();
+        let line = placed.caption[0].clone();
+        let story = Story::Caption {
+            object: id,
+            title: false,
+        };
+        let y = f64::from((line.top() + line.bottom()) / 2.0);
+        assert_eq!(story_at(&layout, 0, 280.0, y), Some(story));
+        // The shape itself is not its caption.
+        assert_ne!(story_at(&layout, 0, 280.0, 340.0), Some(story));
+        assert!(story_pages(&layout).contains(&(story, 0)));
+        let copy = story_copy(&document, story);
+        assert_eq!(copy.body().get(0).unwrap().text(), "Caption");
+        // Edited, its lines are where the shape shows them, and the shape
+        // does not show them twice.
+        let edited = story_layout(&layout, story, 0, &copy);
+        assert_eq!(edited.pages[0].lines.len(), 1);
+        assert!((edited.pages[0].lines[0].origin.1 - line.origin.1).abs() < 0.01);
+        let shown = edited.pages[0]
+            .objects
+            .iter()
+            .find(|o| o.object.id == id)
+            .unwrap();
+        assert!(shown.caption.is_empty());
     }
 
     #[test]

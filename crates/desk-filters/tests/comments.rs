@@ -314,6 +314,7 @@ fn rev_08_comments_of_notes_headers_and_text_boxes_are_kept_in_odt() {
                     Story::Note(_) => "note",
                     Story::Margin { .. } => "header",
                     Story::TextBox(_) => "box",
+                    Story::Caption { .. } => "caption",
                 };
                 format!(
                     "{kind} [{}] {}: {:?} {}",

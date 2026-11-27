@@ -61,6 +61,152 @@ pub struct PlacedObject {
     pub chart: Option<Arc<crate::ChartLayout>>,
     /// An equation laid out, scaled into the frame (W104).
     pub equation: Option<Arc<crate::EquationLayout>>,
+    /// The room its title and caption take above and below it (W122).
+    pub room: CaptionRoom,
+    /// The lines of its title, placed on the page; their paragraphs are
+    /// indexes in the title.
+    pub title: Vec<PlacedLine>,
+    /// The lines of its caption, placed on the page.
+    pub caption: Vec<PlacedLine>,
+}
+
+/// The room that the title and the caption of an object take above and
+/// below its frame, in points (W122).
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct CaptionRoom {
+    /// Above the frame: the title and the gap under it.
+    pub above: f32,
+    /// Below the frame: the gap, then the title when it is below, and the
+    /// caption.
+    pub below: f32,
+}
+
+/// The gap between an object and its title or caption, and between a
+/// title below and the caption, in points.
+pub const CAPTION_GAP: f32 = 4.0;
+
+/// The lines of the paragraphs of a title or a caption, laid out at the
+/// width of the object from a top of 0, and the bottom of the last.
+fn caption_block(
+    document: &Document,
+    caption: &desk_model::Caption,
+    width: f32,
+    system: &mut TextSystem,
+) -> (Vec<PlacedLine>, f32) {
+    let values = desk_text::FieldValues {
+        hidden: crate::hidden_changes(document),
+        ..desk_text::FieldValues::default()
+    };
+    crate::pages::margin_block(
+        document,
+        &caption.paragraphs,
+        width.max(1.0),
+        &values,
+        system,
+    )
+}
+
+/// The room that the title and the caption of an object take (W122).
+pub(crate) fn caption_room(
+    document: &Document,
+    object: &Object,
+    system: &mut TextSystem,
+) -> CaptionRoom {
+    let Some(captions) = object.captions.as_deref() else {
+        return CaptionRoom::default();
+    };
+    let width = object.frame.width.to_pt() as f32;
+    let (above, below) = captions.shown();
+    let mut room = CaptionRoom::default();
+    if let Some(title) = above {
+        room.above = caption_block(document, title, width, system).1 + CAPTION_GAP;
+    }
+    for caption in below {
+        room.below += CAPTION_GAP + caption_block(document, caption, width, system).1;
+    }
+    room
+}
+
+/// The lines of the title or the caption of a placed object with other
+/// paragraphs, as they are being edited (W122).
+pub fn caption_lines(
+    document: &Document,
+    placed: &PlacedObject,
+    title: bool,
+    paragraphs: &[desk_model::Paragraph],
+    system: &mut TextSystem,
+) -> Vec<PlacedLine> {
+    let mut placed = placed.clone();
+    let Some(captions) = placed.object.captions.as_mut() else {
+        return Vec::new();
+    };
+    Arc::make_mut(captions).get_mut(title).paragraphs = paragraphs.into();
+    lay_out_captions(document, &mut placed, system);
+    if title { placed.title } else { placed.caption }
+}
+
+/// The title or the caption under a point of the page, of the objects on
+/// it from front to back: the object, and whether it is the title.
+pub fn caption_at(objects: &[PlacedObject], x: f32, y: f32) -> Option<(desk_model::NodeId, bool)> {
+    let within = |lines: &[PlacedLine], placed: &PlacedObject| {
+        let (Some(first), Some(last)) = (lines.first(), lines.last()) else {
+            return false;
+        };
+        let left = placed.center().0 - placed.width / 2.0;
+        (left..=left + placed.width).contains(&x)
+            && (first.top() - 1.0..=last.bottom() + 1.0).contains(&y)
+    };
+    objects.iter().rev().find_map(|o| {
+        if within(&o.title, o) {
+            Some((o.object.id, true))
+        } else if within(&o.caption, o) {
+            Some((o.object.id, false))
+        } else {
+            None
+        }
+    })
+}
+
+/// Lays out the title and the caption of a placed object above and below
+/// it, at the width of its frame, over the box it takes as it is rotated
+/// (W122).
+fn lay_out_captions(document: &Document, placed: &mut PlacedObject, system: &mut TextSystem) {
+    placed.title.clear();
+    placed.caption.clear();
+    let Some(captions) = placed.object.captions.clone() else {
+        return;
+    };
+    let (_, y0, _, y1) = placed.bounds();
+    let left = placed.center().0 - placed.width / 2.0;
+    let (above, below) = captions.shown();
+    let mut room = CaptionRoom::default();
+    let shift = |lines: Vec<PlacedLine>, top: f32| {
+        lines
+            .into_iter()
+            .map(|mut l| {
+                l.origin.0 += left;
+                l.origin.1 += top;
+                l
+            })
+            .collect::<Vec<_>>()
+    };
+    if let Some(title) = above {
+        let (lines, bottom) = caption_block(document, title, placed.width, system);
+        room.above = bottom + CAPTION_GAP;
+        placed.title = shift(lines, y0 - room.above);
+    }
+    for caption in below {
+        let (lines, bottom) = caption_block(document, caption, placed.width, system);
+        let top = y1 + room.below + CAPTION_GAP;
+        room.below += CAPTION_GAP + bottom;
+        let lines = shift(lines, top);
+        if std::ptr::eq(caption, &captions.title) {
+            placed.title = lines;
+        } else {
+            placed.caption = lines;
+        }
+    }
+    placed.room = room;
 }
 
 impl PlacedObject {
@@ -89,7 +235,26 @@ impl PlacedObject {
             table: None,
             chart: None,
             equation: None,
+            room: CaptionRoom::default(),
+            title: Vec::new(),
+            caption: Vec::new(),
         }
+    }
+
+    /// The box that the object takes with its title and caption, as it
+    /// is rotated: left, top, right and bottom (W122).
+    pub fn bounds_with_captions(&self) -> (f32, f32, f32, f32) {
+        let (x0, y0, x1, y1) = self.bounds();
+        if self.room == CaptionRoom::default() {
+            return (x0, y0, x1, y1);
+        }
+        let left = self.center().0 - self.width / 2.0;
+        (
+            x0.min(left),
+            y0 - self.room.above,
+            x1.max(left + self.width),
+            y1 + self.room.below,
+        )
     }
 
     /// The center of the frame, which it rotates around.
@@ -188,7 +353,7 @@ impl PlacedObject {
             return None;
         }
         let margin = self.wrap_margin();
-        let (x0, y0, x1, y1) = self.bounds();
+        let (x0, y0, x1, y1) = self.bounds_with_captions();
         Some(Exclusion {
             x0: x0 - margin,
             y0: y0 - margin,
@@ -208,6 +373,11 @@ impl PlacedObject {
 
     /// The profile of the contour added to the box of the room it takes.
     pub(crate) fn with_profile(&self, mut e: Exclusion) -> Exclusion {
+        // The text goes around the box of an object with a title or a
+        // caption, which its contour does not hold (W122).
+        if self.room != CaptionRoom::default() {
+            return e;
+        }
         e.profile = self.profile(self.wrap_margin());
         e
     }
@@ -355,6 +525,18 @@ impl PlacedObject {
 pub(crate) struct Floating {
     pub object: Object,
     pub anchor: Place,
+    /// The room of its title and caption (W122).
+    pub room: CaptionRoom,
+}
+
+impl Floating {
+    /// The object placed with its frame moved down by `dy`, with the room
+    /// of its title and caption.
+    pub(crate) fn place(&self, paragraph: Option<usize>, dy: f32) -> PlacedObject {
+        let mut placed = PlacedObject::new(&self.object, paragraph, dy);
+        placed.room = self.room;
+        placed
+    }
 }
 
 /// Where a floating object goes.
@@ -368,7 +550,7 @@ pub(crate) enum Place {
 
 /// The floating objects of a document. An object whose paragraph is gone
 /// stays on the first page.
-pub(crate) fn floating(document: &Document) -> Arc<Vec<Floating>> {
+pub(crate) fn floating(document: &Document, system: &mut TextSystem) -> Arc<Vec<Floating>> {
     let objects = document.objects();
     if objects.is_empty() {
         return Arc::default();
@@ -398,6 +580,7 @@ pub(crate) fn floating(document: &Document) -> Arc<Vec<Floating>> {
                     && !object.anchor.is_master()
             })
             .map(|object| Floating {
+                room: caption_room(document, object, system),
                 object: object.clone(),
                 anchor: match object.anchor {
                     Anchor::Page(page) => Place::Page(page as usize),
@@ -699,28 +882,44 @@ pub(crate) fn floats_in_text(object: &Object) -> bool {
 /// none.
 pub(crate) fn inline_sizes(
     document: &Document,
+    system: &mut TextSystem,
 ) -> Option<Arc<HashMap<desk_model::NodeId, (desk_model::Length, desk_model::Length)>>> {
     let sizes: HashMap<_, _> = document
         .objects()
         .iter()
         .filter(|o| o.anchor == Anchor::InText)
-        .map(|o| (o.id, inline_size(o, floats_in_text(o))))
+        .map(|o| {
+            let floats = floats_in_text(o);
+            (o.id, inline_size(document, o, floats, system))
+        })
         .collect();
     (!sizes.is_empty()).then(|| Arc::new(sizes))
 }
 
 /// The room of an object in the line of a text, as wide as its frame or,
-/// when it floats with its paragraph, as nothing.
-fn inline_size(o: &Object, floats: bool) -> (desk_model::Length, desk_model::Length) {
+/// when it floats with its paragraph, as nothing; as high as its frame
+/// with its title and caption (W122).
+fn inline_size(
+    document: &Document,
+    o: &Object,
+    floats: bool,
+    system: &mut TextSystem,
+) -> (desk_model::Length, desk_model::Length) {
     // A text box in the text hangs from the top of its line, as in
     // Pages, and does not make the line taller; one that floats with its
     // paragraph takes no room in the line (OBJ-14).
+    let room = if hangs(o) || floats {
+        CaptionRoom::default()
+    } else {
+        caption_room(document, o, system)
+    };
+    let captions = desk_model::Length::from_pt(f64::from(room.above + room.below));
     let height = if hangs(o) {
         desk_model::Length::ZERO
     } else if is_sound(o) {
-        o.frame.height + desk_model::Length::from_pt(SOUND_HEADROOM)
+        o.frame.height + desk_model::Length::from_pt(SOUND_HEADROOM) + captions
     } else {
-        o.frame.height
+        o.frame.height + captions
     };
     let width = if floats {
         desk_model::Length::ZERO
@@ -738,12 +937,13 @@ fn inline_size(o: &Object, floats: bool) -> (desk_model::Length, desk_model::Len
 fn text_object_sizes(
     document: &Document,
     paragraphs: &[desk_model::Paragraph],
+    system: &mut TextSystem,
 ) -> Option<Arc<HashMap<desk_model::NodeId, (desk_model::Length, desk_model::Length)>>> {
     let sizes: HashMap<_, _> = desk_model::marks_in(paragraphs)
         .into_iter()
         .filter_map(|(id, _)| document.objects().get(id))
         .filter(|o| o.anchor == Anchor::InText)
-        .map(|o| (o.id, inline_size(o, false)))
+        .map(|o| (o.id, inline_size(document, o, false, system)))
         .collect();
     (!sizes.is_empty()).then(|| Arc::new(sizes))
 }
@@ -754,6 +954,7 @@ fn text_objects(
     document: &Document,
     paragraphs: &[desk_model::Paragraph],
     lines: &[PlacedLine],
+    system: &mut TextSystem,
 ) -> Vec<PlacedObject> {
     let marks = desk_model::marks_in(paragraphs);
     if marks.is_empty() {
@@ -785,7 +986,9 @@ fn text_objects(
         placed.y = if hangs(object) {
             line.top()
         } else {
-            line.baseline() - placed.height
+            // Its caption stands on the baseline, under it (W122).
+            placed.room = caption_room(document, object, system);
+            line.baseline() - placed.room.below - placed.height
         };
         out.push(placed);
     }
@@ -812,10 +1015,26 @@ fn is_sound(object: &Object) -> bool {
 
 /// Puts the objects in the text on the pages, where the lines put their
 /// marks: from the left of the mark, standing on the baseline (OBJ-01).
-pub fn place_inline_objects(document: &Document, layout: &mut DocumentLayout) {
-    if inline_sizes(document).is_none() {
+pub fn place_inline_objects(
+    document: &Document,
+    layout: &mut DocumentLayout,
+    system: &mut TextSystem,
+) {
+    if !document
+        .objects()
+        .iter()
+        .any(|o| o.anchor == Anchor::InText)
+    {
         return;
     }
+    // The room of the titles and captions of those standing in the lines
+    // (W122).
+    let rooms: HashMap<desk_model::NodeId, CaptionRoom> = document
+        .objects()
+        .iter()
+        .filter(|o| o.anchor == Anchor::InText && o.captions.is_some() && !hangs(o))
+        .map(|o| (o.id, caption_room(document, o, system)))
+        .collect();
     let indexes: HashMap<desk_model::NodeId, usize> = document
         .body()
         .iter()
@@ -859,7 +1078,9 @@ pub fn place_inline_objects(document: &Document, layout: &mut DocumentLayout) {
                 at.y = if hangs(object) {
                     line.top()
                 } else {
-                    line.baseline() - at.height
+                    // Its caption stands on the baseline, under it (W122).
+                    at.room = rooms.get(&object.id).copied().unwrap_or_default();
+                    line.baseline() - at.room.below - at.height
                 };
                 at
             })
@@ -948,8 +1169,15 @@ pub fn place_object_text(
         for i in 0..layout.pages[p].objects.len() {
             let placed = &layout.pages[p].objects[i];
             let id = placed.object.id;
-            let ObjectKind::TextBox(text) = &placed.object.kind else {
+            if !matches!(placed.object.kind, ObjectKind::TextBox(_)) {
                 lay_out_text(document, &mut layout.pages[p].objects[i], system);
+                continue;
+            }
+            // The lines of a box come through its chain, its title and
+            // caption by themselves (W122).
+            lay_out_captions(document, &mut layout.pages[p].objects[i], system);
+            let placed = &layout.pages[p].objects[i];
+            let ObjectKind::TextBox(text) = &placed.object.kind else {
                 continue;
             };
             if document.objects().get(id).is_none() || head_of(id) != id {
@@ -969,7 +1197,7 @@ pub fn place_object_text(
             let flowed = flow_text_boxes(document, &refs, &paragraphs, system);
             for ((p, i), lines) in chain.into_iter().zip(flowed) {
                 let placed = &mut layout.pages[p].objects[i];
-                placed.inline = text_objects(document, &paragraphs, &lines);
+                placed.inline = text_objects(document, &paragraphs, &lines, system);
                 for object in &mut placed.inline {
                     lay_out_text_within(document, object, system, 1);
                 }
@@ -999,6 +1227,7 @@ fn lay_out_text_within(
     for child in &mut placed.children {
         lay_out_text_within(document, child, system, depth);
     }
+    lay_out_captions(document, placed, system);
     match &placed.object.kind {
         ObjectKind::Table(table) => {
             let locale = crate::document_locale(document);
@@ -1032,7 +1261,7 @@ fn lay_out_text_within(
     let paragraphs = text.paragraphs.clone();
     placed.lines = text_box_lines(document, placed, &paragraphs, system);
     if depth < NESTED_TEXT_DEPTH {
-        placed.inline = text_objects(document, &paragraphs, &placed.lines);
+        placed.inline = text_objects(document, &paragraphs, &placed.lines, system);
         for object in &mut placed.inline {
             lay_out_text_within(document, object, system, depth + 1);
         }
@@ -1148,7 +1377,7 @@ fn flow_shown(
     let settings = document.text_settings();
     let items = styles.list_items(paragraphs.iter());
     let hidden = crate::hidden_changes(document);
-    let objects = text_object_sizes(document, paragraphs);
+    let objects = text_object_sizes(document, paragraphs, system);
     // Where the next line goes: its slot, and its top from the top of the
     // column.
     let mut slot = 0;
@@ -1621,7 +1850,7 @@ fn shape_lines_from(
     let settings = document.text_settings();
     let items = styles.list_items(paragraphs.iter());
     let hidden = crate::hidden_changes(document);
-    let objects = text_object_sizes(document, paragraphs);
+    let objects = text_object_sizes(document, paragraphs, system);
     let origin = (placed.x + space.inset, placed.y);
     let mut out = Vec::new();
     let mut after = 0.0f32;
