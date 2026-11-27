@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Desk\n"
 "Report-Msgid-Bugs-To: https://github.com/brahm/desk/issues\n"
-"POT-Creation-Date: 2026-11-27 01:02+0000\n"
+"POT-Creation-Date: 2026-11-27 01:51+0000\n"
 "PO-Revision-Date: 2026-11-02 00:54+0000\n"
 "Last-Translator: Desk contributors\n"
 "Language-Team: Brazilian Portuguese\n"
@@ -405,7 +405,7 @@ msgstr "Texturas"
 #: crates/desk-ui/src/format_pane.rs:272 crates/desk-ui/src/graphic_pane.rs:85
 #: crates/desk-ui/src/graphic_pane.rs:113
 #: crates/desk-ui/src/graphic_pane.rs:115 crates/desk-ui/src/links_pane.rs:374
-#: crates/desk-ui/src/lists_pane.rs:59 crates/desk-ui/src/mail_merge.rs:98
+#: crates/desk-ui/src/lists_pane.rs:59 crates/desk-ui/src/mail_merge.rs:112
 #: crates/desk-ui/src/media_pane.rs:87
 #: crates/desk-ui/src/page_templates_pane.rs:28
 #: crates/desk-ui/src/page_templates_pane.rs:133
@@ -1106,7 +1106,7 @@ msgstr "Formato"
 #: crates/desk-ui/src/custom_format.rs:119
 #: crates/desk-ui/src/equation_editor.rs:110
 #: crates/desk-ui/src/language_region.rs:159
-#: crates/desk-ui/src/mail_merge.rs:214
+#: crates/desk-ui/src/mail_merge.rs:227
 msgid "Preview"
 msgstr "Pré-visualização"
 
@@ -1568,7 +1568,7 @@ msgstr "Estilo de tabela {number}"
 
 #: crates/desk-ui/src/editing/tables.rs:206
 #: crates/desk-ui/src/formatting.rs:397 crates/desk-ui/src/inspector.rs:70
-#: crates/desk-ui/src/mail_merge.rs:203 crates/desk-ui/src/table_pane.rs:267
+#: crates/desk-ui/src/mail_merge.rs:216 crates/desk-ui/src/table_pane.rs:267
 #: crates/desk-ui/src/tables/header.rs:53
 #: crates/desk-ui/src/tables/inspector.rs:194
 #: crates/desk-ui/src/tables/inspector.rs:400
@@ -3471,119 +3471,123 @@ msgstr "Escolher imagem…"
 msgid "Choose an Image for the Bullets"
 msgstr "Escolha uma imagem para os marcadores"
 
-#: crates/desk-ui/src/mail_merge.rs:70
+#: crates/desk-ui/src/mail_merge.rs:55
+msgid "_More Fields"
+msgstr "_Mais Campos"
+
+#: crates/desk-ui/src/mail_merge.rs:84
 msgid "Choose where the data come from first."
 msgstr "Escolha primeiro de onde vêm os dados."
 
-#: crates/desk-ui/src/mail_merge.rs:74 crates/desk-ui/src/mail_merge.rs:546
+#: crates/desk-ui/src/mail_merge.rs:88 crates/desk-ui/src/mail_merge.rs:555
 msgid "The source has no records."
 msgstr "A fonte não tem registros."
 
-#: crates/desk-ui/src/mail_merge.rs:85
+#: crates/desk-ui/src/mail_merge.rs:99
 msgid "The contacts of the desktop cannot be read."
 msgstr "Os contatos do desktop não podem ser lidos."
 
-#: crates/desk-ui/src/mail_merge.rs:86
+#: crates/desk-ui/src/mail_merge.rs:100
 msgid "The file is too large."
 msgstr "O arquivo é grande demais."
 
-#: crates/desk-ui/src/mail_merge.rs:87
+#: crates/desk-ui/src/mail_merge.rs:101
 msgid "The file is not a vCard, ODS or CSV file."
 msgstr "O arquivo não é vCard, ODS nem CSV."
 
-#: crates/desk-ui/src/mail_merge.rs:89
+#: crates/desk-ui/src/mail_merge.rs:103
 msgid "The spreadsheet has no table named “{name}”."
 msgstr "A planilha não tem tabela chamada “{name}”."
 
-#: crates/desk-ui/src/mail_merge.rs:91
+#: crates/desk-ui/src/mail_merge.rs:105
 msgid "The file cannot be read."
 msgstr "O arquivo não pode ser lido."
 
-#: crates/desk-ui/src/mail_merge.rs:99
+#: crates/desk-ui/src/mail_merge.rs:113
 msgid "All Contacts"
 msgstr "Todos os contatos"
 
-#: crates/desk-ui/src/mail_merge.rs:134 crates/desk-ui/src/mail_merge.rs:523
+#: crates/desk-ui/src/mail_merge.rs:147 crates/desk-ui/src/mail_merge.rs:532
 msgid "_Sender Field"
 msgstr "Campo do _remetente"
 
-#: crates/desk-ui/src/mail_merge.rs:164
+#: crates/desk-ui/src/mail_merge.rs:177
 msgid "Choose"
 msgstr "Escolher"
 
-#: crates/desk-ui/src/mail_merge.rs:199
+#: crates/desk-ui/src/mail_merge.rs:212
 msgid "Populate With"
 msgstr "Preencher com"
 
-#: crates/desk-ui/src/mail_merge.rs:207 crates/desk-ui/src/undo_names.rs:13
+#: crates/desk-ui/src/mail_merge.rs:220 crates/desk-ui/src/undo_names.rs:13
 msgid "Add"
 msgstr "Adicionar"
 
-#: crates/desk-ui/src/mail_merge.rs:211
+#: crates/desk-ui/src/mail_merge.rs:224
 msgid "Add Merge Field"
 msgstr "Adicionar campo de mesclagem"
 
-#: crates/desk-ui/src/mail_merge.rs:217 crates/desk-ui/src/mail_merge.rs:228
+#: crates/desk-ui/src/mail_merge.rs:230 crates/desk-ui/src/mail_merge.rs:241
 msgid "Previous Record"
 msgstr "Registro anterior"
 
-#: crates/desk-ui/src/mail_merge.rs:223 crates/desk-ui/src/mail_merge.rs:229
+#: crates/desk-ui/src/mail_merge.rs:236 crates/desk-ui/src/mail_merge.rs:242
 msgid "Next Record"
 msgstr "Próximo registro"
 
-#: crates/desk-ui/src/mail_merge.rs:236
+#: crates/desk-ui/src/mail_merge.rs:249
 msgid "Record"
 msgstr "Registro"
 
-#: crates/desk-ui/src/mail_merge.rs:241 crates/desk-ui/src/table_pane.rs:293
+#: crates/desk-ui/src/mail_merge.rs:254 crates/desk-ui/src/table_pane.rs:293
 msgid "Merge"
 msgstr "Mesclar"
 
-#: crates/desk-ui/src/mail_merge.rs:246
+#: crates/desk-ui/src/mail_merge.rs:259
 msgid "Mail Merge"
 msgstr "Mala direta"
 
-#: crates/desk-ui/src/mail_merge.rs:356
+#: crates/desk-ui/src/mail_merge.rs:369
 msgid "vCard Files"
 msgstr "Arquivos vCard"
 
-#: crates/desk-ui/src/mail_merge.rs:361
+#: crates/desk-ui/src/mail_merge.rs:374
 msgid "Spreadsheets"
 msgstr "Planilhas"
 
-#: crates/desk-ui/src/mail_merge.rs:372
+#: crates/desk-ui/src/mail_merge.rs:385
 msgid "Choose a vCard File"
 msgstr "Escolha um arquivo vCard"
 
-#: crates/desk-ui/src/mail_merge.rs:374
+#: crates/desk-ui/src/mail_merge.rs:387
 msgid "Choose a Spreadsheet"
 msgstr "Escolha uma planilha"
 
-#: crates/desk-ui/src/mail_merge.rs:459
+#: crates/desk-ui/src/mail_merge.rs:472
 msgid "Only the first records of the source are used."
 msgstr "Só os primeiros registros da fonte são usados."
 
-#: crates/desk-ui/src/mail_merge.rs:561
+#: crates/desk-ui/src/mail_merge.rs:570
 msgid "{n} of {count}"
 msgstr "{n} de {count}"
 
-#: crates/desk-ui/src/mail_merge.rs:627
+#: crates/desk-ui/src/mail_merge.rs:636
 msgid "_All Contacts"
 msgstr "_Todos os contatos"
 
-#: crates/desk-ui/src/mail_merge.rs:631
+#: crates/desk-ui/src/mail_merge.rs:640
 msgid "Contacts"
 msgstr "Contatos"
 
-#: crates/desk-ui/src/mail_merge.rs:633
+#: crates/desk-ui/src/mail_merge.rs:642
 msgid "_vCard File…"
 msgstr "Arquivo _vCard…"
 
-#: crates/desk-ui/src/mail_merge.rs:634
+#: crates/desk-ui/src/mail_merge.rs:643
 msgid "_Spreadsheet…"
 msgstr "_Planilha…"
 
-#: crates/desk-ui/src/mail_merge.rs:637
+#: crates/desk-ui/src/mail_merge.rs:646
 msgid "_Remove Source"
 msgstr "_Remover fonte"
 

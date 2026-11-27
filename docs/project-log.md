@@ -3066,6 +3066,24 @@ paragraph, and objects on a second page.
   `desk:drop-cap-border-style`.
 - Closes B-044. No task moved to another phase.
 
+### 27 November: the end of W3 (step 13)
+
+- Pages 15.4 was checked on the Mac, driven with the whole screen
+  because its pop-up menus do not open in the background. The rows of
+  the phase are same or by decision, with one gap: the Merge sheet of
+  Pages chooses, for each merge field, the data that fills it (Populate
+  With), where Desk fills a field from the data of its name. That
+  moved to W5 (B-080).
+- The menu of merge fields now offers the nine fields of Pages 15.4 in
+  its order (Full Name, First Name, Last Name, the home and work
+  addresses, the mobile phone, the home email, the job title and the
+  company), the others under More Fields.
+- The artistic lines of Pages are ten styles shown as pictures; the
+  last five are those Desk now draws in its own way.
+- W3 is done: nine rows of the inventory and B-044. Moved to W5: the
+  Edit Page Templates mode (B-078), links to a page of a page layout
+  document (B-079) and Populate With (B-080).
+
 ## Decisions, with their reasons and consequences
 
 Ids `D-nnn` and `R-nnn` are those of [decisions.md](decisions.md).

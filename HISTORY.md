@@ -8,6 +8,9 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
 
 ## Changes since 0.7.0 (unreleased)
 
+* Changed: The menu of merge fields offers the fields of Pages 15.4 first,
+  in its order, and the others under More Fields. (#PR)
+
 * Added: The artistic lines of Pages, chalk, thick brush, chisel pen,
   dry brush and uneven ink, for the lines of shapes, pictures and text
   boxes and the border of a drop cap, drawn by Desk in its own way.
