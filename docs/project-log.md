@@ -3266,7 +3266,7 @@ paragraph, and objects on a second page.
   their own pull request, still in step 6.
 - No task moved to another phase.
 
-### 27 November: the shape library (step 6 of W4, #PR)
+### 27 November: the shape library (step 6 of W4, #269)
 
 - The Shape button opens a library as that of Pages 15.4: categories at
   the side, a grid of shapes, and a search field that finds them in all

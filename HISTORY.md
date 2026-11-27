@@ -11,7 +11,7 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
 * Added: The Shape button opens a shape library by category, with a
   search field, and Arrange > Shape > Save to My Shapes keeps a shape of
   the page in My Shapes, where a right click renames or deletes it
-  (#PR).
+  (#269).
 
 * Added: Arrange > Shape unites, intersects, subtracts and excludes the
   selected shapes into one, holes and all, and Break Apart makes a shape
