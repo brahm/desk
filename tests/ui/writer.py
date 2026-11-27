@@ -3779,15 +3779,15 @@ def contacts_of_the_desktop(work):
         press("ctrl+End")
         activate("insert-merge-field", "First Name")
         activate("insert-sender-field", "Company")
+        wait_for(
+            "the fields with their names",
+            lambda: text_of(document) == "US Letter, landscapeFirst NameCompany\n",
+        )
+        check("the sender fields show their names until the person asks for their card (MAL-01)", True)
         # GNOME keeps no card marked as one's own: it is the card of the
         # name the system gives the person, when it gives one.
         own = GLib.get_real_name() not in ("", "Unknown")
         sender = "Desk & Co." if own else "Company"
-        wait_for(
-            "the sender field filled",
-            lambda: text_of(document) == f"US Letter, landscapeFirst Name{sender}\n",
-        )
-        check("the person's own card fills the sender fields (MAL-01)", True)
         press("ctrl+alt+i")
         activate("inspector-tab", "document")
         wait_for("Mail Merge", lambda: showing_named(app, "Populate With"))
@@ -3804,6 +3804,18 @@ def contacts_of_the_desktop(work):
             "the Preview shows the contacts of the group alone (MAL-04)",
             showing_named(app, "1 of 1") is not None,
         )
+        check("the Preview fills the sender fields with the person's own card (MAL-01)", own)
+        toggle_switch_row(app, "Preview", "the Preview switch")
+        wait_for(
+            "the fields as they are",
+            lambda: text_of(document) == "US Letter, landscapeFirst NameCompany\n",
+        )
+        activate("field-merge-own-card")
+        wait_for(
+            "the sender field filled",
+            lambda: text_of(document) == f"US Letter, landscapeFirst Name{sender}\n",
+        )
+        check("Fill With My Card fills the sender fields (MAL-01)", True)
     finally:
         if writer is not None:
             writer.terminate()

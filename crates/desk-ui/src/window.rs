@@ -1669,7 +1669,7 @@ impl DocumentWindow {
         let (Some(opener), Some(editor)) = (self.opener, self.editor()) else {
             return false;
         };
-        let pages = editor.pages();
+        let pages = editor.saved_pages();
         let document = if as_final {
             match editor.document().final_copy() {
                 Ok(copy) => copy,
@@ -3558,11 +3558,39 @@ impl DocumentWindow {
         let merge = gio::SimpleAction::new("mail-merge", None);
         let weak = Rc::downgrade(self);
         merge.connect_activate(move |_, _| {
-            if let Some(this) = weak.upgrade() {
-                this.mail_merge();
-            }
+            // The contacts of the desktop and the person's own card come
+            // first, away from the window.
+            let weak = weak.clone();
+            crate::desktop_contacts::with_cards(move |_| {
+                if let Some(this) = weak.upgrade() {
+                    this.mail_merge();
+                }
+            });
         });
         self.actions.add_action(&merge);
+        // Fills the sender fields with the person's own card (MAL-01).
+        let own = gio::SimpleAction::new("field-merge-own-card", None);
+        let weak = Rc::downgrade(self);
+        own.connect_activate(move |_, _| {
+            let Some(this) = weak.upgrade() else {
+                return;
+            };
+            let Some(editor) = this.editor() else {
+                return;
+            };
+            let weak = Rc::downgrade(&this);
+            editor.fill_sender_with_own_card(move |found| {
+                if let (false, Some(this)) = (found, weak.upgrade()) {
+                    let dialog = adw::AlertDialog::builder()
+                        .heading(tr("No Card of Your Own"))
+                        .body(tr("Contacts has no card with your name."))
+                        .build();
+                    dialog.add_response("close", &tr("_Close"));
+                    dialog.present(Some(&this.window()));
+                }
+            });
+        });
+        self.actions.add_action(&own);
 
         // The number of columns of the layout at the cursor, which keep
         // their gap (EST-07).
@@ -4819,6 +4847,12 @@ fn fill_field(menu: &gio::Menu, window: &adw::ApplicationWindow, editor: Option<
                 Some(&tr("Use as _Sender Field")),
                 Some("win.field-merge-sender"),
             );
+            if *sender {
+                menu.append(
+                    Some(&tr("Fill With _My Card")),
+                    Some("win.field-merge-own-card"),
+                );
+            }
             if desk_contacts::canonical(name).is_some_and(|n| n.ends_with("Address")) {
                 menu.append(
                     Some(&tr("Single _Line Address")),

@@ -4,7 +4,9 @@
 //! The contacts of the desktop, from Evolution Data Server, which GNOME
 //! Contacts and Evolution keep, as the source of a mail merge (W105,
 //! MAL-01, MAL-04): every contact, or those of a group, and the
-//! person's own card, which fills the sender fields.
+//! person's own card, which fills the sender fields. The desktop is
+//! asked only when the person acts: choosing the source, previewing,
+//! merging, or filling the sender fields.
 //!
 //! The server is reached on the session bus: its sources say which
 //! address books there are, and each book gives its contacts as vCard.
@@ -133,7 +135,9 @@ fn cards_of(bus: &gio::DBusConnection, uid: &str) -> Result<Vec<Card>, glib::Err
     Ok(cards)
 }
 
-/// Every card of the desktop, of every address book.
+/// Every card of the desktop, of every address book, up to
+/// [`vcard::MAX_CARDS`]. It waits on the server: [`with_cards`] asks it
+/// away from the window.
 pub fn cards() -> Result<Vec<Card>, glib::Error> {
     let bus = gio::bus_get_sync(gio::BusType::Session, gio::Cancellable::NONE)?;
     let mut cards = Vec::new();
@@ -144,8 +148,39 @@ pub fn cards() -> Result<Vec<Card>, glib::Error> {
             Ok(more) => cards.extend(more),
             Err(error) => glib::g_warning!("desk", "cannot read the address book {uid}: {error}"),
         }
+        if cards.len() >= vcard::MAX_CARDS {
+            cards.truncate(vcard::MAX_CARDS);
+            break;
+        }
     }
     Ok(cards)
+}
+
+thread_local! {
+    /// The cards that the desktop gave last.
+    static CARDS: std::cell::RefCell<Option<std::rc::Rc<Vec<Card>>>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+/// Asks the desktop for its cards away from the window, which does not
+/// wait, and calls `f` with them, or with why they could not be read.
+/// Only an action of the person asks: the cards are their own.
+pub fn with_cards(f: impl FnOnce(Result<std::rc::Rc<Vec<Card>>, String>) + 'static) {
+    glib::MainContext::default().spawn_local(async move {
+        let read = gio::spawn_blocking(|| cards().map_err(|e| e.to_string()))
+            .await
+            .unwrap_or_else(|_| Err("the contacts could not be read".to_owned()))
+            .map(std::rc::Rc::new);
+        if let Ok(cards) = &read {
+            CARDS.with_borrow_mut(|c| *c = Some(cards.clone()));
+        }
+        f(read);
+    });
+}
+
+/// The cards that the desktop gave last, if it gave any.
+pub fn cards_now() -> Option<std::rc::Rc<Vec<Card>>> {
+    CARDS.with_borrow(Clone::clone)
 }
 
 /// The cards of a group, or every card.
@@ -161,9 +196,10 @@ pub fn in_group(cards: Vec<Card>, group: Option<&str>) -> Vec<Card> {
 
 /// The groups of the cards, in the order of their names.
 pub fn groups(cards: &[Card]) -> Vec<String> {
-    let mut groups: Vec<String> = cards.iter().flat_map(Card::categories).collect();
+    let groups: std::collections::BTreeSet<String> =
+        cards.iter().flat_map(Card::categories).collect();
+    let mut groups: Vec<String> = groups.into_iter().collect();
     groups.sort_by_key(|g| g.to_lowercase());
-    groups.dedup();
     groups
 }
 
@@ -180,38 +216,10 @@ pub fn own_card<'a>(cards: &'a [Card], real_name: &str) -> Option<&'a Card> {
     })
 }
 
-thread_local! {
-    /// The person's own card, once the desktop was asked for it.
-    static OWN: std::cell::RefCell<Option<Option<std::rc::Rc<Card>>>> =
-        const { std::cell::RefCell::new(None) };
-}
-
-/// Calls `f` with the person's own card, or none, asking the desktop for
-/// it the first time, away from the window so that it does not wait.
-pub fn with_own_card(f: impl FnOnce(Option<std::rc::Rc<Card>>) + 'static) {
-    if let Some(card) = OWN.with_borrow(Clone::clone) {
-        f(card);
-        return;
-    }
-    glib::MainContext::default().spawn_local(async move {
-        let name = glib::real_name().to_string_lossy().into_owned();
-        let card = gio::spawn_blocking(move || {
-            cards()
-                .ok()
-                .and_then(|cards| own_card(&cards, &name).cloned())
-        })
-        .await
-        .ok()
-        .flatten()
-        .map(std::rc::Rc::new);
-        OWN.with_borrow_mut(|own| *own = Some(card.clone()));
-        f(card);
-    });
-}
-
-/// The person's own card, if the desktop gave it already.
-pub fn own_card_now() -> Option<std::rc::Rc<Card>> {
-    OWN.with_borrow(Clone::clone).flatten()
+/// The person's own card, among the cards the desktop gave last.
+pub fn own_card_now() -> Option<Card> {
+    let cards = cards_now()?;
+    own_card(&cards, &glib::real_name().to_string_lossy()).cloned()
 }
 
 #[cfg(test)]

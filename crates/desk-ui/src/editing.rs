@@ -517,22 +517,17 @@ struct State {
     /// The data of the record that the merge fields show, while the
     /// preview of a mail merge is on (MAL-04).
     merge_preview: Option<merge::MergePreview>,
-    /// The data of the person's own card, which the sender fields that no
-    /// card filled show (MAL-01), once the desktop gave it.
-    merge_sender: Option<merge::MergePreview>,
-    /// Whether the desktop was asked for that card.
-    sender_asked: bool,
 }
 
 impl State {
     /// Lays out a document as the view shows it: as pages, or in Screen
     /// View.
     fn lay_out(&self, document: &Document) -> DocumentLayout {
-        if let Some(filled) = merge::filled(
-            document,
-            self.merge_preview.as_ref(),
-            self.merge_sender.as_ref(),
-        ) {
+        if let Some(filled) = self
+            .merge_preview
+            .as_ref()
+            .and_then(|preview| merge::filled(document, preview))
+        {
             return lay_out_in(self.screen, &filled);
         }
         lay_out_in(self.screen, document)
@@ -727,8 +722,6 @@ impl TextEditor {
                     handlers: Vec::new(),
                 },
                 merge_preview: None,
-                merge_sender: None,
-                sender_asked: false,
             })),
         };
         this.show_pages();
@@ -751,6 +744,16 @@ impl TextEditor {
             Some(mode) => mode.main.snapshot(),
             None => state.editor.snapshot(),
         }
+    }
+
+    /// The pages as a saved file shows them: without the data of the
+    /// preview of a mail merge, which is not in the document (MAL-04).
+    pub fn saved_pages(&self) -> Vec<DisplayList> {
+        let state = self.state.borrow();
+        if state.merge_preview.is_some() {
+            return DisplayList::pages(&crate::lay_out(Self::main_document(&state)));
+        }
+        DisplayList::pages(Self::main_layout(&state))
     }
 
     /// The pages as they are now.
@@ -3027,11 +3030,10 @@ impl TextEditor {
             let state = self.state.borrow();
             // A screen reader reads the fields of the preview as they show
             // (MAL-04).
-            let filled = merge::filled(
-                state.editor.document(),
-                state.merge_preview.as_ref(),
-                state.merge_sender.as_ref(),
-            );
+            let filled = state
+                .merge_preview
+                .as_ref()
+                .and_then(|preview| merge::filled(state.editor.document(), preview));
             let text = AccessText::new(
                 filled.as_ref().unwrap_or(state.editor.document()),
                 &state.layout,

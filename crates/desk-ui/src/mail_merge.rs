@@ -9,7 +9,9 @@
 //!
 //! A source is a file that the document names. It is read only when the
 //! person asks for its data, by choosing it, opening Add Merge Field,
-//! turning the Preview on or merging, never when the document opens.
+//! turning the Preview on or merging, never when the document opens; so
+//! are the contacts of the desktop, which the Preview and Merge also ask
+//! for the person's own card, for the sender fields.
 
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
@@ -39,15 +41,12 @@ pub const COMMON_FIELDS: [&str; 10] = [
     "Birthday",
 ];
 
-/// The records of a source: those of a file, or the contacts of the
-/// desktop, read now.
+/// The records of a source: those of a file, read now, or the contacts
+/// that the desktop gave last ([`crate::desktop_contacts::with_cards`]).
 pub fn read_records(source: &MergeSource) -> Result<Records, SourceError> {
     if let MergeSource::Contacts { group } = source {
-        let cards = crate::desktop_contacts::cards().map_err(|e| {
-            glib::g_warning!("desk", "cannot read the contacts of the desktop: {e}");
-            SourceError::Desktop
-        })?;
-        let cards = crate::desktop_contacts::in_group(cards, group.as_deref());
+        let cards = crate::desktop_contacts::cards_now().ok_or(SourceError::Desktop)?;
+        let cards = crate::desktop_contacts::in_group(cards.to_vec(), group.as_deref());
         return Ok(Records::of_cards(&cards));
     }
     desk_contacts::read_source(source, |path| std::fs::File::open(path))
@@ -58,7 +57,7 @@ pub fn read_records(source: &MergeSource) -> Result<Records, SourceError> {
 /// of the person's own card, once the desktop gave it (MAL-01).
 fn datum(records: &Records, record: usize, name: &str, sender: bool) -> Option<String> {
     if sender {
-        return crate::desktop_contacts::own_card_now().map(|c| c.get(name).unwrap_or_default());
+        return crate::desktop_contacts::own_card_now().and_then(|c| c.get(name));
     }
     Some(records.datum(record, name).unwrap_or_default().to_owned())
 }
@@ -166,12 +165,35 @@ impl MailMergeGroup {
             .valign(gtk::Align::Center)
             .menu_model(&source_menu(&[]))
             .build();
-        // The groups of the contacts, read when the menu opens.
-        choose.set_create_popup_func(|button| {
-            let groups = crate::desktop_contacts::cards()
-                .map(|cards| crate::desktop_contacts::groups(&cards))
-                .unwrap_or_default();
-            button.set_menu_model(Some(&source_menu(&groups)));
+        // The groups of the contacts, as the desktop gave them last; the
+        // menu asks it again as it opens, away from the window, and shows
+        // the groups once they come.
+        let asked = Rc::new(Cell::new(false));
+        choose.set_create_popup_func(move |button| {
+            let groups = || {
+                crate::desktop_contacts::cards_now()
+                    .map(|cards| crate::desktop_contacts::groups(&cards))
+                    .unwrap_or_default()
+            };
+            let before = groups();
+            button.set_menu_model(Some(&source_menu(&before)));
+            if asked.replace(true) {
+                // The menu opened again as the groups came.
+                asked.set(false);
+                return;
+            }
+            let button = button.downgrade();
+            let asked = asked.clone();
+            crate::desktop_contacts::with_cards(move |_| {
+                let now = groups();
+                match button.upgrade() {
+                    Some(button) if now != before && button.is_active() => {
+                        button.popdown();
+                        button.popup();
+                    }
+                    _ => asked.set(false),
+                }
+            });
         });
         let source = compact::ActionRow::builder()
             .title(tr("Populate With"))
@@ -254,12 +276,25 @@ impl MailMergeGroup {
             }
         });
         let weak = Rc::downgrade(&this);
-        this.preview.connect_active_notify(move |_| {
-            if let Some(this) = weak.upgrade()
-                && !this.updating.get()
-            {
-                this.show_preview();
+        this.preview.connect_active_notify(move |row| {
+            let Some(this) = weak.upgrade() else {
+                return;
+            };
+            if this.updating.get() {
+                return;
             }
+            if !row.is_active() {
+                this.show_preview();
+                return;
+            }
+            // The contacts and the person's own card, for the sender
+            // fields, come first.
+            let weak = Rc::downgrade(&this);
+            crate::desktop_contacts::with_cards(move |_| {
+                if let Some(this) = weak.upgrade() {
+                    this.show_preview();
+                }
+            });
         });
         for (button, step) in [(&this.previous, -1isize), (&this.next, 1)] {
             let weak = Rc::downgrade(&this);
@@ -368,8 +403,25 @@ impl MailMergeGroup {
         };
         editor.set_merge_preview(None);
         editor.set_merge_source(source.clone());
-        if let Some(source) = source {
-            self.load(&source);
+        let Some(source) = source else {
+            return;
+        };
+        *self.records.borrow_mut() = None;
+        let weak = Rc::downgrade(self);
+        self.with_contacts(&source.clone(), move || {
+            if let Some(this) = weak.upgrade() {
+                this.load(&source);
+            }
+        });
+    }
+
+    /// Calls `then` once the contacts of the desktop came, when the source
+    /// is the contacts, or at once.
+    fn with_contacts(&self, source: &MergeSource, then: impl FnOnce() + 'static) {
+        if matches!(source, MergeSource::Contacts { .. }) {
+            crate::desktop_contacts::with_cards(move |_| then());
+        } else {
+            then();
         }
     }
 
@@ -525,10 +577,6 @@ impl MailMergeGroup {
 
     /// Shows the source of the document.
     pub fn show(&self, format: &Format) {
-        // The sender fields show the person's own card (MAL-01).
-        if let Some(editor) = (self.editor)() {
-            editor.fill_sender_fields();
-        }
         // An edit of the document ended the preview.
         if self.preview.is_active() && !(self.editor)().is_some_and(|e| e.merge_previewing()) {
             self.updating.set(true);

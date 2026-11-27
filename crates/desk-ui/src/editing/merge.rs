@@ -39,46 +39,51 @@ fn with_datum(field: &Field, datum: String) -> Option<Field> {
     })
 }
 
-/// A copy of the document with its merge fields as they show: those of
-/// a recipient filled by the preview, while it is on, and the sender
-/// fields that no card filled by the person's own card (MAL-01); none
-/// when nothing fills them.
-pub(super) fn filled(
-    document: &Document,
-    preview: Option<&MergePreview>,
-    sender: Option<&MergePreview>,
-) -> Option<Document> {
-    if preview.is_none() && sender.is_none() {
-        return None;
-    }
+/// A copy of the document with its merge fields filled by the preview:
+/// those of a recipient, and the sender fields that no card filled;
+/// none when they cannot be filled.
+pub(super) fn filled(document: &Document, preview: &MergePreview) -> Option<Document> {
     let mut editor = Editor::new(document.clone());
     editor
         .edit("Preview", |edit| {
             edit.map_fields(&|field| {
                 let Field::Merge {
                     name,
-                    sender: is_sender,
+                    sender,
                     shown,
                     ..
                 } = field
                 else {
                     return None;
                 };
-                let datum = match (is_sender, preview) {
-                    (false, Some(preview)) => preview(name, false),
-                    (true, _) if shown.is_none() => sender.and_then(|s| s(name, true)),
-                    _ => None,
-                }?;
-                with_datum(field, datum)
+                if *sender && shown.is_some() {
+                    return None;
+                }
+                with_datum(field, preview(name, *sender)?)
             })
         })
         .ok()?;
     Some(editor.document().clone())
 }
 
-/// The datum of a field of a card, or nothing.
-fn card_datum(card: &desk_contacts::vcard::Card, name: &str) -> String {
-    card.get(name).unwrap_or_default()
+/// A merge field without a datum, showing its name.
+fn without_datum(field: &Field) -> Option<Field> {
+    match field {
+        Field::Merge {
+            name,
+            sender,
+            single_line,
+            shown: Some(_),
+            origin,
+        } => Some(Field::Merge {
+            name: name.clone(),
+            sender: *sender,
+            single_line: *single_line,
+            shown: None,
+            origin: origin.clone(),
+        }),
+        _ => None,
+    }
 }
 
 impl TextEditor {
@@ -125,26 +130,23 @@ impl TextEditor {
         self.state.borrow().merge_preview.is_some()
     }
 
-    /// Fills the sender fields that no card filled with the person's own
-    /// card, as the document shows them and without changing it, as
-    /// Pages '09 did when a document opened (MAL-01). It asks the
-    /// contacts of the desktop once, if the document has sender fields.
-    pub fn fill_sender_fields(&self) {
-        {
-            let mut state = self.state.borrow_mut();
-            if state.sender_asked || !has_sender_fields(state.editor.document()) {
-                return;
-            }
-            state.sender_asked = true;
-        }
+    /// Fills the sender fields with the person's own card, as they ask
+    /// (MAL-01): the card of their name among the contacts of the
+    /// desktop. Pages '09 did it when a document opened; Desk asks the
+    /// desktop only when the person does, since a document could show
+    /// the card where they would not see it. Whether a card was found
+    /// comes back to `done`.
+    pub fn fill_sender_with_own_card(&self, done: impl FnOnce(bool) + 'static) {
         let weak = self.downgrade();
-        crate::desktop_contacts::with_own_card(move |card| {
-            let (Some(this), Some(card)) = (weak.upgrade(), card) else {
+        crate::desktop_contacts::with_cards(move |_| {
+            let (Some(this), Some(card)) =
+                (weak.upgrade(), crate::desktop_contacts::own_card_now())
+            else {
+                done(false);
                 return;
             };
-            let sender: MergePreview = Rc::new(move |name, _| Some(card_datum(&card, name)));
-            this.state.borrow_mut().merge_sender = Some(sender);
-            this.lay_out_again();
+            this.fill_with_card(&card, true);
+            done(true);
         });
     }
 
@@ -157,9 +159,13 @@ impl TextEditor {
         let card = card.clone();
         self.format_edit("Merge Contact", move |edit| {
             edit.map_fields(&|field| match field {
+                // A field the card has no datum for shows its name again.
                 Field::Merge {
                     name, sender: s, ..
-                } if *s == sender => with_datum(field, card_datum(&card, name)),
+                } if *s == sender => match card.get(name).filter(|d| !d.trim().is_empty()) {
+                    Some(datum) => with_datum(field, datum),
+                    None => without_datum(field),
+                },
                 _ => None,
             })
         });
@@ -172,17 +178,22 @@ impl TextEditor {
         let state = self.state.borrow();
         let paragraph = state.editor.document().body().get(spot.paragraph)?;
         let mut offset = 0;
+        let mut after = None;
         for run in paragraph.runs() {
             let end = offset + run.len();
-            if let Some(Some(Field::Merge { sender, .. })) = &run.attrs.field
-                && offset <= spot.offset
-                && spot.offset <= end
-            {
-                return Some(*sender);
+            if let Some(Some(Field::Merge { sender, .. })) = &run.attrs.field {
+                // The field that starts at the point, before one that
+                // ends there.
+                if spot.offset == offset {
+                    return Some(*sender);
+                }
+                if spot.offset == end {
+                    after = Some(*sender);
+                }
             }
             offset = end;
         }
-        None
+        after
     }
 
     /// Takes a vCard file dropped on a merge field: its first card fills
@@ -198,12 +209,20 @@ impl TextEditor {
         let Some(sender) = self.merge_field_at(x, y) else {
             return false;
         };
+        // The size first, so that a file too large is not read.
+        let size = file
+            .query_info(
+                gio::FILE_ATTRIBUTE_STANDARD_SIZE,
+                gio::FileQueryInfoFlags::NONE,
+                gio::Cancellable::NONE,
+            )
+            .map(|info| info.size());
+        if !size.is_ok_and(|s| (0..=desk_contacts::MAX_SOURCE_BYTES as i64).contains(&s)) {
+            return false;
+        }
         let Ok((bytes, _)) = file.load_contents(gio::Cancellable::NONE) else {
             return false;
         };
-        if bytes.len() > desk_contacts::MAX_SOURCE_BYTES {
-            return false;
-        }
         let text = desk_contacts::decode(&bytes);
         match desk_contacts::vcard::parse(&text).first() {
             Some(card) => {
@@ -215,27 +234,13 @@ impl TextEditor {
     }
 }
 
-/// Whether a document has sender fields, in its body or its headers and
-/// footers.
-fn has_sender_fields(document: &Document) -> bool {
-    let sender = |p: &desk_model::Paragraph| {
-        p.runs()
-            .any(|r| matches!(r.attrs.field, Some(Some(Field::Merge { sender: true, .. }))))
-    };
-    document.body().iter().any(sender)
-        || document
-            .all_headers_footers()
-            .iter()
-            .any(|(_, h)| h.paragraphs().any(sender))
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use desk_model::FIELD_CHARACTER;
 
     #[test]
-    fn mal_01_the_own_card_fills_the_sender_fields_that_no_card_filled() {
+    fn mal_01_mal_04_the_preview_fills_the_sender_fields_that_no_card_filled() {
         let mut editor = Editor::new(Document::new_word_processing());
         editor
             .edit("Fields", |edit| {
@@ -261,9 +266,9 @@ mod tests {
                 Ok(())
             })
             .unwrap();
-        assert!(has_sender_fields(editor.document()));
-        let own: MergePreview = Rc::new(|_, _| Some("Own".into()));
-        let shown = filled(editor.document(), None, Some(&own)).unwrap();
+        let preview: MergePreview =
+            Rc::new(|_, sender| Some(if sender { "Own" } else { "Ana" }.into()));
+        let shown = filled(editor.document(), &preview).unwrap();
         let texts: Vec<String> = shown
             .body()
             .get(0)
@@ -272,7 +277,15 @@ mod tests {
             .filter_map(|r| r.attrs.field.clone().flatten())
             .map(|f| f.text(1, 1))
             .collect();
-        assert_eq!(texts, ["Own", "Desk", "Company"]);
-        assert!(filled(editor.document(), None, None).is_none());
+        assert_eq!(texts, ["Own", "Desk", "Ana"]);
+        let named = without_datum(&Field::Merge {
+            name: "Phone".into(),
+            sender: false,
+            single_line: false,
+            shown: Some("1".into()),
+            origin: None,
+        })
+        .unwrap();
+        assert_eq!(named.text(1, 1), "Phone");
     }
 }

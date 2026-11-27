@@ -3024,10 +3024,17 @@ paragraph, and objects on a second page.
   books and their cards, as vCard, without a library of its own; the
   groups are the categories of the cards. The Flatpak may now talk to
   the server.
-- The sender fields show the person's own card, as Pages '09 did when a
-  document opened, without changing the document. GNOME keeps no card
-  marked as one's own, so it is the card of the name the system gives
-  the person. A sender field that a card filled keeps it.
+- The Preview and Merge fill the sender fields with the person's own
+  card, and Fill With My Card, in the menu of a sender field, writes it
+  in them. GNOME keeps no card marked as one's own, so it is the card of
+  the name the system gives the person. A sender field that a card
+  filled keeps it.
+- Pages '09 filled the sender fields as a document opened. Desk does
+  not: the security review showed that a document could put the card
+  in fields too pale to see, and the thumbnail saved in the file would
+  carry it. The desktop is asked for contacts only when the person
+  acts, away from the window so that it never waits, and the thumbnail
+  of a saved file never shows the data of a Preview.
 - A vCard file dropped on a merge field fills the fields, as dragging a
   card did in both Pages: on a sender field the sender fields, on
   another field the fields of the recipient. Undo takes the data away.
