@@ -11,7 +11,7 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
 * Added: The artistic lines of Pages, chalk, thick brush, chisel pen,
   dry brush and uneven ink, for the lines of shapes, pictures and text
   boxes and the border of a drop cap, drawn by Desk in its own way.
-  Other programs show them as solid lines. (#PR)
+  Other programs show them as solid lines. (#257)
 
 * Added: A mail merge can take the contacts of GNOME, all of them or a
   group, and the Preview, Merge and Fill With My Card put your own card
