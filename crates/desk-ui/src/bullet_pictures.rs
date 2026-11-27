@@ -139,9 +139,9 @@ pub fn picture_from_file(file: &gtk::gio::File) -> Option<Picture> {
     Picture::from_png(texture.save_to_png_bytes().to_vec())
 }
 
-/// The picture of an image file for a document: PNG, JPEG and PDF as
-/// they are, so that photographs stay small and PDF stays sharp, and any
-/// other format that GTK reads as PNG (OBJ-01).
+/// The picture of an image file for a document: PNG, JPEG, PDF, SVG and
+/// HEIC as they are, so that photographs stay small and drawings stay
+/// sharp, and any other format that GTK reads as PNG (OBJ-01, W108).
 ///
 /// A file larger than `MAX_PICTURE` is not read, as one dropped on the
 /// document was read whole whatever its size (review RV, batch 5).
@@ -151,6 +151,20 @@ pub fn document_picture_from_file(file: &gtk::gio::File) -> Option<Picture> {
     if bytes.starts_with(b"%PDF-") {
         let (width, height) = desk_render::pdf_size(bytes)?;
         return Picture::from_pdf(bytes.to_vec(), width, height);
+    }
+    if desk_model::is_svg(bytes) {
+        // One that librsvg cannot measure is taken as GTK reads it.
+        return desk_render::svg_size(bytes)
+            .and_then(|(width, height)| Picture::from_svg(bytes.to_vec(), width, height))
+            .or_else(|| picture_from_file(file));
+    }
+    if desk_model::is_heif(bytes) {
+        // Measured as it is drawn, with its turns; one that cannot be
+        // decoded is taken as GTK reads it, if it can.
+        let picture = desk_render::heic_size(bytes)
+            .and_then(|(width, height)| Picture::from_heic(bytes.to_vec(), width, height))
+            .filter(|p| desk_render::picture_surface(p).is_some());
+        return picture.or_else(|| picture_from_file(file));
     }
     Picture::from_bytes(bytes.to_vec())
         // A JPEG that the renderer cannot decode is taken as GTK reads it.
@@ -239,9 +253,18 @@ pub fn document_picture_filters(with_media: bool) -> gtk::gio::ListStore {
     filters
 }
 
-/// A small image of a picture, for menus.
+/// The image of a picture for GTK, for menus and the clipboard: PNG and
+/// JPEG as they are, and the others, which GTK may not read, as their
+/// pixels drawn in PNG (W108).
 pub fn texture(picture: &Picture) -> Option<gtk::gdk::Texture> {
-    gtk::gdk::Texture::from_bytes(&gtk::glib::Bytes::from(picture.data())).ok()
+    use desk_model::PictureFormat;
+    if matches!(picture.format(), PictureFormat::Png | PictureFormat::Jpeg) {
+        return gtk::gdk::Texture::from_bytes(&gtk::glib::Bytes::from(picture.data())).ok();
+    }
+    let surface = desk_render::picture_surface(picture)?;
+    let mut png = Vec::new();
+    surface.write_to_png(&mut png).ok()?;
+    gtk::gdk::Texture::from_bytes(&gtk::glib::Bytes::from_owned(png)).ok()
 }
 
 #[cfg(test)]
@@ -263,6 +286,24 @@ mod tests {
         assert!(file_size(&file).is_none_or(|size| size == 0));
         assert!(load_bounded(&file, 1 << 20).is_some_and(|b| !b.is_empty()));
         assert_eq!(load_bounded(&file, 10), None);
+    }
+
+    #[test]
+    fn w108_svg_and_heic_pictures_are_given_to_gtk_as_their_pixels() {
+        // GTK may read neither: the clipboard and the menus take their
+        // pixels.
+        let svg = br#"<svg xmlns="http://www.w3.org/2000/svg" width="40" height="30"/>"#;
+        let svg = Picture::from_svg(svg.to_vec(), 40.0, 30.0).unwrap();
+        let pixels = texture(&svg).unwrap();
+        assert_eq!((pixels.width(), pixels.height()), (80, 60));
+        let heic = std::fs::read(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../corpus/fixtures/images/gradient-64x48.heic"
+        ))
+        .unwrap();
+        let heic = Picture::from_heic(heic, 64, 48).unwrap();
+        let pixels = texture(&heic).unwrap();
+        assert_eq!((pixels.width(), pixels.height()), (64, 48));
     }
 
     #[test]

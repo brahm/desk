@@ -64,6 +64,10 @@ tiff = { version = "0.11.3", default-features = false, features = ["deflate", "l
 gif = { version = "0.14.2", default-features = false, features = ["std"] }
 glib = "0.22.10"
 poppler-rs = { version = "0.26.0", features = ["v0_82"] }
+# SVG drawn as it is by librsvg, and HEIC read by libheif, both of which
+# come with GNOME (W108).
+librsvg-rebind = "0.3.0"
+libheif-rs = { version = "3.0.0", default-features = false, features = ["v1_17"] }
 zune-jpeg = "0.5.15"
 
 desk-chart = { path = "crates/desk-chart" }

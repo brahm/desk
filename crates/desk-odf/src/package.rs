@@ -279,6 +279,7 @@ fn picture_type(path: &str) -> &'static str {
         Some("jpg" | "jpeg") => "image/jpeg",
         Some("gif") => "image/gif",
         Some("svg") => "image/svg+xml",
+        Some("heic" | "heif") => "image/heic",
         Some("tif" | "tiff") => "image/tiff",
         Some("pdf") => "application/pdf",
         Some("mov") => "video/quicktime",

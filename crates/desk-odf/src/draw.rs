@@ -481,7 +481,9 @@ impl DrawObject {
     /// link to.
     pub fn hrefs(&self) -> Vec<&str> {
         match &self.kind {
-            DrawKind::Image { href } => vec![href.as_str()],
+            DrawKind::Image { href, fallback } => std::iter::once(href.as_str())
+                .chain(fallback.as_deref())
+                .collect(),
             DrawKind::Media { href, poster, .. } => std::iter::once(href.as_str())
                 .chain(poster.as_deref())
                 .collect(),
@@ -577,6 +579,11 @@ pub enum DrawKind {
     Image {
         /// `xlink:href`: the path of the picture in the package.
         href: String,
+        /// The `xlink:href` of a second `draw:image` of the frame: a
+        /// picture in a format that more programs read, which stands for
+        /// the first in those that cannot read it, as for an SVG or HEIC
+        /// one (W108).
+        fallback: Option<String>,
     },
     /// `draw:frame` with a `draw:plugin` that plays a movie or a sound,
     /// and the `draw:image` that stands for it.
@@ -987,6 +994,12 @@ fn draw_object_at(
             } else if let Some(image) = e.child(DRAW, "image") {
                 DrawKind::Image {
                     href: image.attr(XLINK, "href")?.to_owned(),
+                    fallback: e
+                        .elements()
+                        .filter(|i| i.name.is(DRAW, "image"))
+                        .nth(1)
+                        .and_then(|i| i.attr(XLINK, "href"))
+                        .map(str::to_owned),
                 }
             } else {
                 let text = e.child(DRAW, "text-box")?;
@@ -1330,13 +1343,15 @@ fn write_shape(w: &mut Writer, object: &DrawObject, paragraph: &dyn Fn(&mut Writ
             w.attr_opt("desk:shape", desk_shape.as_deref());
             w.end();
         }
-        DrawKind::Image { href } => {
-            w.start("draw:image")
-                .attr("xlink:href", href)
-                .attr("xlink:type", "simple")
-                .attr("xlink:show", "embed")
-                .attr("xlink:actuate", "onLoad")
-                .end();
+        DrawKind::Image { href, fallback } => {
+            for href in std::iter::once(href).chain(fallback) {
+                w.start("draw:image")
+                    .attr("xlink:href", href)
+                    .attr("xlink:type", "simple")
+                    .attr("xlink:show", "embed")
+                    .attr("xlink:actuate", "onLoad")
+                    .end();
+            }
         }
         DrawKind::Media {
             href,

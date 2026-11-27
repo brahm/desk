@@ -39,6 +39,10 @@ impl MediaFormat {
     pub fn sniff(bytes: &[u8]) -> Option<Self> {
         let at = |range: std::ops::Range<usize>| bytes.get(range).unwrap_or_default();
         if at(4..8) == b"ftyp" {
+            // HEIC and AVIF pictures start as movies do (W108).
+            if crate::is_heif(bytes) || matches!(at(8..12), b"mif1" | b"msf1" | b"avif" | b"avis") {
+                return None;
+            }
             return Some(match at(8..12) {
                 b"qt  " => Self::QuickTime,
                 b"M4A " | b"M4B " => Self::M4a,
@@ -238,7 +242,13 @@ mod tests {
         mp4.extend(b"ftypisom");
         let mut m4a = vec![0, 0, 0, 20];
         m4a.extend(b"ftypM4A ");
-        let cases: [(&[u8], Option<MediaFormat>); 8] = [
+        let mut heic = vec![0, 0, 0, 24];
+        heic.extend(b"ftypheic\0\0\0\0mif1heic");
+        let mut avif = vec![0, 0, 0, 20];
+        avif.extend(b"ftypavif\0\0\0\0");
+        let cases: [(&[u8], Option<MediaFormat>); 10] = [
+            (&heic, None),
+            (&avif, None),
             (&mov, Some(MediaFormat::QuickTime)),
             (&mp4, Some(MediaFormat::Mp4)),
             (&m4a, Some(MediaFormat::M4a)),

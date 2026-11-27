@@ -8,6 +8,10 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
 
 ## Changes since 0.7.0 (unreleased)
 
+* Added: SVG images, drawn sharp at every size, and HEIC photographs
+  can be inserted, dragged in and opened from ODT and Pages files; in
+  ODT a PNG goes beside them for other programs (#263).
+
 * Added: Objects have a title, above or below them, and a caption,
   turned on in the Style tab, edited in place and kept in ODF (#262).
 

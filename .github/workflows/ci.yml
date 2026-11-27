@@ -35,7 +35,7 @@ jobs:
       - name: Install GTK, Libadwaita, the test fonts, Poppler and a display
         run: |
           apt-get update
-          apt-get install --yes --no-install-recommends curl ca-certificates git build-essential pkg-config libgtk-4-dev libadwaita-1-dev libpoppler-glib-dev fonts-liberation fonts-texgyre fonts-urw-base35 fonts-crosextra-carlito fonts-crosextra-caladea poppler-utils hunspell-en-us hunspell-pt-br hyphen-en-us hyphen-pt-br xvfb xauth
+          apt-get install --yes --no-install-recommends curl ca-certificates git build-essential pkg-config libgtk-4-dev libadwaita-1-dev libpoppler-glib-dev librsvg2-dev libheif-dev libheif-plugin-libde265 fonts-liberation fonts-texgyre fonts-urw-base35 fonts-crosextra-carlito fonts-crosextra-caladea poppler-utils hunspell-en-us hunspell-pt-br hyphen-en-us hyphen-pt-br xvfb xauth
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
       - uses: dtolnay/rust-toolchain@df2a88e9fe4098bad09cb42c3dec7187f15861fc # master
         with:
@@ -77,7 +77,7 @@ jobs:
       - name: Install GTK and Libadwaita
         run: |
           apt-get update
-          apt-get install --yes --no-install-recommends curl ca-certificates git build-essential pkg-config libgtk-4-dev libadwaita-1-dev libpoppler-glib-dev
+          apt-get install --yes --no-install-recommends curl ca-certificates git build-essential pkg-config libgtk-4-dev libadwaita-1-dev libpoppler-glib-dev librsvg2-dev libheif-dev libheif-plugin-libde265
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
       - uses: dtolnay/rust-toolchain@df2a88e9fe4098bad09cb42c3dec7187f15861fc # master
         with:
@@ -96,7 +96,7 @@ jobs:
       - name: Install GTK, Libadwaita, the test fonts and Jing
         run: |
           apt-get update
-          apt-get install --yes --no-install-recommends curl ca-certificates git build-essential pkg-config libgtk-4-dev libadwaita-1-dev libpoppler-glib-dev fonts-liberation jing unzip
+          apt-get install --yes --no-install-recommends curl ca-certificates git build-essential pkg-config libgtk-4-dev libadwaita-1-dev libpoppler-glib-dev librsvg2-dev libheif-dev libheif-plugin-libde265 fonts-liberation jing unzip
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
       - uses: dtolnay/rust-toolchain@df2a88e9fe4098bad09cb42c3dec7187f15861fc # master
         with:
@@ -120,7 +120,7 @@ jobs:
       - name: Install GTK, Libadwaita, a display and AT-SPI
         run: |
           apt-get update
-          apt-get install --yes --no-install-recommends curl ca-certificates git build-essential pkg-config libgtk-4-dev libadwaita-1-dev libpoppler-glib-dev fonts-liberation xvfb xauth xdotool dbus libglib2.0-bin at-spi2-core python3-gi gir1.2-atspi-2.0 hunspell-en-us gstreamer1.0-plugins-good gstreamer1.0-libav
+          apt-get install --yes --no-install-recommends curl ca-certificates git build-essential pkg-config libgtk-4-dev libadwaita-1-dev libpoppler-glib-dev librsvg2-dev libheif-dev libheif-plugin-libde265 fonts-liberation xvfb xauth xdotool dbus libglib2.0-bin at-spi2-core python3-gi gir1.2-atspi-2.0 hunspell-en-us gstreamer1.0-plugins-good gstreamer1.0-libav
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
       - uses: dtolnay/rust-toolchain@df2a88e9fe4098bad09cb42c3dec7187f15861fc # master
         with:
@@ -153,7 +153,7 @@ jobs:
       - name: Install Cairo, GLib, FreeType and Fontconfig
         run: |
           sudo apt-get update
-          sudo apt-get install --yes --no-install-recommends libcairo2-dev libglib2.0-dev libfreetype-dev libfontconfig-dev libpoppler-glib-dev
+          sudo apt-get install --yes --no-install-recommends libcairo2-dev libglib2.0-dev libfreetype-dev libfontconfig-dev libpoppler-glib-dev librsvg2-dev libheif-dev libheif-plugin-libde265
       - uses: dtolnay/rust-toolchain@df2a88e9fe4098bad09cb42c3dec7187f15861fc # master
         with:
           toolchain: nightly

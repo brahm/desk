@@ -5346,3 +5346,138 @@ fn w122_a_title_turned_off_keeps_its_place_below() {
     let was = editor.document().objects().get(id).unwrap();
     assert_eq!(read.frame, was.frame);
 }
+
+/// A small SVG drawing: a blue square on a view box, 40 by 30 pixels.
+const SVG: &[u8] = br#"<?xml version="1.0"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="40" height="30" viewBox="0 0 4 3">
+  <rect width="4" height="3" fill="blue"/>
+</svg>"#;
+
+/// A HEIC photograph of 64 by 48 pixels, made for these tests.
+fn heic() -> Vec<u8> {
+    std::fs::read(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../corpus/fixtures/images/gradient-64x48.heic"
+    ))
+    .unwrap()
+}
+
+#[test]
+fn w108_svg_and_heic_pictures_are_read_as_they_are() {
+    use desk_model::PictureFormat;
+    let svg = desk_filters::picture::picture_within(SVG, 256).unwrap();
+    assert_eq!(svg.format(), PictureFormat::Svg);
+    assert_eq!((svg.width(), svg.height()), (40, 30));
+    // One that declares no size takes that of its view box.
+    let boxed = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 8"/>"#;
+    let boxed = desk_filters::picture::picture_within(boxed, 256).unwrap();
+    assert_eq!((boxed.width(), boxed.height()), (12, 8));
+    let heic = desk_filters::picture::picture_within(&heic(), 256).unwrap();
+    assert_eq!(heic.format(), PictureFormat::Heic);
+    assert_eq!((heic.width(), heic.height()), (64, 48));
+    // A file that only looks like one is refused.
+    assert!(desk_filters::picture::picture_within(b"<svg", 256).is_none());
+    let mut broken = heic.data()[..40].to_vec();
+    broken.resize(80, 0);
+    assert!(desk_filters::picture::picture_within(&broken, 256).is_none());
+}
+
+#[test]
+fn w108_svg_and_heic_pictures_go_to_odt_with_a_png_for_other_programs() {
+    use desk_model::{Frame, Object, ObjectKind, Picture, PictureFormat};
+    let svg = desk_filters::picture::picture_within(SVG, 256).unwrap();
+    let heic = desk_filters::picture::picture_within(&heic(), 256).unwrap();
+    let mut editor = desk_model::Editor::new(Document::new_word_processing());
+    editor
+        .edit("Pictures", |edit| {
+            for (picture, x) in [(svg.clone(), 0.0), (heic.clone(), 100.0)] {
+                let id = edit.new_id();
+                edit.add_object(Object::new(
+                    id,
+                    ObjectKind::Image(picture),
+                    Frame::from_pt(x, 0.0, 60.0, 40.0),
+                ))?;
+            }
+            Ok(())
+        })
+        .unwrap();
+    let bytes = write_odt(editor.document()).unwrap();
+    keep("w108-svg-heic.odt", &bytes);
+    let mut archive = zip::ZipArchive::new(std::io::Cursor::new(&bytes)).unwrap();
+    let mut content = String::new();
+    std::io::Read::read_to_string(&mut archive.by_name("content.xml").unwrap(), &mut content)
+        .unwrap();
+    // Each frame holds its picture, then a PNG that stands for it.
+    for (first, second) in [
+        ("Pictures/object1.svg", "Pictures/object2.png"),
+        ("Pictures/object3.heic", "Pictures/object4.png"),
+    ] {
+        let at = content.find(first).unwrap();
+        assert!(content[at..].find(second).is_some(), "{content}");
+    }
+    let mut manifest = String::new();
+    std::io::Read::read_to_string(
+        &mut archive.by_name("META-INF/manifest.xml").unwrap(),
+        &mut manifest,
+    )
+    .unwrap();
+    assert!(manifest.contains(
+        r#"manifest:full-path="Pictures/object1.svg" manifest:media-type="image/svg+xml""#
+    ));
+    assert!(manifest.contains(
+        r#"manifest:full-path="Pictures/object3.heic" manifest:media-type="image/heic""#
+    ));
+    let mut png = Vec::new();
+    std::io::Read::read_to_end(
+        &mut archive.by_name("Pictures/object4.png").unwrap(),
+        &mut png,
+    )
+    .unwrap();
+    let png = Picture::from_png(png).unwrap();
+    assert_eq!((png.width(), png.height()), (64, 48));
+    // Desk reads them back as they were.
+    let read = read_odt(&bytes).unwrap();
+    let pictures: Vec<Picture> = read
+        .objects()
+        .iter()
+        .filter_map(|o| match &o.kind {
+            ObjectKind::Image(p) => Some(p.clone()),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(pictures, [svg, heic]);
+    assert_eq!(pictures[0].format(), PictureFormat::Svg);
+}
+
+#[test]
+fn w108_the_second_picture_of_a_frame_stands_for_one_desk_cannot_read() {
+    use desk_model::{Frame, Object, ObjectKind, PictureFormat};
+    let svg = desk_filters::picture::picture_within(SVG, 256).unwrap();
+    let mut editor = desk_model::Editor::new(Document::new_word_processing());
+    editor
+        .edit("Picture", |edit| {
+            let id = edit.new_id();
+            edit.add_object(Object::new(
+                id,
+                ObjectKind::Image(svg.clone()),
+                Frame::from_pt(0.0, 0.0, 60.0, 40.0),
+            ))
+        })
+        .unwrap();
+    let bytes = write_odt(editor.document()).unwrap();
+    // The SVG made into something no program reads.
+    let bytes = with_stream(&bytes, "Pictures/object1.svg", |_| {
+        "not a picture".to_owned()
+    });
+    let read = read_odt(&bytes).unwrap();
+    let picture = read
+        .objects()
+        .iter()
+        .find_map(|o| match &o.kind {
+            ObjectKind::Image(p) => Some(p.clone()),
+            _ => None,
+        })
+        .unwrap();
+    assert_eq!(picture.format(), PictureFormat::Png);
+    assert_eq!((picture.width(), picture.height()), (40, 30));
+}

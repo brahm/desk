@@ -10,6 +10,8 @@ publish.workspace = true
 
 [dependencies]
 poppler-rs.workspace = true
+librsvg-rebind.workspace = true
+libheif-rs.workspace = true
 zune-jpeg.workspace = true
 cairo-rs.workspace = true
 desk-layout.workspace = true

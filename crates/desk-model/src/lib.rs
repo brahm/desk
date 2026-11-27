@@ -151,7 +151,7 @@ pub use object_style::{
 pub use op::Op;
 pub use outline::{MAX_OUTLINE_LEVEL, heading_level};
 pub use page_templates::{PageTemplate, PageTemplates, Placeholder, PlaceholderKind};
-pub use picture::{Picture, PictureFormat};
+pub use picture::{Picture, PictureFormat, is_heif, is_svg};
 pub use pixel_outline::{pixel_outline, pixel_outlines};
 pub use presentation::{SLIDE_SIZE, Slide, Topics};
 pub use section::{Columns, Layout, MAX_COLUMNS, PARTS, Section, SectionStart, Start};
