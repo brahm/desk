@@ -1247,8 +1247,13 @@ fn model_look(source: &odf::TextDocument, g: &odf::GraphicProperties) -> desk_mo
                 .stroke_width
                 .map_or(Length::from_pt(1.0), length)
                 .max(Length::from_pt(0.5)),
-            style: match (g.stroke.as_deref(), g.stroke_style.as_deref()) {
-                (_, Some("dotted")) => desk_model::BorderStyle::Dotted,
+            style: match (
+                g.stroke.as_deref(),
+                g.stroke_style
+                    .as_deref()
+                    .and_then(desk_model::BorderStyle::from_name),
+            ) {
+                (_, Some(style)) if style != desk_model::BorderStyle::Solid => style,
                 (Some("dash"), _) => desk_model::BorderStyle::Dashed,
                 _ => desk_model::BorderStyle::Solid,
             },
@@ -2167,8 +2172,12 @@ impl Exporter<'_> {
         }
         match style.stroke {
             Some(stroke) => {
+                // Other programs draw an artistic line solid (B-044).
                 g.stroke = Some(
-                    if stroke.style == desk_model::BorderStyle::Solid {
+                    if matches!(
+                        stroke.style,
+                        desk_model::BorderStyle::Solid | desk_model::BorderStyle::Artistic(_)
+                    ) {
                         "solid"
                     } else {
                         "dash"
@@ -2177,11 +2186,8 @@ impl Exporter<'_> {
                 );
                 g.stroke_color = Some(odf_color(stroke.color));
                 g.stroke_width = Some(odf_length(stroke.width));
-                g.stroke_style = match stroke.style {
-                    desk_model::BorderStyle::Solid => None,
-                    desk_model::BorderStyle::Dashed => Some("dashed".into()),
-                    desk_model::BorderStyle::Dotted => Some("dotted".into()),
-                };
+                g.stroke_style = (stroke.style != desk_model::BorderStyle::Solid)
+                    .then(|| stroke.style.name().to_owned());
                 // As wide as the ends that Desk draws.
                 let size = odf_length(Length::from_pt((stroke.width.to_pt() * 3.0).max(6.0)));
                 if let Some(m) = marker(stroke.start) {

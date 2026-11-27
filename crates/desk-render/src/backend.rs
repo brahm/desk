@@ -380,7 +380,19 @@ impl Painter {
                             cr.fill()?;
                         }
                     }
-                    if let Some(stroke) = stroke.as_ref().filter(|s| drawn_width(s.width)) {
+                    if let Some((stroke, brush)) = stroke
+                        .as_ref()
+                        .filter(|s| drawn_width(s.width))
+                        .and_then(|s| Some((s, s.brush?)))
+                    {
+                        // The line of a pen or brush is a shape to fill
+                        // (B-044).
+                        cr.new_path();
+                        trace(cr, &crate::brush::outline(path, stroke.width, brush));
+                        set_color(cr, stroke.color);
+                        cr.set_fill_rule(cairo::FillRule::Winding);
+                        cr.fill()?;
+                    } else if let Some(stroke) = stroke.as_ref().filter(|s| drawn_width(s.width)) {
                         set_color(cr, stroke.color);
                         cr.set_line_width(f64::from(stroke.width));
                         cr.set_line_cap(cairo::LineCap::Butt);

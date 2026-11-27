@@ -3042,6 +3042,29 @@ paragraph, and objects on a second page.
   file.
 - The UI tests run against a small stand-in of the server.
 - W105 is done. No task moved to another phase.
+- The owner confirmed afterwards that the sender fields are filled only
+  when the person asks (D-032).
+
+### 27 November: the artistic lines (step 12 of W3)
+
+- The lines of shapes, pictures, text boxes and the border of a drop
+  cap can be drawn as five of the artistic lines of Pages 15.4: chalk,
+  thick brush, chisel pen, dry brush and uneven ink. They join solid,
+  dashed and dotted in the Stroke row of the Graphic group and in the
+  Border Style of a drop cap; the borders of paragraphs keep the three
+  plain lines.
+- Desk draws them its own way (D-011): the path is walked along its
+  length and each brush gives the width of the line at each point,
+  where its edges wander and where the ink leaves gaps; chalk is grains
+  scattered across the width and a dry brush is bristles side by side.
+  The result is a shape to fill, so the screen, printing and PDF draw
+  the same line, and noise of the position along the path, never
+  chance, keeps it the same every time.
+- In ODF the line is `draw:stroke="solid"`, so other programs show it
+  solid, with its name in `desk:stroke-style`, which already named the
+  dashed and dotted lines; a drop cap names it in
+  `desk:drop-cap-border-style`.
+- Closes B-044. No task moved to another phase.
 
 ## Decisions, with their reasons and consequences
 
@@ -3433,6 +3456,17 @@ file, such as parts of a Pages document; the owner chose to ask first.
 *Consequences:* closes B-061. Save offers to save over the file or as a
 new file; until then the changes stay in the recovery draft, and the
 file as it was opened stays among its versions.
+
+### Mail merge (27 November)
+
+**D-032: the sender fields are filled only when the person asks (27 November).**
+*Why:* Pages '09 filled the sender fields with the person's card as a
+document opened. The security review of the contacts showed that a
+document could then take the card into fields too pale to see, and the
+thumbnail saved in the file would carry it; the owner chose to fill
+them only when the person acts.
+*Consequences:* Preview, Merge and Fill With My Card fill the sender
+fields; opening a document never does, as was already built in #256.
 
 ## What changed direction, and what it cost
 

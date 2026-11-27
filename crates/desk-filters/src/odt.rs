@@ -747,7 +747,7 @@ fn para_attrs(p: &odf::ParagraphProperties, t: &odf::TextProperties) -> ParaAttr
         border: para_border(p),
         // One line or none is no drop cap, which takes away that of the
         // style (PXV-06). The first word counts as its first character.
-        drop_cap: p.drop_cap.map(|d| {
+        drop_cap: p.drop_cap.as_ref().map(|d| {
             (d.lines >= 2).then(|| DropCap {
                 lines: d.lines.min(u32::from(u8::MAX)) as u8,
                 characters: d.length.clamp(1, u32::from(u8::MAX)) as u8,
@@ -760,14 +760,18 @@ fn para_attrs(p: &odf::ParagraphProperties, t: &odf::TextProperties) -> ParaAttr
                 // Other programs wrap the lines by the rectangle.
                 follow_shape: d.follow_shape.unwrap_or(false),
                 outdent: d.outdent.unwrap_or(0).min(200) as u8,
-                background: d.background.map(|b| {
+                background: d.background.as_ref().map(|b| {
                     let start = DropCapShape::default();
                     let percent = |v: Option<u32>, or: u8| v.map_or(or, |v| v.min(100) as u8);
                     DropCapShape {
                         fill: rgba(b.fill),
                         border_width: b.border_width.map_or(Length::ZERO, length),
                         border_color: b.border_color.map_or(start.border_color, rgba),
-                        border_style: b.border_style.map_or(start.border_style, border_style),
+                        border_style: b
+                            .border_style
+                            .as_deref()
+                            .and_then(BorderStyle::from_name)
+                            .unwrap_or(start.border_style),
                         scale: percent(b.scale, start.scale).max(10),
                         radius: percent(b.radius, start.radius),
                     }
@@ -837,9 +841,11 @@ fn border_style(style: odf::BorderLine) -> BorderStyle {
     }
 }
 
+/// The line of `fo:border` for a style, solid for an artistic line,
+/// which ODF has not.
 fn odf_border_style(style: BorderStyle) -> odf::BorderLine {
     match style {
-        BorderStyle::Solid => odf::BorderLine::Solid,
+        BorderStyle::Solid | BorderStyle::Artistic(_) => odf::BorderLine::Solid,
         BorderStyle::Dashed => odf::BorderLine::Dashed,
         BorderStyle::Dotted => odf::BorderLine::Dotted,
     }
@@ -978,7 +984,7 @@ fn paragraph_properties(a: &ParaAttrs) -> odf::ParagraphProperties {
                         .then(|| odf_color(b.border_color)),
                     border_style: (b.border_width > Length::ZERO
                         && b.border_style != BorderStyle::Solid)
-                        .then(|| odf_border_style(b.border_style)),
+                        .then(|| b.border_style.name().to_owned()),
                     scale: Some(u32::from(b.scale)),
                     radius: Some(u32::from(b.radius)),
                 }),
@@ -4828,11 +4834,8 @@ fn drop_cap_style(line: &str) -> Option<DropCapStyle> {
                     rgba(odf::Color::parse(value)?)
             }
             "border-style" => {
-                shape.get_or_insert_with(DropCapShape::default).border_style = match value {
-                    "dashed" => BorderStyle::Dashed,
-                    "dotted" => BorderStyle::Dotted,
-                    _ => BorderStyle::Solid,
-                }
+                shape.get_or_insert_with(DropCapShape::default).border_style =
+                    BorderStyle::from_name(value).unwrap_or_default()
             }
             "scale" => {
                 shape.get_or_insert_with(DropCapShape::default).scale =
@@ -4888,11 +4891,7 @@ fn odf_drop_cap_style(style: &DropCapStyle) -> String {
         odf_color(style.color),
     );
     if let Some(shape) = cap.background {
-        let border_style = match shape.border_style {
-            BorderStyle::Solid => "solid",
-            BorderStyle::Dashed => "dashed",
-            BorderStyle::Dotted => "dotted",
-        };
+        let border_style = shape.border_style.name();
         line.push_str(&format!(
             " fill={} border={} border-color={} border-style={border_style} scale={}% radius={}%",
             odf_color(shape.fill),

@@ -608,6 +608,7 @@ def main():
     reflection_of_a_shape(work)
     advanced_gradient(work)
     mask_and_frame(work)
+    artistic_line(work)
     mask_from_the_menu(work)
     gnome_window(work)
     two_level_inspector(work)
@@ -2466,6 +2467,27 @@ def mask_and_frame(work):
     finally:
         writer.terminate()
         writer.wait(timeout=10)
+
+def artistic_line(work):
+    """The Stroke row of the Graphic group draws the line of a shape with
+    chalk, one of the artistic lines, and it is saved (B-044)."""
+    writer, app, letter = open_with_a_shape(work, "Chalk.odt")
+    try:
+        # After None, Solid, Dashed and Dotted comes Chalk.
+        choose_in_list(
+            app, "Stroke", "Chalk.odt", ["Home", "Down", "Down", "Down", "Down", "Return"]
+        )
+        press("ctrl+s")
+        wait_for(
+            "the saved line of chalk",
+            lambda: saved_content(letter, r'desk:stroke-style="chalk"')
+            and saved_content(letter, r'draw:stroke="solid"'),
+        )
+        check("a shape drawn with a line of chalk is saved (B-044)", True)
+    finally:
+        writer.terminate()
+        writer.wait(timeout=10)
+
 
 def mask_from_the_menu(work):
     """Mask with Shape of the Arrange menu masks the selected picture with

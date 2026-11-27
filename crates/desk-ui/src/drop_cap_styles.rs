@@ -89,7 +89,8 @@ fn draw_preview(cr: &cairo::Context, width: f64, height: f64, style: &DropCapSty
             match shape.border_style {
                 BorderStyle::Dashed => cr.set_dash(&[3.0, 2.0], 0.0),
                 BorderStyle::Dotted => cr.set_dash(&[1.0, 1.5], 0.0),
-                BorderStyle::Solid => cr.set_dash(&[], 0.0),
+                // An artistic line is drawn solid at the size of a preview.
+                BorderStyle::Solid | BorderStyle::Artistic(_) => cr.set_dash(&[], 0.0),
             }
             let _ = cr.stroke();
         } else {

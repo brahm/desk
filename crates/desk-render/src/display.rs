@@ -455,6 +455,9 @@ pub struct PathStroke {
     /// The lengths of the dashes and the gaps between them; empty for a
     /// solid line.
     pub dashes: Vec<f32>,
+    /// The pen or brush that draws the line, for an artistic one, whose
+    /// dashes are empty (B-044).
+    pub brush: Option<desk_model::Brush>,
 }
 
 /// What one page, slide or sheet draws, in points from its top left
@@ -605,6 +608,7 @@ impl DisplayList {
                             .into_iter()
                             .map(|d| d as f32)
                             .collect(),
+                        brush: cap.shape.border_style.brush(),
                     }),
                 });
             }
@@ -821,6 +825,7 @@ fn object_item(placed: &PlacedObject) -> Item {
                     .into_iter()
                     .map(|d| d as f32)
                     .collect(),
+                brush: stroke.style.brush(),
             }
         });
     let mut flips = true;
@@ -1128,6 +1133,7 @@ fn frame_items(frame: PictureFrame, rect: (f32, f32, f32, f32)) -> Vec<Item> {
             width,
             color,
             dashes: Vec::new(),
+            brush: None,
         }),
     };
     // Lit from the top left, across the band.
@@ -1271,6 +1277,7 @@ fn line_items(
         };
         let plain = PathStroke {
             dashes: Vec::new(),
+            brush: None,
             ..stroke.clone()
         };
         match kind {
@@ -1409,6 +1416,7 @@ fn media_icon(sound: bool, x: f32, y: f32, w: f32, h: f32) -> Vec<Item> {
                     width: (s * 0.06).max(1.0),
                     color: gray,
                     dashes: Vec::new(),
+                    brush: None,
                 }),
             },
         ];
@@ -1762,6 +1770,7 @@ fn chart_items(laid: &desk_layout::ChartLayout, x: f32, y: f32) -> Vec<Item> {
                         width: *w,
                         color: table_color(*c),
                         dashes: d.clone(),
+                        brush: None,
                     }),
                 };
                 if *shadow {

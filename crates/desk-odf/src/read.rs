@@ -702,14 +702,10 @@ fn paragraph_properties(e: &Element) -> ParagraphProperties {
                         fill,
                         border_width: length(d, DESK, "drop-cap-border-width"),
                         border_color: d.attr(DESK, "drop-cap-border-color").and_then(Color::parse),
-                        border_style: d.attr(DESK, "drop-cap-border-style").and_then(|v| {
-                            match v.trim() {
-                                "solid" => Some(BorderLine::Solid),
-                                "dashed" => Some(BorderLine::Dashed),
-                                "dotted" => Some(BorderLine::Dotted),
-                                _ => None,
-                            }
-                        }),
+                        border_style: d
+                            .attr(DESK, "drop-cap-border-style")
+                            .map(|v| v.trim().to_owned())
+                            .filter(|v| !v.is_empty()),
                         scale: percent("drop-cap-scale"),
                         radius: percent("drop-cap-radius"),
                     }

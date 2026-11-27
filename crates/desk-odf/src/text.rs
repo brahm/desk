@@ -874,7 +874,7 @@ pub struct ParagraphProperties {
 
 /// `style:drop-cap`: the first characters of a paragraph made as tall as
 /// some of its lines.
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct DropCap {
     /// `style:length`: how many characters, or 0 for `word`, the first
     /// word.
@@ -898,7 +898,7 @@ pub struct DropCap {
 
 /// The shape behind the characters of a drop cap, written with
 /// `desk:drop-cap-fill` (docs/odf-extensions.md).
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct DropCapBackground {
     /// `desk:drop-cap-fill`: the color inside.
     pub fill: Color,
@@ -907,8 +907,9 @@ pub struct DropCapBackground {
     /// `desk:drop-cap-border-color`: the color of that line.
     pub border_color: Option<Color>,
     /// `desk:drop-cap-border-style`: how that line is drawn, as
-    /// `fo:border` names it: `solid`, `dashed` or `dotted`.
-    pub border_style: Option<BorderLine>,
+    /// `fo:border` names it, `solid`, `dashed` or `dotted`, or as the
+    /// artistic lines of Desk, as `desk:stroke-style` names them.
+    pub border_style: Option<String>,
     /// `desk:drop-cap-scale`: how tall the characters are in it, in
     /// percent of their height without it.
     pub scale: Option<u32>,

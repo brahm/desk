@@ -175,11 +175,14 @@ These sit on the `style:graphic-properties` of the graphic style of a
 #### `desk:stroke-style`
 
 - **Feature:** a dashed or dotted line in the two patterns of Desk
-  (OBJ-35).
-- **Value:** `dashed` or `dotted`. Absent means solid, or the dash of
-  `draw:stroke` read as dashed.
-- **Fallback:** `draw:stroke="dash"`, which other programs draw with their
-  default dash.
+  (OBJ-35), or one of the artistic lines that Desk draws as a pen or a
+  brush would (B-044).
+- **Value:** `dashed` or `dotted`; or `chalk`, `thick-brush`,
+  `chisel-pen`, `dry-brush` or `uneven-ink`. Absent, or a name Desk does
+  not know, means solid, or the dash of `draw:stroke` read as dashed.
+- **Fallback:** `draw:stroke="dash"` for a dashed or dotted line, which
+  other programs draw with their default dash; `draw:stroke="solid"` for
+  an artistic line, which they draw solid.
 
 #### `desk:shadow-blur`
 
@@ -569,8 +572,9 @@ options of Pages 15.4 (PXV-06), written by `paragraph_children` in
 
 - **Feature:** how the line around the shape of a drop cap is drawn
   (PXV-06).
-- **Value:** `solid`, `dashed` or `dotted`, as `fo:border` names them;
-  solid when absent.
+- **Value:** `solid`, `dashed` or `dotted`, as `fo:border` names them,
+  or an artistic line as `desk:stroke-style` names it (B-044); solid when
+  absent or not known.
 - **Fallback:** no line.
 
 #### `desk:drop-cap-scale`
@@ -599,7 +603,8 @@ one style, in the order of the menu, as words of a name, `=` and a value:
 `lines`, `characters`, `raised`, `wrap` (`shape` or `rectangle`),
 `distance`, `outdent` (a percent), `weight` (100 to 900) and `color` of
 the letters, and, for a style with a shape, `fill`, `border`,
-`border-color`, `border-style`, `scale` and `radius`. Other programs
+`border-color`, `border-style` (named as `desk:drop-cap-border-style`
+names it), `scale` and `radius`. Other programs
 ignore the item; Desk reads a document without it with the six styles.
 
 #### Chart styles (settings, not an attribute)

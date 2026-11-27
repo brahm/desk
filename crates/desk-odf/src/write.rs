@@ -873,7 +873,7 @@ fn write_background(w: &mut Writer, background: Option<Background>) {
 /// The children of `style:paragraph-properties`, after its attributes.
 fn paragraph_children(w: &mut Writer, p: &ParagraphProperties) {
     tab_stops(w, p);
-    if let Some(cap) = p.drop_cap {
+    if let Some(cap) = &p.drop_cap {
         w.start("style:drop-cap");
         if cap.length == 0 {
             w.attr("style:length", "word");
@@ -895,19 +895,14 @@ fn paragraph_children(w: &mut Writer, p: &ParagraphProperties) {
         if let Some(outdent) = cap.outdent {
             w.attr("desk:drop-cap-outdent", &format!("{outdent}%"));
         }
-        if let Some(shape) = cap.background {
+        if let Some(shape) = &cap.background {
             w.attr("desk:drop-cap-fill", &shape.fill.to_string());
             len(w, "desk:drop-cap-border-width", shape.border_width);
             if let Some(color) = shape.border_color {
                 w.attr("desk:drop-cap-border-color", &color.to_string());
             }
-            if let Some(style) = shape.border_style {
-                let name = match style {
-                    BorderLine::Solid => "solid",
-                    BorderLine::Dashed => "dashed",
-                    BorderLine::Dotted => "dotted",
-                };
-                w.attr("desk:drop-cap-border-style", name);
+            if let Some(style) = &shape.border_style {
+                w.attr("desk:drop-cap-border-style", style);
             }
             if let Some(scale) = shape.scale {
                 w.attr("desk:drop-cap-scale", &format!("{scale}%"));

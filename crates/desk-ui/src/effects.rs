@@ -14,8 +14,8 @@ use std::rc::Rc;
 
 use adw::prelude::*;
 use desk_model::{
-    Baseline, BorderSides, BorderStyle, Capitalization, CharAttrs, CharFormat, Language, Length,
-    Ligatures, ParaAttrs, ParaBorder, ParaFormat, Rgba, Shadow,
+    Baseline, BorderSides, BorderStyle, Brush, Capitalization, CharAttrs, CharFormat, Language,
+    Length, Ligatures, ParaAttrs, ParaBorder, ParaFormat, Rgba, Shadow,
 };
 
 use crate::formatting::{EditorOf, from_gdk, labelled, to_gdk};
@@ -105,7 +105,7 @@ const SIDES: [BorderSides; 5] = [
     BorderSides::Box,
 ];
 
-/// The styles of lines in the order of their menu.
+/// The styles of the lines of paragraphs in the order of their menu.
 pub(crate) const STYLES: [BorderStyle; 3] =
     [BorderStyle::Solid, BorderStyle::Dashed, BorderStyle::Dotted];
 
@@ -133,6 +133,11 @@ pub(crate) fn style_name(style: BorderStyle) -> String {
         BorderStyle::Solid => tr("Solid"),
         BorderStyle::Dashed => tr("Dashed"),
         BorderStyle::Dotted => tr("Dotted"),
+        BorderStyle::Artistic(Brush::Chalk) => tr("Chalk"),
+        BorderStyle::Artistic(Brush::ThickBrush) => tr("Thick Brush"),
+        BorderStyle::Artistic(Brush::ChiselPen) => tr("Chisel Pen"),
+        BorderStyle::Artistic(Brush::DryBrush) => tr("Dry Brush"),
+        BorderStyle::Artistic(Brush::UnevenInk) => tr("Uneven Ink"),
     }
 }
 
