@@ -155,6 +155,7 @@ fn adjustments(properties: &[(String, f64)]) -> desk_model::Adjustments {
         exposure: get("kSFRExposureProperty"),
         temperature: get("kSFRTemperature"),
         tint: get("kSFRTint"),
+        ..desk_model::Adjustments::default()
     }
 }
 

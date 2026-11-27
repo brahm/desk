@@ -46,6 +46,12 @@ pub struct GraphicProperties {
     /// from -100 to 100: brightness, contrast, saturation, exposure,
     /// temperature and tint.
     pub image_adjust: Option<String>,
+    /// `desk:image-sharpness`: the sharpness of Adjust Image, from -100 to
+    /// 100 (W110).
+    pub image_sharpness: Option<String>,
+    /// `desk:image-levels`: the levels of Adjust Image, as the values from
+    /// 0 to 255 that become black and white (W110).
+    pub image_levels: Option<String>,
     /// `desk:instant-alpha`: where Instant Alpha clicked a picture, in
     /// order, each as `x y tolerance` with `x` and `y` in ten-thousandths
     /// of its width and height, separated by commas.
@@ -659,6 +665,8 @@ pub(crate) fn graphic_properties(e: &Element) -> GraphicProperties {
         mask: text(DESK, "mask"),
         mask_shape: text(DESK, "mask-shape"),
         image_adjust: text(DESK, "image-adjust"),
+        image_sharpness: text(DESK, "image-sharpness"),
+        image_levels: text(DESK, "image-levels"),
         instant_alpha: text(DESK, "instant-alpha"),
         alpha_kept: text(DESK, "alpha-kept"),
         stroke: text(DRAW, "stroke"),
@@ -734,6 +742,8 @@ pub(crate) fn write_graphic_properties(w: &mut Writer, g: &GraphicProperties) {
     w.attr_opt("desk:mask", g.mask.as_deref());
     w.attr_opt("desk:mask-shape", g.mask_shape.as_deref());
     w.attr_opt("desk:image-adjust", g.image_adjust.as_deref());
+    w.attr_opt("desk:image-sharpness", g.image_sharpness.as_deref());
+    w.attr_opt("desk:image-levels", g.image_levels.as_deref());
     w.attr_opt("desk:instant-alpha", g.instant_alpha.as_deref());
     w.attr_opt("desk:alpha-kept", g.alpha_kept.as_deref());
     w.attr_opt("draw:stroke", g.stroke.as_deref());

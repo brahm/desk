@@ -75,6 +75,8 @@ fn graphic(source: &odf::TextDocument, name: Option<&str>) -> odf::GraphicProper
             mask,
             mask_shape,
             image_adjust,
+            image_sharpness,
+            image_levels,
             instant_alpha,
             alpha_kept,
             marker_start,
@@ -377,6 +379,14 @@ fn odf_picture_settings(
             "{} {} {} {} {} {}",
             a.brightness, a.contrast, a.saturation, a.exposure, a.temperature, a.tint
         ));
+        // In attributes of their own, so that older versions of Desk
+        // still read the six others (W110).
+        if a.sharpness != 0 {
+            g.image_sharpness = Some(a.sharpness.to_string());
+        }
+        if (a.black, a.white) != (0, 255) {
+            g.image_levels = Some(format!("{} {}", a.black, a.white));
+        }
     }
 }
 
@@ -524,26 +534,52 @@ fn model_picture_settings(
         settings.alpha_kept = alpha_kept(value);
     }
     let unit = |v: f64| v.round().clamp(-100.0, 100.0) as i8;
-    let numbers: Option<Vec<i8>> = g.image_adjust.as_deref().and_then(|v| {
+    let numbers: Option<Vec<f64>> = g.image_adjust.as_deref().and_then(|v| {
         v.split_whitespace()
-            .map(|n| n.parse::<f64>().ok().filter(|n| n.is_finite()).map(unit))
+            .map(|n| n.parse::<f64>().ok().filter(|n| n.is_finite()))
             .collect()
     });
-    match numbers {
-        Some(n) if n.len() == 6 => {
+    match numbers.as_deref() {
+        Some(
+            &[
+                brightness,
+                contrast,
+                saturation,
+                exposure,
+                temperature,
+                tint,
+            ],
+        ) => {
             settings.adjust = desk_model::Adjustments {
-                brightness: n[0],
-                contrast: n[1],
-                saturation: n[2],
-                exposure: n[3],
-                temperature: n[4],
-                tint: n[5],
+                brightness: unit(brightness),
+                contrast: unit(contrast),
+                saturation: unit(saturation),
+                exposure: unit(exposure),
+                temperature: unit(temperature),
+                tint: unit(tint),
+                ..desk_model::Adjustments::default()
             };
         }
         _ => {
             settings.adjust.brightness = g.luminance.map_or(0, unit);
             settings.adjust.contrast = g.contrast.map_or(0, unit);
         }
+    }
+    let number = |v: &str| v.parse::<f64>().ok().filter(|n| n.is_finite());
+    if let Some(sharpness) = g.image_sharpness.as_deref().and_then(number) {
+        settings.adjust.sharpness = unit(sharpness);
+    }
+    let levels: Option<Vec<f64>> = g
+        .image_levels
+        .as_deref()
+        .and_then(|v| v.split_whitespace().map(number).collect());
+    if let Some(&[black, white]) = levels.as_deref() {
+        // A black of 255 leaves no room for white: the most is 254, and
+        // white is above it.
+        let black = black.round().clamp(0.0, 254.0) as u8;
+        let white = white.round().clamp(0.0, 255.0) as u8;
+        settings.adjust.black = black;
+        settings.adjust.white = white.max(black + 1);
     }
     settings
 }
@@ -3449,6 +3485,48 @@ fn alpha_kept(value: &str) -> Option<desk_model::AlphaOutline> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn w110_the_sharpness_and_the_levels_are_read_within_their_bounds() {
+        let picture = crate::picture::picture_within(&png(8, 8), MAX_SIDE).unwrap();
+        let frame = Frame::from_pt(0.0, 0.0, 6.0, 6.0);
+        let read = |sharpness: &str, levels: &str| {
+            let g = odf::GraphicProperties {
+                image_adjust: Some("0 0 -40 0 0 0".into()),
+                image_sharpness: Some(sharpness.into()),
+                image_levels: Some(levels.into()),
+                ..odf::GraphicProperties::default()
+            };
+            model_picture_settings(&g, &picture, frame).adjust
+        };
+        let a = read("30", "12 240");
+        assert_eq!(
+            (a.saturation, a.sharpness, a.black, a.white),
+            (-40, 30, 12, 240)
+        );
+        // A black of 255 keeps room for white; white stays above black.
+        let a = read("500", "255 255");
+        assert_eq!((a.sharpness, a.black, a.white), (100, 254, 255));
+        let a = read("x", "200 100");
+        assert_eq!((a.sharpness, a.black, a.white), (0, 200, 201));
+        // Written back the same way.
+        let mut g = odf::GraphicProperties::default();
+        let mut object = Object::new(
+            desk_model::NodeId::new(1).unwrap(),
+            ObjectKind::Image(picture.clone()),
+            frame,
+        );
+        object.picture.adjust = desk_model::Adjustments {
+            sharpness: -20,
+            black: 5,
+            white: 250,
+            ..desk_model::Adjustments::default()
+        };
+        odf_picture_settings(&mut g, &object, &picture);
+        assert_eq!(g.image_adjust.as_deref(), Some("0 0 0 0 0 0"));
+        assert_eq!(g.image_sharpness.as_deref(), Some("-20"));
+        assert_eq!(g.image_levels.as_deref(), Some("5 250"));
+    }
 
     #[test]
     fn obj_04_obj_07_masks_and_adjustments_of_other_programs_are_read() {

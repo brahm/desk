@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Desk\n"
 "Report-Msgid-Bugs-To: https://github.com/brahm/desk/issues\n"
-"POT-Creation-Date: 2026-11-27 12:43+0000\n"
+"POT-Creation-Date: 2026-11-27 17:46+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -17,6 +17,70 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=INTEGER; plural=EXPRESSION;\n"
+
+#: crates/desk-ui/src/adjust_dialog.rs:147
+#: crates/desk-ui/src/outline_view.rs:97
+msgid "Levels"
+msgstr ""
+
+#: crates/desk-ui/src/adjust_dialog.rs:154
+msgid "Histogram of the lightness of the picture"
+msgstr ""
+
+#: crates/desk-ui/src/adjust_dialog.rs:157
+msgid "Black Point"
+msgstr ""
+
+#: crates/desk-ui/src/adjust_dialog.rs:158
+msgid "White Point"
+msgstr ""
+
+#: crates/desk-ui/src/adjust_dialog.rs:160
+msgid "Auto Levels"
+msgstr ""
+
+#: crates/desk-ui/src/adjust_dialog.rs:167
+msgid "Adjustments"
+msgstr ""
+
+#: crates/desk-ui/src/adjust_dialog.rs:170
+msgid "Brightness"
+msgstr ""
+
+#: crates/desk-ui/src/adjust_dialog.rs:171
+msgid "Contrast"
+msgstr ""
+
+#: crates/desk-ui/src/adjust_dialog.rs:172
+#: crates/desk-ui/src/picture_pane.rs:174
+msgid "Saturation"
+msgstr ""
+
+#: crates/desk-ui/src/adjust_dialog.rs:173
+#: crates/desk-ui/src/picture_pane.rs:173
+msgid "Exposure"
+msgstr ""
+
+#: crates/desk-ui/src/adjust_dialog.rs:174
+msgid "Temperature"
+msgstr ""
+
+#: crates/desk-ui/src/adjust_dialog.rs:175
+msgid "Tint"
+msgstr ""
+
+#: crates/desk-ui/src/adjust_dialog.rs:176
+msgid "Sharpness"
+msgstr ""
+
+#: crates/desk-ui/src/adjust_dialog.rs:183
+#: crates/desk-ui/src/picture_pane.rs:151
+msgid "Reset Image"
+msgstr ""
+
+#: crates/desk-ui/src/adjust_dialog.rs:291
+msgid "Adjust Image"
+msgstr ""
 
 #: crates/desk-ui/src/area.rs:43 crates/desk-ui/src/formatting.rs:300
 #: crates/desk-ui/src/formatting.rs:447 crates/desk-ui/src/inspector.rs:264
@@ -161,20 +225,20 @@ msgid "Blue Square"
 msgstr ""
 
 #: crates/desk-ui/src/bullet_pictures.rs:44
-#: crates/desk-ui/src/graphic_pane.rs:90 crates/desk-ui/src/picture_pane.rs:110
+#: crates/desk-ui/src/graphic_pane.rs:90 crates/desk-ui/src/picture_pane.rs:98
 msgid "Arrow"
 msgstr ""
 
-#: crates/desk-ui/src/bullet_pictures.rs:216
+#: crates/desk-ui/src/bullet_pictures.rs:230
 #: crates/desk-ui/src/lists_pane.rs:514
 msgid "Images"
 msgstr ""
 
-#: crates/desk-ui/src/bullet_pictures.rs:221
+#: crates/desk-ui/src/bullet_pictures.rs:235
 msgid "Movies and Sounds"
 msgstr ""
 
-#: crates/desk-ui/src/bullet_pictures.rs:226
+#: crates/desk-ui/src/bullet_pictures.rs:240
 msgid "Images, Movies and Sounds"
 msgstr ""
 
@@ -637,7 +701,7 @@ msgstr ""
 msgid "Circle"
 msgstr ""
 
-#: crates/desk-ui/src/chart_pane.rs:277 crates/desk-ui/src/picture_pane.rs:107
+#: crates/desk-ui/src/chart_pane.rs:277 crates/desk-ui/src/picture_pane.rs:95
 msgid "Triangle"
 msgstr ""
 
@@ -645,7 +709,7 @@ msgstr ""
 msgid "Square"
 msgstr ""
 
-#: crates/desk-ui/src/chart_pane.rs:279 crates/desk-ui/src/picture_pane.rs:109
+#: crates/desk-ui/src/chart_pane.rs:279 crates/desk-ui/src/picture_pane.rs:97
 msgid "Diamond"
 msgstr ""
 
@@ -1951,7 +2015,7 @@ msgstr ""
 
 #: crates/desk-ui/src/fill_rows.rs:153 crates/desk-ui/src/formatting.rs:359
 #: crates/desk-ui/src/inspector.rs:63 crates/desk-ui/src/lists_pane.rs:242
-#: crates/desk-ui/src/picture_pane.rs:176
+#: crates/desk-ui/src/picture_pane.rs:165
 msgid "Image"
 msgstr ""
 
@@ -3150,34 +3214,34 @@ msgstr ""
 msgid "Outside Margin"
 msgstr ""
 
-#: crates/desk-ui/src/lib.rs:409
+#: crates/desk-ui/src/lib.rs:410
 msgid ""
 "The font {requested} is not installed, so {used} is used, which has the same "
 "metrics."
 msgstr ""
 
-#: crates/desk-ui/src/lib.rs:412
+#: crates/desk-ui/src/lib.rs:413
 msgid ""
 "The font {requested} is not installed, so {used} is used, which looks alike; "
 "lines may break elsewhere."
 msgstr ""
 
-#: crates/desk-ui/src/lib.rs:415
+#: crates/desk-ui/src/lib.rs:416
 msgid ""
 "The font {requested} is not installed, so {used} is used; lines may break "
 "elsewhere."
 msgstr ""
 
-#: crates/desk-ui/src/lib.rs:730 crates/desk-ui/src/tables/window.rs:463
+#: crates/desk-ui/src/lib.rs:731 crates/desk-ui/src/tables/window.rs:463
 #: crates/desk-ui/src/window.rs:1961 crates/desk-ui/src/window.rs:2980
 msgid "Untitled"
 msgstr ""
 
-#: crates/desk-ui/src/lib.rs:733
+#: crates/desk-ui/src/lib.rs:734
 msgid "Recover Unsaved Changes?"
 msgstr ""
 
-#: crates/desk-ui/src/lib.rs:736
+#: crates/desk-ui/src/lib.rs:737
 msgid ""
 "{app} closed unexpectedly. The changes to this document were kept: {names}."
 msgid_plural ""
@@ -3185,20 +3249,20 @@ msgid_plural ""
 msgstr[0] ""
 msgstr[1] ""
 
-#: crates/desk-ui/src/lib.rs:744 crates/desk-ui/src/window.rs:2646
+#: crates/desk-ui/src/lib.rs:745 crates/desk-ui/src/window.rs:2646
 #: crates/desk-ui/src/window.rs:2693
 msgid "_Discard"
 msgstr ""
 
-#: crates/desk-ui/src/lib.rs:745
+#: crates/desk-ui/src/lib.rs:746
 msgid "_Recover"
 msgstr ""
 
-#: crates/desk-ui/src/lib.rs:780
+#: crates/desk-ui/src/lib.rs:781
 msgid "Open a Document"
 msgstr ""
 
-#: crates/desk-ui/src/lib.rs:802
+#: crates/desk-ui/src/lib.rs:803
 msgid "All Documents"
 msgstr ""
 
@@ -3989,10 +4053,6 @@ msgstr ""
 msgid "Paste as Outline"
 msgstr ""
 
-#: crates/desk-ui/src/outline_view.rs:97
-msgid "Levels"
-msgstr ""
-
 #: crates/desk-ui/src/outline_view.rs:310
 msgid "Drag to move the topic"
 msgstr ""
@@ -4091,129 +4151,117 @@ msgid ""
 "Carries the content to the placeholder of the same tag of another template"
 msgstr ""
 
-#: crates/desk-ui/src/picture_pane.rs:100
+#: crates/desk-ui/src/picture_pane.rs:88
 msgid "Mask"
 msgstr ""
 
-#: crates/desk-ui/src/picture_pane.rs:101
+#: crates/desk-ui/src/picture_pane.rs:89
 msgid "Shows only the part of the picture inside its frame"
 msgstr ""
 
-#: crates/desk-ui/src/picture_pane.rs:104
+#: crates/desk-ui/src/picture_pane.rs:92
 msgid "Rectangle"
 msgstr ""
 
-#: crates/desk-ui/src/picture_pane.rs:105
+#: crates/desk-ui/src/picture_pane.rs:93
 msgid "Rounded Rectangle"
 msgstr ""
 
-#: crates/desk-ui/src/picture_pane.rs:106
+#: crates/desk-ui/src/picture_pane.rs:94
 msgid "Oval"
 msgstr ""
 
-#: crates/desk-ui/src/picture_pane.rs:108
+#: crates/desk-ui/src/picture_pane.rs:96
 msgid "Right Triangle"
 msgstr ""
 
-#: crates/desk-ui/src/picture_pane.rs:111
+#: crates/desk-ui/src/picture_pane.rs:99
 msgid "Double Arrow"
 msgstr ""
 
-#: crates/desk-ui/src/picture_pane.rs:112
+#: crates/desk-ui/src/picture_pane.rs:100
 msgid "Star"
 msgstr ""
 
-#: crates/desk-ui/src/picture_pane.rs:113
+#: crates/desk-ui/src/picture_pane.rs:101
 msgid "Polygon"
 msgstr ""
 
-#: crates/desk-ui/src/picture_pane.rs:114
+#: crates/desk-ui/src/picture_pane.rs:102
 msgid "Quote Bubble"
 msgstr ""
 
-#: crates/desk-ui/src/picture_pane.rs:115
+#: crates/desk-ui/src/picture_pane.rs:103
 msgid "Callout"
 msgstr ""
 
-#: crates/desk-ui/src/picture_pane.rs:117
+#: crates/desk-ui/src/picture_pane.rs:105
 msgid "Other Shape"
 msgstr ""
 
-#: crates/desk-ui/src/picture_pane.rs:121
+#: crates/desk-ui/src/picture_pane.rs:109
 msgid "Mask Shape"
 msgstr ""
 
-#: crates/desk-ui/src/picture_pane.rs:124
+#: crates/desk-ui/src/picture_pane.rs:112
 msgid "Picture Size"
 msgstr ""
 
-#: crates/desk-ui/src/picture_pane.rs:125
+#: crates/desk-ui/src/picture_pane.rs:113
 msgid "Percent of the frame"
 msgstr ""
 
-#: crates/desk-ui/src/picture_pane.rs:126
+#: crates/desk-ui/src/picture_pane.rs:114
 msgid "Picture Left"
 msgstr ""
 
-#: crates/desk-ui/src/picture_pane.rs:127
-#: crates/desk-ui/src/picture_pane.rs:129
+#: crates/desk-ui/src/picture_pane.rs:115
+#: crates/desk-ui/src/picture_pane.rs:117
 msgid "Points from the frame"
 msgstr ""
 
-#: crates/desk-ui/src/picture_pane.rs:128
+#: crates/desk-ui/src/picture_pane.rs:116
 msgid "Picture Top"
 msgstr ""
 
-#: crates/desk-ui/src/picture_pane.rs:131
+#: crates/desk-ui/src/picture_pane.rs:119
 msgid "Take Out a Color"
 msgstr ""
 
-#: crates/desk-ui/src/picture_pane.rs:134
-#: crates/desk-ui/src/picture_pane.rs:144
+#: crates/desk-ui/src/picture_pane.rs:122
+#: crates/desk-ui/src/picture_pane.rs:132
 msgid "Click a color in the picture, and drag to take out more or less"
 msgstr ""
 
-#: crates/desk-ui/src/picture_pane.rs:138
+#: crates/desk-ui/src/picture_pane.rs:126
 msgid "Restore Colors"
 msgstr ""
 
-#: crates/desk-ui/src/picture_pane.rs:142 crates/desk-ui/src/undo_names.rs:88
+#: crates/desk-ui/src/picture_pane.rs:130 crates/desk-ui/src/undo_names.rs:88
 msgid "Instant Alpha"
 msgstr ""
 
-#: crates/desk-ui/src/picture_pane.rs:153
-msgid "Brightness"
+#: crates/desk-ui/src/picture_pane.rs:141
+msgid "Enhance"
 msgstr ""
 
-#: crates/desk-ui/src/picture_pane.rs:154
-msgid "Contrast"
+#: crates/desk-ui/src/picture_pane.rs:143
+msgid "Sets the exposure and the saturation from the picture"
+msgstr ""
+
+#: crates/desk-ui/src/picture_pane.rs:146
+msgid "Adjust Image…"
+msgstr ""
+
+#: crates/desk-ui/src/picture_pane.rs:148
+msgid "The levels, the sharpness and all the adjustments"
 msgstr ""
 
 #: crates/desk-ui/src/picture_pane.rs:155
-msgid "Saturation"
-msgstr ""
-
-#: crates/desk-ui/src/picture_pane.rs:156
-msgid "Exposure"
-msgstr ""
-
-#: crates/desk-ui/src/picture_pane.rs:157
-msgid "Temperature"
-msgstr ""
-
-#: crates/desk-ui/src/picture_pane.rs:158
-msgid "Tint"
-msgstr ""
-
-#: crates/desk-ui/src/picture_pane.rs:162
-msgid "Reset Image"
-msgstr ""
-
-#: crates/desk-ui/src/picture_pane.rs:166
 msgid "Reduce File Size"
 msgstr ""
 
-#: crates/desk-ui/src/picture_pane.rs:169
+#: crates/desk-ui/src/picture_pane.rs:158
 msgid "Keeps only the part of the picture that shows, at the size it is shown"
 msgstr ""
 

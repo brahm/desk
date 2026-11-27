@@ -3222,6 +3222,21 @@ paragraph, and objects on a second page.
   rust-cache and cargo-deny were still waiting behind them.
 - No task moved to another phase.
 
+### 27 November: Enhance and the adjustments of images (step 4 of W4, #265)
+
+- The Image tab shows the adjustments as Pages 15.4 does: Exposure and
+  Saturation with a slider, Enhance, which sets them from the histogram
+  of the picture, and Reset. Adjust Image… opens the full window of
+  Pages '09, kept by D-003, now with the levels over the histogram,
+  Auto Levels and the sharpness it lacked.
+- The sharpness and the levels are kept in ODF in two new attributes,
+  `desk:image-sharpness` and `desk:image-levels`, so that older versions
+  of Desk still read the six adjustments of before.
+- Left for the session on the Mac of step 13, still in W4: Auto Crop,
+  the names under which Pages '09 keeps the sharpness and the levels,
+  and the checks of W107 and W109.
+- No task moved to another phase.
+
 ## Decisions, with their reasons and consequences
 
 Ids `D-nnn` and `R-nnn` are those of [decisions.md](decisions.md).

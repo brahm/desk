@@ -8,6 +8,11 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
 
 ## Changes since 0.7.0 (unreleased)
 
+* Added: The Image tab shows Exposure and Saturation with sliders and an
+  Enhance button that sets them from the picture; Adjust Image opens the
+  full window with the levels over the histogram, Auto Levels and
+  sharpness (#265).
+
 * Changed: checkout, upload-artifact, download-artifact,
   upload-pages-artifact and deploy-pages moved off the deprecated
   Node.js 20, reuse-action went to version 6, and Dependabot proposes

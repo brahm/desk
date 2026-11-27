@@ -930,10 +930,10 @@ pub fn adjusted_surface(
         let keep = instant_alpha(&pixels, w, h, alpha);
         for (i, (rgb, a)) in pixels.into_iter().enumerate() {
             let a = a * keep[i];
-            let rgb = if adjust.is_none() {
-                rgb
-            } else {
+            let rgb = if adjust.changes_colors() {
                 adjust.apply(rgb)
+            } else {
+                rgb
             };
             let byte = |v: f32| (v.clamp(0.0, 1.0) * a * 255.0).round() as u8;
             let pixel = &mut data[(i / w) * stride + (i % w) * 4..][..4];
@@ -943,11 +943,96 @@ pub fn adjusted_surface(
             pixel[3] = (a * 255.0).round() as u8;
         }
     }
+    if adjust.sharpness != 0 {
+        let mut data = surface
+            .data()
+            .map_err(|_| RenderError::Cairo(cairo::Error::SurfaceFinished))?;
+        sharpen(&mut data, w, h, stride, adjust.sharpness);
+    }
     surface.mark_dirty();
     match kept {
         Some(kept) => keep_inside(&surface, kept),
         None => Ok(surface),
     }
+}
+
+/// Sharpens premultiplied pixels by the difference from the mean of their
+/// neighbors, or softens them toward it below zero (W110).
+fn sharpen(data: &mut [u8], w: usize, h: usize, stride: usize, sharpness: i8) {
+    let amount = f32::from(sharpness) / 100.0 * if sharpness > 0 { 1.5 } else { 1.0 };
+    let source = data.to_vec();
+    // Premultiplied ARGB in a word of the machine's order.
+    let word = |x: usize, y: usize| {
+        source
+            .get(y * stride + x * 4..)
+            .and_then(|p| p.get(..4))
+            .map_or(0, |p| u32::from_ne_bytes([p[0], p[1], p[2], p[3]]))
+    };
+    let channel = |word: u32, shift: u32| ((word >> shift) & 0xFF) as f32;
+    for y in 0..h {
+        for x in 0..w {
+            let own = word(x, y);
+            let alpha = channel(own, 24);
+            let mut out = own & 0xFF00_0000;
+            for shift in [16, 8, 0] {
+                let mut sum = 0.0;
+                let mut count = 0.0;
+                for ny in y.saturating_sub(1)..(y + 2).min(h) {
+                    for nx in x.saturating_sub(1)..(x + 2).min(w) {
+                        sum += channel(word(nx, ny), shift);
+                        count += 1.0;
+                    }
+                }
+                let value = channel(own, shift);
+                // Premultiplied: no channel above its opacity.
+                let sharp = (value + amount * (value - sum / count))
+                    .round()
+                    .clamp(0.0, alpha);
+                out |= (sharp as u32) << shift;
+            }
+            if let Some(p) = data
+                .get_mut(y * stride + x * 4..)
+                .and_then(|p| p.get_mut(..4))
+            {
+                p.copy_from_slice(&out.to_ne_bytes());
+            }
+        }
+    }
+}
+
+/// The histogram of a picture with the colors of `adjust` applied, from
+/// at most about a quarter of a million of its pixels: as it is for the
+/// levels, and as the other adjustments leave it for Enhance (W110).
+pub fn histogram(
+    picture: &desk_model::Picture,
+    adjust: desk_model::Adjustments,
+) -> Option<desk_model::Histogram> {
+    let mut surface = picture_surface(picture)?;
+    let (w, h) = (surface.width() as usize, surface.height() as usize);
+    let stride = surface.stride() as usize;
+    let step = ((w * h) as f64 / 262_144.0).sqrt().ceil().max(1.0) as usize;
+    let data = surface.data().ok()?;
+    let mut histogram = desk_model::Histogram::default();
+    for y in (0..h).step_by(step) {
+        for x in (0..w).step_by(step) {
+            let p = data.get(y * stride + x * 4..)?.get(..4)?;
+            // Premultiplied BGRA in a word of the machine's order.
+            let word = u32::from_ne_bytes([p[0], p[1], p[2], p[3]]);
+            let a = word >> 24;
+            if a == 0 {
+                continue;
+            }
+            let straight = |shift: u32| (((word >> shift) & 0xFF) * 255 / a).min(255) as u8;
+            let rgb = [straight(16), straight(8), straight(0)];
+            if adjust.changes_colors() {
+                let adjusted = adjust.apply(rgb.map(|v| f32::from(v) / 255.0));
+                histogram.add(adjusted.map(|v| (v * 255.0).round().clamp(0.0, 255.0) as u8));
+            } else {
+                histogram.add(rgb);
+            }
+        }
+    }
+    Some(histogram)
 }
 
 /// The part of a picture inside the polygons that Instant Alpha keeps, by
