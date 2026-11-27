@@ -264,6 +264,17 @@ pub fn is_svg(bytes: &[u8]) -> bool {
             };
             rest = after.get(end + 3..).unwrap_or_default();
         } else if let Some(after) = rest.strip_prefix("<!DOCTYPE") {
+            // An internal subset, between brackets, holds `>` of its own,
+            // as the entities that Illustrator declares.
+            let after = match (after.find('['), after.find('>')) {
+                (Some(open), Some(close)) if open < close => {
+                    let Some(end) = after.get(open..).and_then(|a| a.find(']')) else {
+                        return false;
+                    };
+                    after.get(open + end + 1..).unwrap_or_default()
+                }
+                _ => after,
+            };
             let Some(end) = after.find('>') else {
                 return false;
             };
@@ -273,7 +284,7 @@ pub fn is_svg(bytes: &[u8]) -> bool {
         }
     }
     rest.strip_prefix("<svg")
-        .is_some_and(|after| after.starts_with(|c: char| c.is_whitespace() || c == '>'))
+        .is_some_and(|after| after.starts_with(|c: char| c.is_whitespace() || c == '>' || c == '/'))
         || rest.starts_with("<svg:svg")
 }
 
@@ -374,6 +385,11 @@ mod tests {
             b"\xef\xbb\xbf<?xml version='1.0'?>\n<!-- made -->\n<!DOCTYPE svg>\n<svg>"
         ));
         assert!(!is_svg(b"<svgx>"));
+        assert!(is_svg(b"<svg/>"));
+        // An internal subset holds `>` of its own, as Illustrator writes.
+        assert!(is_svg(
+            b"<!DOCTYPE svg PUBLIC \"-//W3C//DTD SVG 1.1//EN\" \"x.dtd\" [\n<!ENTITY ns \"a\">\n]>\n<svg version=\"1.1\">"
+        ));
         assert!(!is_svg(b"<html><svg>"));
         let svg = Picture::from_svg(b"<svg width='20' height='10'/>".to_vec(), 20.0, 10.0).unwrap();
         assert_eq!(svg.format(), PictureFormat::Svg);

@@ -142,7 +142,7 @@ impl TextEditor {
                     kind: ObjectKind::Image(picture),
                     ..
                 },
-            ] => gdk::Texture::from_bytes(&gtk::glib::Bytes::from(picture.data())).ok(),
+            ] => crate::bullet_pictures::texture(picture),
             _ => None,
         };
         let mut content = vec![match picture {

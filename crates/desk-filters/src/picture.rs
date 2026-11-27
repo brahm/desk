@@ -93,6 +93,15 @@ fn from_heic(bytes: &[u8]) -> Option<Picture> {
     let handle = context.primary_image_handle().ok()?;
     let (width, height) = (handle.width(), handle.height());
     fits(width, height).then_some(())?;
+    // Without a decoder of HEVC, libheif reads the size but not the
+    // pixels: the picture is refused, so that a PNG beside it in the
+    // file stands for it.
+    let decoders = libheif_rs::LibHeif::new()
+        .decoder_descriptors(1, Some(libheif_rs::CompressionFormat::Hevc))
+        .len();
+    if decoders == 0 {
+        return None;
+    }
     Picture::from_heic(bytes.to_vec(), width, height)
 }
 
@@ -103,12 +112,42 @@ pub const FALLBACK_MAX_SIDE: u32 = 2048;
 /// A PNG of an SVG or HEIC picture, at most `FALLBACK_MAX_SIDE` on its
 /// larger side, for the programs that read neither; `None` for a picture
 /// of another format, or one that cannot be drawn (W108).
+///
+/// The PNG made last for each of a few pictures is kept, so that saving
+/// again does not decode them again.
 pub fn png_fallback(picture: &Picture) -> Option<Picture> {
-    match picture.format() {
-        desk_model::PictureFormat::Svg => svg_png(picture),
-        desk_model::PictureFormat::Heic => heic_png(picture.data()),
-        _ => None,
+    use std::hash::{Hash, Hasher};
+    use std::sync::Mutex;
+    /// The PNGs made, by the hash and length of their picture, newest last.
+    static MADE: Mutex<Vec<(u64, usize, Option<Picture>)>> = Mutex::new(Vec::new());
+    if !matches!(
+        picture.format(),
+        desk_model::PictureFormat::Svg | desk_model::PictureFormat::Heic
+    ) {
+        return None;
     }
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    picture.data().hash(&mut hasher);
+    let key = (hasher.finish(), picture.data().len());
+    if let Ok(mut made) = MADE.lock()
+        && let Some(at) = made.iter().position(|(h, l, _)| (*h, *l) == key)
+    {
+        let entry = made.remove(at);
+        let png = entry.2.clone();
+        made.push(entry);
+        return png;
+    }
+    let png = match picture.format() {
+        desk_model::PictureFormat::Svg => svg_png(picture),
+        _ => heic_png(picture.data()),
+    };
+    if let Ok(mut made) = MADE.lock() {
+        if made.len() >= 32 {
+            made.remove(0);
+        }
+        made.push((key.0, key.1, png.clone()));
+    }
+    png
 }
 
 fn svg_png(picture: &Picture) -> Option<Picture> {

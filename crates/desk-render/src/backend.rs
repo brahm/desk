@@ -66,6 +66,8 @@ pub struct Painter {
     pictures: Vec<(desk_model::Picture, cairo::ImageSurface)>,
     /// The pictures with their colors changed, by what changed them.
     adjusted: Vec<(AdjustedKey, cairo::ImageSurface)>,
+    /// The SVG pictures read so far, newest last (W108).
+    svgs: Vec<(desk_model::Picture, librsvg_rebind::Handle)>,
 }
 
 impl Painter {
@@ -76,7 +78,29 @@ impl Painter {
             faces: HashMap::new(),
             pictures: Vec::new(),
             adjusted: Vec::new(),
+            svgs: Vec::new(),
         })
+    }
+
+    /// The SVG picture read by librsvg, kept so that it is not read
+    /// again at each paint.
+    fn svg(&mut self, picture: &desk_model::Picture) -> Option<librsvg_rebind::Handle> {
+        if let Some(at) = self
+            .svgs
+            .iter()
+            .position(|(p, _)| p.same_data(picture) || p == picture)
+        {
+            let entry = self.svgs.remove(at);
+            let handle = entry.1.clone();
+            self.svgs.push(entry);
+            return Some(handle);
+        }
+        let handle = svg_handle(picture.data())?;
+        if self.svgs.len() >= 16 {
+            self.svgs.remove(0);
+        }
+        self.svgs.push((picture.clone(), handle.clone()));
+        Some(handle)
     }
 
     /// The picture decoded, or `None` when Cairo cannot read it.
@@ -324,7 +348,9 @@ impl Painter {
                         continue;
                     }
                     if picture.format() == desk_model::PictureFormat::Svg {
-                        paint_svg(cr, picture, (*x, *y, *width, *height))?;
+                        if let Some(handle) = self.svg(picture) {
+                            paint_svg(cr, &handle, picture, (*x, *y, *width, *height))?;
+                        }
                         continue;
                     }
                     let Some(surface) = self.picture(picture) else {
@@ -1261,13 +1287,11 @@ pub fn svg_size(data: &[u8]) -> Option<(f64, f64)> {
 /// stays sharp on screen and in a PDF (W108).
 fn paint_svg(
     cr: &Context,
+    handle: &librsvg_rebind::Handle,
     picture: &desk_model::Picture,
     (x, y, width, height): (f32, f32, f32, f32),
 ) -> Result<(), RenderError> {
     use librsvg_rebind::prelude::*;
-    let Some(handle) = svg_handle(picture.data()) else {
-        return Ok(());
-    };
     cr.save()?;
     cr.rectangle(
         f64::from(x),
@@ -1327,19 +1351,17 @@ fn heic_surface(data: &[u8]) -> Option<cairo::ImageSurface> {
         for row in 0..h {
             let from = plane.data.get(row * plane.stride..)?.get(..w * 4)?;
             let to = out.get_mut(row * stride..)?.get_mut(..w * 4)?;
-            for (rgba, bgra) in from
+            for (rgba, out) in from
                 .as_chunks::<4>()
                 .0
                 .iter()
                 .zip(to.as_chunks_mut::<4>().0.iter_mut())
             {
-                // Premultiplied BGRA in memory on little-endian machines.
-                let a = u16::from(rgba[3]);
-                let pre = |c: u8| ((u16::from(c) * a + 127) / 255) as u8;
-                bgra[0] = pre(rgba[2]);
-                bgra[1] = pre(rgba[1]);
-                bgra[2] = pre(rgba[0]);
-                bgra[3] = rgba[3];
+                // Premultiplied ARGB in a word of the machine's order.
+                let a = u32::from(rgba[3]);
+                let pre = |c: u8| (u32::from(c) * a + 127) / 255;
+                let word = (a << 24) | (pre(rgba[0]) << 16) | (pre(rgba[1]) << 8) | pre(rgba[2]);
+                *out = word.to_ne_bytes();
             }
         }
     }
