@@ -12,10 +12,10 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
   and charts of Pages 15.4: the shape library and combined shapes, the
   image gallery, captions, 3D objects, drawings, recorded sound, SVG
   and HEIC images, and the donut, radar, bubble and interactive charts
-  (#PR).
+  (#259).
 * Changed: Writer structure and templates (W3) is done, checked on the
   Mac with Pages 15.4; Writer objects and charts (W4) is the phase in
-  progress (#PR).
+  progress (#259).
 
 * Changed: The menu of merge fields offers the fields of Pages 15.4 first,
   in its order, and the others under More Fields. (#258)
