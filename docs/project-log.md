@@ -3201,6 +3201,27 @@ paragraph, and objects on a second page.
   decoded, and are no longer mistaken for movies, with HEIC ones.
 - No task moved to another phase.
 
+### 27 November: the actions of the CI on Node.js 24
+
+- The five update requests Dependabot opened on 24 November (#208 to
+  #212) were not closed but taken, in one pull request: checkout 7.0.1,
+  upload-artifact 7.0.2, upload-pages-artifact 5.0.0, deploy-pages 5.0.1
+  and reuse-action 6.0.0, with download-artifact 8.0.2, which reads what
+  upload-artifact writes and had not been proposed yet.
+- Why: deploy-pages 4, upload-artifact 4 and download-artifact 4 target
+  Node.js 20, which GitHub has deprecated; the runners already force
+  them onto Node.js 24 with a warning on every run, and will stop
+  running Node.js 20. Closing the requests would have kept those
+  versions, and Dependabot does not propose again a version whose
+  request was closed, so the website and the nightly Flatpak would have
+  broken later, by surprise. Each commit was checked against the tag of
+  its upstream repository, and the changes of each action read: none
+  needs a change in the workflows.
+- Dependabot now groups the updates of the actions in one request a
+  week. It had stopped at five open requests, so actions/cache,
+  rust-cache and cargo-deny were still waiting behind them.
+- No task moved to another phase.
+
 ## Decisions, with their reasons and consequences
 
 Ids `D-nnn` and `R-nnn` are those of [decisions.md](decisions.md).
