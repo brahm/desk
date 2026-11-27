@@ -403,13 +403,17 @@ These sit on the `style:graphic-properties` of the graphic style of a
   the object, as LibreOffice writes a caption: the paragraphs of the
   title, a paragraph that holds the object as a character (`as-char`),
   then those of the caption. The frame takes the anchor, the place and
-  the wrap of the object; the object keeps its size, its style and its
-  `draw:transform` when it is rotated.
+  the wrap of the object, and starts higher by about the height of the
+  title; the object keeps its size, its style, its own `svg:x` and
+  `svg:y`, which Desk reads back, and its `draw:transform` when it is
+  rotated.
 - **Value:** the parts of the text of the frame, in order, separated by
   spaces: `title=N`, `object` and `caption=N`, where N is the number of
-  paragraphs. `object title=1` is a title below the object. A value that
-  does not match the paragraphs, or a paragraph of the object with other
-  than one object, makes the frame an ordinary text box. A title or a
+  paragraphs. `object title=1` is a title below the object; a last
+  `title-below` keeps the position of a title turned off. A value that
+  does not match the paragraphs, a paragraph of the object with other
+  than one object, or a title or a caption with an object or a note,
+  makes the frame an ordinary text box. A title or a
   caption that is turned off is not written.
 - **Fallback:** the frame, with the title, the object and the caption in
   its text, as a caption made in LibreOffice shows.

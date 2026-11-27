@@ -61,11 +61,16 @@ impl StoryMode {
 /// the body of a page that shows headers or footers.
 pub fn story_at(layout: &DocumentLayout, page: usize, x: f64, y: f64) -> Option<Story> {
     let p = layout.pages.get(page)?;
-    // The title or the caption of an object (W122).
-    if let Some((object, title)) = desk_layout::caption_at(&p.objects, x as f32, y as f32) {
+    let hit = desk_layout::object_at(&p.objects, x as f32, y as f32, 0.0, true);
+    // The title or the caption of an object (W122), unless an object in
+    // front of it is under the point.
+    if let Some((index, title)) = desk_layout::caption_at(&p.objects, x as f32, y as f32)
+        && hit.is_none_or(|h| h <= index)
+    {
+        let object = p.objects[index].object.id;
         return Some(Story::Caption { object, title });
     }
-    if let Some(index) = desk_layout::object_at(&p.objects, x as f32, y as f32, 0.0, true)
+    if let Some(index) = hit
         && p.objects[index].object.holds_text()
         // The text of the masters is not typed in on the pages.
         && !p.objects[index].object.anchor.is_master()
@@ -413,9 +418,9 @@ pub fn story_pages(layout: &DocumentLayout) -> Vec<(Story, usize)> {
                     index,
                 );
             }
-            // Its title and caption (W122).
+            // Its title and caption (W122), but those of the masters.
             for (lines, title) in [(&object.title, true), (&object.caption, false)] {
-                if !lines.is_empty() {
+                if !lines.is_empty() && !object.object.anchor.is_master() {
                     let id = object.object.id;
                     add(Story::Caption { object: id, title }, index);
                 }

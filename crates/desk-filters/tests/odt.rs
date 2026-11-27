@@ -5318,3 +5318,31 @@ fn w122_titles_and_captions_round_trip_in_frames_around_their_objects() {
         style
     );
 }
+
+#[test]
+fn w122_a_title_turned_off_keeps_its_place_below() {
+    use desk_model::{Anchor, Editor, Frame, Object, ObjectKind, Shape};
+    let mut editor = Editor::new(Document::new_word_processing());
+    let id = editor
+        .edit("Shape", |edit| {
+            let mut shape = Object::new(
+                edit.new_id(),
+                ObjectKind::Shape(Shape::Rectangle),
+                Frame::from_pt(100.0, 150.0, 120.0, 80.0),
+            );
+            shape.anchor = Anchor::Page(0);
+            let id = shape.id;
+            edit.add_object(shape)?;
+            edit.show_caption(id, false, true)?;
+            edit.set_title_below(id, true)?;
+            Ok(id)
+        })
+        .unwrap();
+    let bytes = write_odt(editor.document()).unwrap();
+    let again = read_odt(&bytes).unwrap();
+    let read = again.objects().iter().next().unwrap();
+    let captions = read.captions.as_deref().unwrap();
+    assert!(captions.title_below && !captions.title.shown && captions.caption.shown);
+    let was = editor.document().objects().get(id).unwrap();
+    assert_eq!(read.frame, was.frame);
+}

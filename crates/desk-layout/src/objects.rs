@@ -146,8 +146,9 @@ pub fn caption_lines(
 }
 
 /// The title or the caption under a point of the page, of the objects on
-/// it from front to back: the object, and whether it is the title.
-pub fn caption_at(objects: &[PlacedObject], x: f32, y: f32) -> Option<(desk_model::NodeId, bool)> {
+/// it from front to back but those of the masters: the index of the
+/// object, and whether it is the title.
+pub fn caption_at(objects: &[PlacedObject], x: f32, y: f32) -> Option<(usize, bool)> {
     let within = |lines: &[PlacedLine], placed: &PlacedObject| {
         let (Some(first), Some(last)) = (lines.first(), lines.last()) else {
             return false;
@@ -156,15 +157,20 @@ pub fn caption_at(objects: &[PlacedObject], x: f32, y: f32) -> Option<(desk_mode
         (left..=left + placed.width).contains(&x)
             && (first.top() - 1.0..=last.bottom() + 1.0).contains(&y)
     };
-    objects.iter().rev().find_map(|o| {
-        if within(&o.title, o) {
-            Some((o.object.id, true))
-        } else if within(&o.caption, o) {
-            Some((o.object.id, false))
-        } else {
-            None
-        }
-    })
+    objects
+        .iter()
+        .enumerate()
+        .rev()
+        .filter(|(_, o)| !o.object.anchor.is_master())
+        .find_map(|(i, o)| {
+            if within(&o.title, o) {
+                Some((i, true))
+            } else if within(&o.caption, o) {
+                Some((i, false))
+            } else {
+                None
+            }
+        })
 }
 
 /// Lays out the title and the caption of a placed object above and below
@@ -173,6 +179,12 @@ pub fn caption_at(objects: &[PlacedObject], x: f32, y: f32) -> Option<(desk_mode
 fn lay_out_captions(document: &Document, placed: &mut PlacedObject, system: &mut TextSystem) {
     placed.title.clear();
     placed.caption.clear();
+    placed.room = CaptionRoom::default();
+    // A text box that hangs in the line takes no room there for them.
+    let in_line = placed.object.anchor == Anchor::InText;
+    if in_line && hangs(&placed.object) && !floats_in_text(&placed.object) {
+        return;
+    }
     let Some(captions) = placed.object.captions.clone() else {
         return;
     };
@@ -890,7 +902,7 @@ pub(crate) fn inline_sizes(
         .filter(|o| o.anchor == Anchor::InText)
         .map(|o| {
             let floats = floats_in_text(o);
-            (o.id, inline_size(document, o, floats, system))
+            (o.id, inline_size(document, o, floats, true, system))
         })
         .collect();
     (!sizes.is_empty()).then(|| Arc::new(sizes))
@@ -898,17 +910,18 @@ pub(crate) fn inline_sizes(
 
 /// The room of an object in the line of a text, as wide as its frame or,
 /// when it floats with its paragraph, as nothing; as high as its frame
-/// with its title and caption (W122).
+/// with its title and caption when they show there (W122).
 fn inline_size(
     document: &Document,
     o: &Object,
     floats: bool,
+    captions: bool,
     system: &mut TextSystem,
 ) -> (desk_model::Length, desk_model::Length) {
     // A text box in the text hangs from the top of its line, as in
     // Pages, and does not make the line taller; one that floats with its
     // paragraph takes no room in the line (OBJ-14).
-    let room = if hangs(o) || floats {
+    let room = if !captions || hangs(o) || floats {
         CaptionRoom::default()
     } else {
         caption_room(document, o, system)
@@ -943,7 +956,7 @@ fn text_object_sizes(
         .into_iter()
         .filter_map(|(id, _)| document.objects().get(id))
         .filter(|o| o.anchor == Anchor::InText)
-        .map(|o| (o.id, inline_size(document, o, false, system)))
+        .map(|o| (o.id, inline_size(document, o, false, false, system)))
         .collect();
     (!sizes.is_empty()).then(|| Arc::new(sizes))
 }
@@ -954,7 +967,6 @@ fn text_objects(
     document: &Document,
     paragraphs: &[desk_model::Paragraph],
     lines: &[PlacedLine],
-    system: &mut TextSystem,
 ) -> Vec<PlacedObject> {
     let marks = desk_model::marks_in(paragraphs);
     if marks.is_empty() {
@@ -986,9 +998,7 @@ fn text_objects(
         placed.y = if hangs(object) {
             line.top()
         } else {
-            // Its caption stands on the baseline, under it (W122).
-            placed.room = caption_room(document, object, system);
-            line.baseline() - placed.room.below - placed.height
+            line.baseline() - placed.height
         };
         out.push(placed);
     }
@@ -1197,7 +1207,7 @@ pub fn place_object_text(
             let flowed = flow_text_boxes(document, &refs, &paragraphs, system);
             for ((p, i), lines) in chain.into_iter().zip(flowed) {
                 let placed = &mut layout.pages[p].objects[i];
-                placed.inline = text_objects(document, &paragraphs, &lines, system);
+                placed.inline = text_objects(document, &paragraphs, &lines);
                 for object in &mut placed.inline {
                     lay_out_text_within(document, object, system, 1);
                 }
@@ -1209,6 +1219,7 @@ pub fn place_object_text(
 
 fn lay_out_text(document: &Document, placed: &mut PlacedObject, system: &mut TextSystem) {
     lay_out_text_within(document, placed, system, 0);
+    lay_out_captions(document, placed, system);
 }
 
 /// How deep the objects in the texts of objects are laid out, each in the
@@ -1227,7 +1238,6 @@ fn lay_out_text_within(
     for child in &mut placed.children {
         lay_out_text_within(document, child, system, depth);
     }
-    lay_out_captions(document, placed, system);
     match &placed.object.kind {
         ObjectKind::Table(table) => {
             let locale = crate::document_locale(document);
@@ -1261,7 +1271,7 @@ fn lay_out_text_within(
     let paragraphs = text.paragraphs.clone();
     placed.lines = text_box_lines(document, placed, &paragraphs, system);
     if depth < NESTED_TEXT_DEPTH {
-        placed.inline = text_objects(document, &paragraphs, &placed.lines, system);
+        placed.inline = text_objects(document, &paragraphs, &placed.lines);
         for object in &mut placed.inline {
             lay_out_text_within(document, object, system, depth + 1);
         }

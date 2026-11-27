@@ -1309,8 +1309,19 @@ fn import_one(
     // The frame that Desk writes around an object with a title or a
     // caption (W122).
     if let Some((inner, parts)) = captioned_parts(object) {
-        let Some(mut built) =
-            import_one(source, document, &inner, anchor, setup, paragraph, depth)?
+        // Frames in frames count toward the depth of texts in objects.
+        if depth >= NESTED_TEXT_DEPTH {
+            return Ok(None);
+        }
+        let Some(mut built) = import_one(
+            source,
+            document,
+            &inner,
+            anchor,
+            setup,
+            paragraph,
+            depth + 1,
+        )?
         else {
             return Ok(None);
         };
@@ -1329,11 +1340,6 @@ fn import_one(
                 read.push(paragraph(document, p)?);
             }
             at += count;
-            // Only text: a title or a caption holds no objects or notes.
-            let read: Vec<Paragraph> = read
-                .into_iter()
-                .map(|p| without_marks(&p))
-                .collect::<Result<_, _>>()?;
             let caption = captions.get_mut(title);
             caption.shown = true;
             caption.paragraphs = Arc::from(read);
@@ -1557,7 +1563,7 @@ fn captioned_parts(
     inner.anchor.clone_from(&object.anchor);
     inner.anchor_page = object.anchor_page;
     inner.z_index = object.z_index;
-    if inner.transform.is_none() {
+    if inner.transform.is_none() && (inner.x.is_none() || inner.y.is_none()) {
         inner.x = object.x;
         inner.y = object.y;
     }
@@ -1578,6 +1584,9 @@ fn captioned_held(
     let mut parts = Vec::new();
     let mut seen = (false, false, false);
     for token in value.split_whitespace() {
+        if token == "title-below" {
+            continue;
+        }
         if token == "object" {
             if seen.2 {
                 return None;
@@ -1601,11 +1610,12 @@ fn captioned_held(
         };
         parts.push((Some(title), Some(count)));
     }
-    let total: usize = parts
+    // Counts that do not add up to the paragraphs, however large, make
+    // the frame a text box.
+    let total = parts
         .iter()
         .filter_map(|(_, c)| *c)
-        .sum::<usize>()
-        .checked_add(1)?;
+        .try_fold(1usize, usize::checked_add)?;
     if !seen.2 || total != paragraphs.len() {
         return None;
     }
@@ -1614,6 +1624,17 @@ fn captioned_held(
         .take_while(|(p, _)| p.is_some())
         .filter_map(|(_, c)| *c)
         .sum();
+    // A title or a caption holds text only: one with an object or a
+    // note makes the frame an ordinary text box.
+    let marked = paragraphs.iter().enumerate().any(|(i, p)| {
+        i != before
+            && p.spans
+                .iter()
+                .any(|s| matches!(s.field, Some(odf::Field::Object(_) | odf::Field::Note(_))))
+    });
+    if marked {
+        return None;
+    }
     let held = &paragraphs[before];
     let mut objects = held.spans.iter().filter_map(|s| match &s.field {
         Some(odf::Field::Object(o)) => Some(&**o),
@@ -1632,7 +1653,7 @@ fn captioned_inner(object: &odf::DrawObject) -> Option<&odf::DrawObject> {
     captioned_held(object).map(|(inner, _)| inner)
 }
 
-/// Whether the title comes after the object in the parts of a captioned
+/// Whether the title is below the object, by the parts of a captioned
 /// frame (W122).
 fn title_after_object(object: &odf::DrawObject) -> bool {
     let value = object.captions.as_deref().unwrap_or_default();
@@ -1640,27 +1661,8 @@ fn title_after_object(object: &odf::DrawObject) -> bool {
     let title_at = value
         .split_whitespace()
         .position(|t| t.starts_with("title="));
-    matches!((object_at, title_at), (Some(o), Some(t)) if t > o)
-}
-
-/// A paragraph without the marks of objects and notes.
-fn without_marks(paragraph: &Paragraph) -> Result<Paragraph, FilterError> {
-    let runs: Vec<desk_model::Run> = paragraph
-        .runs()
-        .filter(|r| {
-            !matches!(
-                r.attrs.field,
-                Some(Some(Field::ObjectMark { .. } | Field::NoteMark { .. }))
-            )
-        })
-        .cloned()
-        .collect();
-    Ok(Paragraph::from_runs(
-        paragraph.id(),
-        paragraph.style(),
-        paragraph.attrs().clone(),
-        runs,
-    )?)
+    value.split_whitespace().any(|t| t == "title-below")
+        || matches!((object_at, title_at), (Some(o), Some(t)) if t > o)
 }
 
 fn import_inline_objects(
@@ -2785,10 +2787,22 @@ impl Exporter<'_> {
         let anchor = inner.anchor.take();
         let anchor_page = inner.anchor_page.take();
         let z_index = inner.z_index.take();
+        // The object keeps its place in its own attributes, which a
+        // program that reads it as a character leaves aside; the frame
+        // starts higher by about the title, which other programs show
+        // above the object.
         let rotated = inner.transform.is_some();
         let frame = |l: desk_model::Length| rotated.then(|| odf::Length(l.to_pt()));
-        let x = inner.x.take().or_else(|| frame(object.frame.x));
-        let y = inner.y.take().or_else(|| frame(object.frame.y));
+        let x = inner.x.or_else(|| frame(object.frame.x));
+        let title_lines = above.map_or(0, |t| t.paragraphs.len()) as f64;
+        let y = inner.y.or_else(|| frame(object.frame.y)).map(|y| {
+            let above = if title_lines > 0.0 {
+                title_lines * 14.0 + 4.0
+            } else {
+                0.0
+            };
+            odf::Length(y.0 - above)
+        });
         let width = inner.width;
         inner.anchor = Some("as-char".into());
         let style = paragraphs.first().and_then(|p| p.style.clone());
@@ -2804,6 +2818,10 @@ impl Exporter<'_> {
         for caption in below {
             let title = std::ptr::eq(caption, &captions.title);
             self.caption_part(caption, title, &mut track, &mut paragraphs, &mut parts);
+        }
+        // A title below that is turned off keeps its place.
+        if captions.title_below && !captions.title.shown {
+            parts.push("title-below".into());
         }
         // As high as the object and a line of each paragraph, for the
         // programs that keep the frame at its height.

@@ -3185,7 +3185,8 @@ paragraph, and objects on a second page.
   says which paragraphs are which.
 - Moved to W5 (B-081): titles and captions of the objects of master
   pages and page templates, and the text of a title or caption turned
-  off, in ODF.
+  off, in ODF; and showing those of objects inside text boxes, shapes
+  and groups, and of a text box that hangs in the line.
 
 ## Decisions, with their reasons and consequences
 
