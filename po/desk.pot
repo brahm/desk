@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Desk\n"
 "Report-Msgid-Bugs-To: https://github.com/brahm/desk/issues\n"
-"POT-Creation-Date: 2026-11-27 21:42+0000\n"
+"POT-Creation-Date: 2026-11-27 21:49+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -272,7 +272,7 @@ msgid "Insert"
 msgstr ""
 
 #: crates/desk-ui/src/captured_pages.rs:51
-#: crates/desk-ui/src/custom_format.rs:262 crates/desk-ui/src/fill_rows.rs:492
+#: crates/desk-ui/src/custom_format.rs:262 crates/desk-ui/src/fill_rows.rs:501
 #: crates/desk-ui/src/page_templates.rs:69
 #: crates/desk-ui/src/page_templates.rs:73
 #: crates/desk-ui/src/tables/window.rs:982 crates/desk-ui/src/undo_names.rs:31
@@ -1816,7 +1816,7 @@ msgid "Uneven Ink"
 msgstr ""
 
 #: crates/desk-ui/src/effects.rs:164 crates/desk-ui/src/effects.rs:174
-#: crates/desk-ui/src/fill_rows.rs:706
+#: crates/desk-ui/src/fill_rows.rs:715
 msgid "Color"
 msgstr ""
 
@@ -1992,16 +1992,16 @@ msgstr ""
 msgid "Tile"
 msgstr ""
 
-#: crates/desk-ui/src/fill_rows.rs:154 crates/desk-ui/src/fill_rows.rs:839
+#: crates/desk-ui/src/fill_rows.rs:154 crates/desk-ui/src/fill_rows.rs:848
 #: crates/desk-ui/src/object_text_pane.rs:165
 msgid "Color Fill"
 msgstr ""
 
-#: crates/desk-ui/src/fill_rows.rs:155 crates/desk-ui/src/fill_rows.rs:840
+#: crates/desk-ui/src/fill_rows.rs:155 crates/desk-ui/src/fill_rows.rs:849
 msgid "Gradient Fill"
 msgstr ""
 
-#: crates/desk-ui/src/fill_rows.rs:156 crates/desk-ui/src/fill_rows.rs:842
+#: crates/desk-ui/src/fill_rows.rs:156 crates/desk-ui/src/fill_rows.rs:851
 msgid "Image Fill"
 msgstr ""
 
@@ -2009,7 +2009,7 @@ msgstr ""
 msgid "Tinted Image Fill"
 msgstr ""
 
-#: crates/desk-ui/src/fill_rows.rs:158 crates/desk-ui/src/fill_rows.rs:841
+#: crates/desk-ui/src/fill_rows.rs:158 crates/desk-ui/src/fill_rows.rs:850
 msgid "Advanced Gradient Fill"
 msgstr ""
 
@@ -2032,7 +2032,7 @@ msgstr ""
 msgid "Image Size"
 msgstr ""
 
-#: crates/desk-ui/src/fill_rows.rs:170 crates/desk-ui/src/fill_rows.rs:708
+#: crates/desk-ui/src/fill_rows.rs:170 crates/desk-ui/src/fill_rows.rs:717
 msgid "Fill Color"
 msgstr ""
 
@@ -2110,14 +2110,18 @@ msgid "A picture is not saved here."
 msgstr ""
 
 #: crates/desk-ui/src/fill_rows.rs:410
+msgid "This gradient has more colors or values than a saved fill keeps."
+msgstr ""
+
+#: crates/desk-ui/src/fill_rows.rs:413
 msgid "As many fills are saved as are kept. Delete one to save another."
 msgstr ""
 
-#: crates/desk-ui/src/fill_rows.rs:414
+#: crates/desk-ui/src/fill_rows.rs:417
 msgid "The file of saved fills cannot be read or written."
 msgstr ""
 
-#: crates/desk-ui/src/fill_rows.rs:594
+#: crates/desk-ui/src/fill_rows.rs:603
 msgid "Choose an Image to Fill With"
 msgstr ""
 
@@ -5235,8 +5239,8 @@ msgstr ""
 msgid "lock security closed"
 msgstr ""
 
-#: crates/desk-ui/src/shape_library.rs:1124
-#: crates/desk-ui/src/shape_library.rs:1364
+#: crates/desk-ui/src/shape_library.rs:1125
+#: crates/desk-ui/src/shape_library.rs:1365
 #: crates/desk-ui/src/window/objects.rs:267
 msgid "My Shape"
 msgstr ""

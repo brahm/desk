@@ -121,6 +121,13 @@ impl GradientBar {
         self.area.queue_draw();
     }
 
+    /// Chooses the color at a place in order.
+    pub fn choose(&self, index: usize) {
+        let last = self.stops.borrow().len().saturating_sub(1);
+        self.current.set(index.min(last));
+        self.area.queue_draw();
+    }
+
     /// The chosen color, by its place in order.
     pub fn current(&self) -> usize {
         self.current.get()

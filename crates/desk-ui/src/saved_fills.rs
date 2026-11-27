@@ -71,14 +71,27 @@ fn angle(text: &str) -> Option<i32> {
 
 /// A fill in words, or none for one that is not saved, such as a
 /// picture.
+/// It writes only what it reads back: the limits of [`fill_of_text`].
 pub(crate) fn fill_to_text(fill: &Fill) -> Option<String> {
+    let turn = |a: i32| (-36_000..=36_000).contains(&a);
     match fill {
         Fill::Color(c) => Some(format!("color {}", hex(*c))),
         Fill::Gradient { from, to, angle } => {
-            Some(format!("gradient {} {} {angle}", hex(*from), hex(*to)))
+            turn(*angle).then(|| format!("gradient {} {} {angle}", hex(*from), hex(*to)))
         }
         Fill::Advanced(gradient) => {
-            if gradient.stops.len() < 2 || gradient.stops.len() > MAX_STOPS {
+            let within = |v: u16| v <= 1000;
+            if gradient.stops.len() < 2
+                || gradient.stops.len() > MAX_STOPS
+                || !turn(gradient.angle)
+                || gradient
+                    .center
+                    .is_some_and(|(x, y)| !within(x) || !within(y))
+                || gradient
+                    .stops
+                    .iter()
+                    .any(|s| !within(s.at) || !within(s.blend))
+            {
                 return None;
             }
             let center = gradient
@@ -214,9 +227,10 @@ fn write_lines(file: &Path, lines: &[Line]) -> std::io::Result<()> {
         }
         text.push('\n');
     }
-    // Written beside it first, so that a failure leaves the old file.
+    // Written beside it first, so that a failure leaves the old file; by
+    // a name of this process, so that two never write the same one.
     let mut part = file.as_os_str().to_owned();
-    part.push(".part");
+    part.push(format!(".{}.part", std::process::id()));
     let part = PathBuf::from(part);
     std::fs::write(&part, text)?;
     std::fs::rename(&part, file)
@@ -239,6 +253,9 @@ pub(crate) fn read_saved(file: &Path) -> Vec<Saved> {
 pub(crate) enum SaveError {
     /// It is a picture, or none.
     Unsupported,
+    /// It is a gradient with more colors, or values further out, than a
+    /// saved fill keeps.
+    TooLarge,
     /// As many are saved as are kept.
     Full,
     /// The file cannot be read or written.
@@ -248,7 +265,12 @@ pub(crate) enum SaveError {
 /// Saves a fill in a file and returns it; one saved already is not saved
 /// twice.
 pub(crate) fn add_saved(file: &Path, fill: &Fill) -> Result<Saved, SaveError> {
-    fill_to_text(fill).ok_or(SaveError::Unsupported)?;
+    if fill_to_text(fill).is_none() {
+        return Err(match fill {
+            Fill::Gradient { .. } | Fill::Advanced(_) => SaveError::TooLarge,
+            _ => SaveError::Unsupported,
+        });
+    }
     let mut lines = read_lines(file).map_err(SaveError::File)?;
     let saved: Vec<&Saved> = lines
         .iter()
@@ -391,6 +413,15 @@ mod tests {
         assert!(matches!(
             add_saved(&file, &image),
             Err(SaveError::Unsupported)
+        ));
+        // What would not be read back is not written.
+        let Fill::Advanced(mut far) = advanced() else {
+            unreachable!()
+        };
+        far.stops[1].blend = 1500;
+        assert!(matches!(
+            add_saved(&file, &Fill::Advanced(far)),
+            Err(SaveError::TooLarge)
         ));
         assert_eq!(read_saved(&file), [first.clone(), second.clone()]);
         let mut text = std::fs::read_to_string(&file).unwrap();

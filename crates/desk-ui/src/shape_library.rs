@@ -1063,9 +1063,10 @@ fn write_lines(file: &Path, lines: &[Line]) -> std::io::Result<()> {
         }
         text.push('\n');
     }
-    // Written beside it first, so that a failure leaves the old file.
+    // Written beside it first, so that a failure leaves the old file; by
+    // a name of this process, so that two never write the same one.
     let mut part = file.as_os_str().to_owned();
-    part.push(".part");
+    part.push(format!(".{}.part", std::process::id()));
     let part = PathBuf::from(part);
     std::fs::write(&part, text)?;
     std::fs::rename(&part, file)

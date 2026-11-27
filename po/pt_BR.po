@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Desk\n"
 "Report-Msgid-Bugs-To: https://github.com/brahm/desk/issues\n"
-"POT-Creation-Date: 2026-11-27 21:42+0000\n"
+"POT-Creation-Date: 2026-11-27 21:49+0000\n"
 "PO-Revision-Date: 2026-11-02 00:54+0000\n"
 "Last-Translator: Desk contributors\n"
 "Language-Team: Brazilian Portuguese\n"
@@ -273,7 +273,7 @@ msgid "Insert"
 msgstr "Inserir"
 
 #: crates/desk-ui/src/captured_pages.rs:51
-#: crates/desk-ui/src/custom_format.rs:262 crates/desk-ui/src/fill_rows.rs:492
+#: crates/desk-ui/src/custom_format.rs:262 crates/desk-ui/src/fill_rows.rs:501
 #: crates/desk-ui/src/page_templates.rs:69
 #: crates/desk-ui/src/page_templates.rs:73
 #: crates/desk-ui/src/tables/window.rs:982 crates/desk-ui/src/undo_names.rs:31
@@ -1822,7 +1822,7 @@ msgid "Uneven Ink"
 msgstr "Tinta Irregular"
 
 #: crates/desk-ui/src/effects.rs:164 crates/desk-ui/src/effects.rs:174
-#: crates/desk-ui/src/fill_rows.rs:706
+#: crates/desk-ui/src/fill_rows.rs:715
 msgid "Color"
 msgstr "Cor"
 
@@ -1998,16 +1998,16 @@ msgstr "Tamanho original"
 msgid "Tile"
 msgstr "Lado a lado"
 
-#: crates/desk-ui/src/fill_rows.rs:154 crates/desk-ui/src/fill_rows.rs:839
+#: crates/desk-ui/src/fill_rows.rs:154 crates/desk-ui/src/fill_rows.rs:848
 #: crates/desk-ui/src/object_text_pane.rs:165
 msgid "Color Fill"
 msgstr "Preenchimento de cor"
 
-#: crates/desk-ui/src/fill_rows.rs:155 crates/desk-ui/src/fill_rows.rs:840
+#: crates/desk-ui/src/fill_rows.rs:155 crates/desk-ui/src/fill_rows.rs:849
 msgid "Gradient Fill"
 msgstr "Preenchimento em degradê"
 
-#: crates/desk-ui/src/fill_rows.rs:156 crates/desk-ui/src/fill_rows.rs:842
+#: crates/desk-ui/src/fill_rows.rs:156 crates/desk-ui/src/fill_rows.rs:851
 msgid "Image Fill"
 msgstr "Preenchimento com imagem"
 
@@ -2015,7 +2015,7 @@ msgstr "Preenchimento com imagem"
 msgid "Tinted Image Fill"
 msgstr "Preenchimento com imagem tingida"
 
-#: crates/desk-ui/src/fill_rows.rs:158 crates/desk-ui/src/fill_rows.rs:841
+#: crates/desk-ui/src/fill_rows.rs:158 crates/desk-ui/src/fill_rows.rs:850
 msgid "Advanced Gradient Fill"
 msgstr "Preenchimento em degradê avançado"
 
@@ -2038,7 +2038,7 @@ msgstr "Imagem"
 msgid "Image Size"
 msgstr "Tamanho da imagem"
 
-#: crates/desk-ui/src/fill_rows.rs:170 crates/desk-ui/src/fill_rows.rs:708
+#: crates/desk-ui/src/fill_rows.rs:170 crates/desk-ui/src/fill_rows.rs:717
 msgid "Fill Color"
 msgstr "Cor do preenchimento"
 
@@ -2084,7 +2084,8 @@ msgstr "Salvar Preenchimento"
 
 #: crates/desk-ui/src/fill_rows.rs:208
 msgid "Keeps this fill here, to use again in any document"
-msgstr "Guarda este preenchimento aqui, para usar de novo em qualquer documento"
+msgstr ""
+"Guarda este preenchimento aqui, para usar de novo em qualquer documento"
 
 #: crates/desk-ui/src/fill_rows.rs:229 crates/desk-ui/src/fill_rows.rs:232
 #: crates/desk-ui/src/fill_rows.rs:234
@@ -2116,14 +2117,19 @@ msgid "A picture is not saved here."
 msgstr "Uma imagem não é salva aqui."
 
 #: crates/desk-ui/src/fill_rows.rs:410
-msgid "As many fills are saved as are kept. Delete one to save another."
-msgstr "Já há tantos preenchimentos salvos quanto cabem. Exclua um para salvar outro."
+msgid "This gradient has more colors or values than a saved fill keeps."
+msgstr "Este gradiente tem mais cores ou valores do que um preenchimento salvo guarda."
 
-#: crates/desk-ui/src/fill_rows.rs:414
+#: crates/desk-ui/src/fill_rows.rs:413
+msgid "As many fills are saved as are kept. Delete one to save another."
+msgstr ""
+"Já há tantos preenchimentos salvos quanto cabem. Exclua um para salvar outro."
+
+#: crates/desk-ui/src/fill_rows.rs:417
 msgid "The file of saved fills cannot be read or written."
 msgstr "O arquivo de preenchimentos salvos não pode ser lido ou gravado."
 
-#: crates/desk-ui/src/fill_rows.rs:594
+#: crates/desk-ui/src/fill_rows.rs:603
 msgid "Choose an Image to Fill With"
 msgstr "Escolha uma imagem para o preenchimento"
 
@@ -5273,8 +5279,8 @@ msgstr "Cadeado"
 msgid "lock security closed"
 msgstr "trancar segurança fechado"
 
-#: crates/desk-ui/src/shape_library.rs:1124
-#: crates/desk-ui/src/shape_library.rs:1364
+#: crates/desk-ui/src/shape_library.rs:1125
+#: crates/desk-ui/src/shape_library.rs:1365
 #: crates/desk-ui/src/window/objects.rs:267
 msgid "My Shape"
 msgstr "Minha Forma"

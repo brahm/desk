@@ -406,6 +406,9 @@ impl FillRows {
                 Err(crate::saved_fills::SaveError::Unsupported) => {
                     Some(tr("A picture is not saved here."))
                 }
+                Err(crate::saved_fills::SaveError::TooLarge) => Some(tr(
+                    "This gradient has more colors or values than a saved fill keeps.",
+                )),
                 Err(crate::saved_fills::SaveError::Full) => Some(tr(
                     "As many fills are saved as are kept. Delete one to save another.",
                 )),
@@ -433,12 +436,18 @@ impl FillRows {
                 let to = self.gradient_end.rgba();
                 self.fill_color.set_rgba(&to);
                 self.gradient_end.set_rgba(&from);
+                // An advanced gradient chosen next starts from it.
+                self.gradient_bar
+                    .set_stops(reversed(self.gradient_bar.stops()));
                 self.updating.set(updating);
                 self.changed();
             }
             Kind::Advanced => {
-                self.gradient_bar
-                    .set_stops(reversed(self.gradient_bar.stops()));
+                // The color chosen stays chosen, where it now is.
+                let stops = self.gradient_bar.stops();
+                let chosen = stops.len().saturating_sub(1 + self.gradient_bar.current());
+                self.gradient_bar.set_stops(reversed(stops));
+                self.gradient_bar.choose(chosen);
                 self.show_stop();
                 self.changed();
             }
@@ -951,6 +960,8 @@ mod tests {
         let at: Vec<u16> = back.stops.iter().map(|s| s.at).collect();
         assert_eq!(at, [0, 400, 1000]);
         assert_eq!(back.stops[0].color, Rgba::WHITE);
+        // The color that was chosen, the first, is chosen still, now last.
+        assert_eq!(rows.gradient_bar.current(), 2);
         rows.reverse();
         assert_eq!(rows.value(), Some(advanced.clone()));
         rows.show(Some(&gradient), Rgba::BLACK);
