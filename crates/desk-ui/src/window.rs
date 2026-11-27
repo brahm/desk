@@ -4833,15 +4833,9 @@ fn fill_field(menu: &gio::Menu, window: &adw::ApplicationWindow, editor: Option<
         } => {
             state("field-merge-sender", sender.to_variant());
             state("field-merge-single-line", single_line.to_variant());
+            // The fields in the order of the other menus of fields.
             let names = gio::Menu::new();
-            for field in desk_contacts::CONTACT_FIELDS {
-                let item = gio::MenuItem::new(Some(&field.replace('_', "__")), None);
-                item.set_action_and_target_value(
-                    Some("win.field-merge-name"),
-                    Some(&field.to_variant()),
-                );
-                names.append_item(&item);
-            }
+            crate::mail_merge::contact_items(&names, "win.field-merge-name");
             menu.append_submenu(Some(&tr("Change _Field")), &names);
             menu.append(
                 Some(&tr("Use as _Sender Field")),

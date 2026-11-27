@@ -40,18 +40,30 @@ pub const COMMON_FIELDS: [&str; 9] = [
     "Company",
 ];
 
-/// The fields of a contact in a menu: the common ones, then the others
-/// under More Fields, as Pages 15.4 has them.
-fn contact_items(menu: &gio::Menu, sender: bool) {
-    let common: Vec<String> = COMMON_FIELDS.iter().map(|n| (*n).to_owned()).collect();
-    field_items(menu, &common, sender);
-    let more: Vec<String> = desk_contacts::CONTACT_FIELDS
+/// The fields of a contact in a menu for an action that takes the name
+/// of a field: the common ones, then the others under More Fields, as
+/// Pages 15.4 has them, Name shown as its Full Name.
+pub fn contact_items(menu: &gio::Menu, action: &str) {
+    let item = |menu: &gio::Menu, name: &str| {
+        let label = if name == "Name" {
+            tr("Full Name")
+        } else {
+            name.replace('_', "__")
+        };
+        let item = gio::MenuItem::new(Some(&label), None);
+        item.set_action_and_target_value(Some(action), Some(&name.to_variant()));
+        menu.append_item(&item);
+    };
+    for name in COMMON_FIELDS {
+        item(menu, name);
+    }
+    let others = gio::Menu::new();
+    for name in desk_contacts::CONTACT_FIELDS
         .iter()
         .filter(|n| !COMMON_FIELDS.contains(n))
-        .map(|n| (*n).to_owned())
-        .collect();
-    let others = gio::Menu::new();
-    field_items(&others, &more, sender);
+    {
+        item(&others, name);
+    }
     menu.append_submenu(Some(&tr("_More Fields")), &others);
 }
 
@@ -140,10 +152,10 @@ fn field_items(menu: &gio::Menu, names: &[String], sender: bool) {
 pub fn insert_menu() -> gio::Menu {
     let menu = gio::Menu::new();
     let recipients = gio::Menu::new();
-    contact_items(&recipients, false);
+    contact_items(&recipients, "win.insert-merge-field");
     menu.append_section(None, &recipients);
     let sender = gio::Menu::new();
-    contact_items(&sender, true);
+    contact_items(&sender, "win.insert-sender-field");
     menu.append_submenu(Some(&tr("_Sender Field")), &sender);
     menu
 }

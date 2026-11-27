@@ -80,6 +80,7 @@ backlog	B-076	open
 backlog	B-077	open
 backlog	B-078	open
 backlog	B-079	open
+backlog	B-080	open
 feature	S001	done
 feature	S002	done
 feature	S003	done
@@ -661,7 +662,7 @@ phase	T4	not-started
 phase	T5	not-started
 phase	W1	done
 phase	W2	done
-phase	W3	in-progress
+phase	W3	done
 phase	W4	not-started
 phase	W5	not-started
 phase	W6	not-started
