@@ -8,6 +8,9 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
 
 ## Changes since 0.7.0 (unreleased)
 
+* Added: Pictures, shapes and equations pasted into the text of a text
+  box or a shape go in its lines, and are kept in ODF (#261).
+
 * Changed: The parity matrix of Desk Writer describes the objects and
   charts of Pages 15.4, and nine new rows test the image gallery,
   titles and captions, 3D objects, drawings, combined shapes, the new

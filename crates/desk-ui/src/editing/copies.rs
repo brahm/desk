@@ -11,7 +11,7 @@
 
 use std::cell::RefCell;
 
-use desk_model::{Anchor, Length, NodeId, Object, ObjectKind};
+use desk_model::{Anchor, Length, NodeId, Object, ObjectKind, Story};
 use gtk::gdk;
 use gtk::prelude::*;
 
@@ -29,8 +29,35 @@ pub(super) const COPY_OFFSET: f64 = 10.0;
 struct CopiedObjects {
     page: usize,
     objects: Vec<Object>,
+    /// The objects in their texts, and in the texts of those, which
+    /// their copies take copies of (W106).
+    nested: Vec<Object>,
     /// The document they are from, whose styles their text names.
     document: desk_model::Document,
+}
+
+impl CopiedObjects {
+    /// The objects of a document, those in the texts of others apart.
+    fn of(page: usize, document: desk_model::Document) -> Self {
+        let all: Vec<Object> = document.objects().iter().cloned().collect();
+        let marked: std::collections::HashSet<NodeId> = desk_model::objects_in_texts(all.iter())
+            .into_iter()
+            .collect();
+        let (nested, objects) = all
+            .into_iter()
+            .partition(|o| o.anchor == Anchor::InText && marked.contains(&o.id));
+        Self {
+            page,
+            objects,
+            nested,
+            document,
+        }
+    }
+
+    /// The objects with those in their texts, to copy them together.
+    fn with_nested(&self) -> Vec<Object> {
+        self.objects.iter().chain(&self.nested).cloned().collect()
+    }
 }
 
 /// A drag that draws a rectangle on a page and selects the objects it
@@ -80,10 +107,12 @@ impl TextEditor {
                 }
             })
             .collect();
+        let document = state.editor.document();
         Some(CopiedObjects {
             page: page?,
+            nested: document.objects_in_texts_of(&objects),
             objects,
-            document: state.editor.document().clone(),
+            document: document.clone(),
         })
     }
 
@@ -122,7 +151,7 @@ impl TextEditor {
         }];
         // For the other apps of Desk.
         if let Some(format) = crate::objects_format() {
-            match (format.write)(&copied.document, &copied.objects) {
+            match (format.write)(&copied.document, &copied.with_nested()) {
                 Ok(bytes) => content.push(gdk::ContentProvider::for_bytes(
                     format.media_type,
                     &gtk::glib::Bytes::from_owned(bytes),
@@ -189,12 +218,7 @@ impl TextEditor {
             };
             let Some(this) = weak.upgrade() else { return };
             let page = this.view.current_page().unwrap_or(0);
-            let objects = document.objects().iter().cloned().collect();
-            this.paste_copied(&CopiedObjects {
-                page,
-                objects,
-                document,
-            });
+            this.paste_copied(&CopiedObjects::of(page, document));
         });
         true
     }
@@ -204,6 +228,13 @@ impl TextEditor {
     /// stand there. One that was in the line of the text goes in at the
     /// cursor (OBJ-22).
     fn paste_copied(&self, copied: &CopiedObjects) {
+        if !self.has_selected_objects()
+            && matches!(self.story(), Some(Story::TextBox(_)))
+            && copied.objects.iter().all(nests_in_text)
+        {
+            self.paste_in_story(copied);
+            return;
+        }
         let cursor = (!self.has_selected_objects() && self.story().is_none())
             .then(|| {
                 let state = self.state.borrow();
@@ -217,7 +248,7 @@ impl TextEditor {
         }
         .unwrap_or(copied.page);
         let offset = self.free_offset(&copied.objects, page);
-        let objects: Vec<Object> = copied
+        let mut objects: Vec<Object> = copied
             .objects
             .iter()
             .map(|object| {
@@ -228,6 +259,7 @@ impl TextEditor {
                 placed
             })
             .collect();
+        objects.extend(copied.nested.iter().cloned());
         let in_text: Vec<bool> = copied
             .objects
             .iter()
@@ -332,6 +364,40 @@ impl TextEditor {
         self.arrange_objects(name, |edit, _| {
             edit.duplicate_objects(&ids, dx, dy).map(Some)
         });
+    }
+
+    /// Pastes copied objects in the lines of the text of the text box or
+    /// the shape being edited, one after another at the cursor or in
+    /// place of the selection, as Pages 15.4 puts objects inside a box
+    /// (W106).
+    fn paste_in_story(&self, copied: &CopiedObjects) {
+        let before = self.selection();
+        let (start, end) = before.ordered();
+        let mut objects: Vec<Object> = copied
+            .objects
+            .iter()
+            .map(|o| Object {
+                anchor: Anchor::Page(0),
+                ..o.clone()
+            })
+            .collect();
+        objects.extend(copied.nested.iter().cloned());
+        let result = self.state.borrow_mut().editor.edit("Paste", |edit| {
+            let from = super::at_spot(edit.document(), start)?;
+            let to = super::at_spot(edit.document(), end)?;
+            let mut at = if start == end {
+                from
+            } else {
+                edit.delete(from, to)?
+            };
+            let objects = edit.adopt_object_styles(&copied.document, &objects)?;
+            for id in edit.add_copies(&objects)? {
+                edit.put_object_in_text(id, at)?;
+                at.offset += desk_model::FIELD_CHARACTER.len_utf8();
+            }
+            Ok(crate::text_nav::Spot::of(edit.document(), at))
+        });
+        self.finish_edit(before, result);
     }
 
     /// Adds copies of objects, as a drag with Alt leaves them, and
@@ -466,5 +532,76 @@ impl TextEditor {
         if self.state.borrow_mut().marquee.take().is_some() {
             self.view.set_marquee(None);
         }
+    }
+}
+
+/// Whether an object goes in the lines of the text of a text box or a
+/// shape when it is pasted there: a picture, a shape or an equation, as
+/// Pages 15.4 nests them (W106).
+fn nests_in_text(object: &Object) -> bool {
+    matches!(
+        object.kind,
+        ObjectKind::Image(_) | ObjectKind::Shape(_) | ObjectKind::Equation(_)
+    )
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use desk_model::{
+        Anchor, Document, Editor, Frame, Object, ObjectKind, Paragraph, Shape, Story, TextBox,
+    };
+
+    use super::{CopiedObjects, TextEditor};
+
+    #[test]
+    fn w106_objects_pasted_in_a_text_box_go_in_its_lines() {
+        crate::with_gtk(|| {
+            let mut editor = Editor::new(Document::new_word_processing());
+            let boxed = editor
+                .edit("Box", |edit| {
+                    let style = edit.document().styles().default_paragraph();
+                    let paragraph = Paragraph::new(edit.new_id(), style);
+                    let mut text_box = Object::new(
+                        edit.new_id(),
+                        ObjectKind::TextBox(TextBox::new(
+                            Arc::from([paragraph]),
+                            desk_model::Length::from_points(4),
+                        )),
+                        Frame::from_pt(100.0, 100.0, 200.0, 100.0),
+                    );
+                    text_box.anchor = Anchor::Page(0);
+                    let id = text_box.id;
+                    edit.add_object(text_box)?;
+                    Ok(id)
+                })
+                .unwrap();
+            let view = crate::view::DocumentView::new();
+            let text = TextEditor::new(&view, editor.document().clone());
+            text.enter_story(Story::TextBox(boxed), 0, None);
+            let square = Object::new(
+                desk_model::NodeId::new(9_999).unwrap(),
+                ObjectKind::Shape(Shape::Rectangle),
+                Frame::from_pt(10.0, 10.0, 20.0, 20.0),
+            );
+            text.paste_copied(&CopiedObjects {
+                page: 0,
+                objects: vec![square.clone(), square],
+                nested: Vec::new(),
+                document: editor.document().clone(),
+            });
+            text.leave_story(None);
+            let document = text.document();
+            let marks = document.story_object_marks();
+            assert_eq!(marks.len(), 2, "{marks:?}");
+            for (id, (story, _)) in &marks {
+                assert_eq!(*story, Story::TextBox(boxed));
+                assert_eq!(document.objects().get(*id).unwrap().anchor, Anchor::InText);
+            }
+            // One after the other, at the cursor.
+            let text = &document.story_paragraphs(Story::TextBox(boxed))[0];
+            assert_eq!(text.text().chars().count(), 2);
+        });
     }
 }

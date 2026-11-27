@@ -66,7 +66,7 @@ mod format;
 mod header;
 mod id;
 mod inline;
-pub use inline::marks_in;
+pub use inline::{marks_in, objects_in_texts};
 mod bookmarks;
 mod list;
 mod media;

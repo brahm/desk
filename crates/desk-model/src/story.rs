@@ -351,7 +351,8 @@ impl Edit {
 
     /// Changes the text of a story with the tools of the body, in a copy
     /// of the document whose body is that text, and writes it back with
-    /// what belongs to the whole document, as its comments (W149). A
+    /// what belongs to the whole document, as its comments (W149), and
+    /// the objects in its lines. A
     /// story without paragraphs, as an empty header, has no text to
     /// change.
     pub fn edit_story<T>(
@@ -367,11 +368,14 @@ impl Edit {
                 Story::Margin { .. } => ModelError::EmptyRange,
             });
         }
+        let before = paragraphs.clone();
         let mut copy = self.document().with_body(paragraphs);
         let (value, _) = copy.transact("Edit", change)?;
         self.adopt_document_settings(&copy)?;
         let paragraphs: Vec<Paragraph> = copy.body().iter().cloned().collect();
         self.set_story(story, paragraphs)?;
+        // And the objects in its lines (EST-12, EST-13, W106).
+        self.adopt_story_objects(&copy, &before)?;
         Ok(value)
     }
 

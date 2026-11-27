@@ -5048,3 +5048,155 @@ fn with_part(bytes: &[u8], name: &str, text: &str) -> Vec<u8> {
     }
     out
 }
+
+#[test]
+fn w106_objects_in_the_texts_of_boxes_and_shapes_round_trip() {
+    use desk_model::{Anchor, Editor, Frame, Object, ObjectKind, Position, Shape, Story};
+    let mut editor = Editor::new(Document::new_word_processing());
+    // A text box and an oval, each with a square in its text.
+    let holders = editor
+        .edit("Objects", |edit| {
+            let style = edit.document().styles().default_paragraph();
+            let mut holders = Vec::new();
+            for (kind, size) in [
+                (
+                    ObjectKind::TextBox(desk_model::TextBox::new(
+                        std::sync::Arc::from([Paragraph::new(edit.new_id(), style)]),
+                        desk_model::Length::from_points(4),
+                    )),
+                    12.0,
+                ),
+                (ObjectKind::Shape(Shape::Ellipse), 16.0),
+            ] {
+                let mut holder = Object::new(
+                    edit.new_id(),
+                    kind,
+                    Frame::from_pt(50.0, 60.0, 200.0, 120.0),
+                );
+                holder.anchor = Anchor::Page(0);
+                let id = holder.id;
+                edit.add_object(holder)?;
+                let story = Story::TextBox(id);
+                if matches!(
+                    edit.document().objects().get(id).unwrap().kind,
+                    ObjectKind::Shape(_)
+                ) {
+                    edit.format_whole_story(story, |_, _, _| Ok(()))?;
+                }
+                edit.edit_story(story, |edit| {
+                    let start = edit.document().start();
+                    let at = edit.insert_text(start, "In it")?;
+                    let square = Object::new(
+                        edit.new_id(),
+                        ObjectKind::Shape(Shape::Rectangle),
+                        Frame::from_pt(0.0, 0.0, size, size),
+                    );
+                    edit.insert_object_in_text(Position::new(at.paragraph, 2), square)?;
+                    Ok(())
+                })?;
+                holders.push(id);
+            }
+            Ok(holders)
+        })
+        .unwrap();
+    assert_eq!(editor.document().story_object_marks().len(), 2);
+    let bytes = write_odt(editor.document()).unwrap();
+    keep("w106-objects-in-boxes-and-shapes.odt", &bytes);
+    let again = read_odt(&bytes).unwrap();
+    let marks = again.story_object_marks();
+    assert_eq!(marks.len(), 2, "{marks:?}");
+    let mut found: Vec<(bool, f64, usize)> = marks
+        .iter()
+        .map(|(id, (story, at))| {
+            let object = again.objects().get(*id).unwrap();
+            assert_eq!(object.anchor, Anchor::InText);
+            let Story::TextBox(holder) = story else {
+                panic!("{story:?}");
+            };
+            let holder = again.objects().get(*holder).unwrap();
+            (
+                matches!(holder.kind, ObjectKind::TextBox(_)),
+                object.frame.width.to_pt(),
+                at.offset,
+            )
+        })
+        .collect();
+    found.sort_by(|a, b| a.1.total_cmp(&b.1));
+    assert_eq!(found, [(true, 12.0, 2), (false, 16.0, 2)]);
+    // Only the two holders float on the page.
+    let floating = again
+        .objects()
+        .iter()
+        .filter(|o| o.anchor != Anchor::InText)
+        .count();
+    assert_eq!(floating, holders.len());
+}
+
+#[test]
+fn w106_a_loop_of_objects_in_texts_is_written_once_with_the_equations() {
+    use desk_model::{
+        Anchor, CharAttrs, Editor, Equation, FIELD_CHARACTER, Field, Frame, Object, ObjectKind,
+        Shape, Story,
+    };
+    let mut editor = Editor::new(Document::new_word_processing());
+    let start = editor.document().start();
+    editor
+        .edit("Objects", |edit| {
+            let style = edit.document().styles().default_paragraph();
+            // A text box in the body, and an equation after it.
+            let boxed = Object::new(
+                edit.new_id(),
+                ObjectKind::TextBox(desk_model::TextBox::new(
+                    std::sync::Arc::from([Paragraph::new(edit.new_id(), style)]),
+                    desk_model::Length::from_points(4),
+                )),
+                Frame::from_pt(0.0, 0.0, 200.0, 80.0),
+            );
+            let id = boxed.id;
+            let after = edit.insert_object_in_text(start, boxed)?;
+            let equation = Object::new(
+                edit.new_id(),
+                ObjectKind::Equation(std::sync::Arc::new(Equation::from_mathml(
+                    r#"<math xmlns="http://www.w3.org/1998/Math/MathML"><mi>x</mi></math>"#,
+                ))),
+                Frame::from_pt(0.0, 0.0, 10.0, 10.0),
+            );
+            edit.insert_object_in_text(after, equation)?;
+            // In the box, a shape whose text holds the box.
+            let mut shape = Object::new(
+                edit.new_id(),
+                ObjectKind::Shape(Shape::Rectangle),
+                Frame::from_pt(0.0, 0.0, 30.0, 20.0),
+            );
+            let runs = [Run::with_attrs(
+                &FIELD_CHARACTER.to_string(),
+                None,
+                CharAttrs {
+                    field: Some(Some(Field::ObjectMark { object: id })),
+                    ..CharAttrs::default()
+                },
+            )];
+            let text = Paragraph::from_runs(edit.new_id(), style, ParaAttrs::default(), runs)?;
+            shape.text = Some(desk_model::TextBox::in_shape(std::sync::Arc::from([text])));
+            shape.anchor = Anchor::InText;
+            let shape_id = shape.id;
+            edit.add_object(shape)?;
+            edit.edit_story(Story::TextBox(id), |edit| {
+                let start = edit.document().start();
+                edit.put_object_in_text(shape_id, start)
+            })
+        })
+        .unwrap();
+    let bytes = write_odt(editor.document()).unwrap();
+    keep("w106-loop-of-objects.odt", &bytes);
+    let again = read_odt(&bytes).unwrap();
+    // The box, the shape in it, whose text leaves the box out, and the
+    // equation, written once.
+    assert_eq!(again.objects().len(), 3);
+    let equations = again
+        .objects()
+        .iter()
+        .filter(|o| matches!(o.kind, ObjectKind::Equation(_)))
+        .count();
+    assert_eq!(equations, 1);
+}

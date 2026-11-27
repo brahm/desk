@@ -49,6 +49,9 @@ pub struct PlacedObject {
     pub lines: Vec<PlacedLine>,
     /// The objects of a group, placed.
     pub children: Vec<PlacedObject>,
+    /// The objects in the lines of its text, placed on the page as its
+    /// lines are (W106).
+    pub inline: Vec<PlacedObject>,
     /// What the objects above a text box on its page take from its text,
     /// which goes around them as body text does (OBJ-13, OBJ-17).
     pub(crate) wraps: Arc<[Exclusion]>,
@@ -81,6 +84,7 @@ impl PlacedObject {
             height: frame.height.to_pt() as f32,
             lines: Vec::new(),
             children,
+            inline: Vec::new(),
             wraps: Arc::from([]),
             table: None,
             chart: None,
@@ -376,6 +380,11 @@ pub(crate) fn floating(document: &Document) -> Arc<Vec<Floating>> {
         .map(|(i, p)| (p.id(), i))
         .collect();
     let marks = document.object_marks();
+    // Those in the texts of objects go with their lines too (W106).
+    let in_texts: std::collections::HashSet<desk_model::NodeId> =
+        desk_model::objects_in_texts(objects.iter())
+            .into_iter()
+            .collect();
     Arc::new(
         objects
             .iter()
@@ -383,7 +392,9 @@ pub(crate) fn floating(document: &Document) -> Arc<Vec<Floating>> {
             // that float with their paragraph, and those of the masters on
             // every page of their sections.
             .filter(|object| {
-                (object.anchor != Anchor::InText || floats_in_text(object))
+                (object.anchor != Anchor::InText
+                    || (floats_in_text(object)
+                        && (marks.contains_key(&object.id) || !in_texts.contains(&object.id))))
                     && !object.anchor.is_master()
             })
             .map(|object| Floating {
@@ -693,28 +704,92 @@ pub(crate) fn inline_sizes(
         .objects()
         .iter()
         .filter(|o| o.anchor == Anchor::InText)
-        .map(|o| {
-            // A text box in the text hangs from the top of its line, as in
-            // Pages, and does not make the line taller; one that floats
-            // with its paragraph takes no room in the line (OBJ-14).
-            let height = if hangs(o) {
-                desk_model::Length::ZERO
-            } else if is_sound(o) {
-                o.frame.height + desk_model::Length::from_pt(SOUND_HEADROOM)
-            } else {
-                o.frame.height
-            };
-            let width = if floats_in_text(o) {
-                desk_model::Length::ZERO
-            } else if is_sound(o) {
-                o.frame.width + desk_model::Length::from_pt(SOUND_SIDE_ROOM)
-            } else {
-                o.frame.width
-            };
-            (o.id, (width, height))
-        })
+        .map(|o| (o.id, inline_size(o, floats_in_text(o))))
         .collect();
     (!sizes.is_empty()).then(|| Arc::new(sizes))
+}
+
+/// The room of an object in the line of a text, as wide as its frame or,
+/// when it floats with its paragraph, as nothing.
+fn inline_size(o: &Object, floats: bool) -> (desk_model::Length, desk_model::Length) {
+    // A text box in the text hangs from the top of its line, as in
+    // Pages, and does not make the line taller; one that floats with its
+    // paragraph takes no room in the line (OBJ-14).
+    let height = if hangs(o) {
+        desk_model::Length::ZERO
+    } else if is_sound(o) {
+        o.frame.height + desk_model::Length::from_pt(SOUND_HEADROOM)
+    } else {
+        o.frame.height
+    };
+    let width = if floats {
+        desk_model::Length::ZERO
+    } else if is_sound(o) {
+        o.frame.width + desk_model::Length::from_pt(SOUND_SIDE_ROOM)
+    } else {
+        o.frame.width
+    };
+    (width, height)
+}
+
+/// The width and height of the objects in the text of a text box or a
+/// shape, by object, for their marks in its paragraphs (W106): each in the
+/// line, as none floats with a paragraph there. None when it has none.
+fn text_object_sizes(
+    document: &Document,
+    paragraphs: &[desk_model::Paragraph],
+) -> Option<Arc<HashMap<desk_model::NodeId, (desk_model::Length, desk_model::Length)>>> {
+    let sizes: HashMap<_, _> = desk_model::marks_in(paragraphs)
+        .into_iter()
+        .filter_map(|(id, _)| document.objects().get(id))
+        .filter(|o| o.anchor == Anchor::InText)
+        .map(|o| (o.id, inline_size(o, false)))
+        .collect();
+    (!sizes.is_empty()).then(|| Arc::new(sizes))
+}
+
+/// The objects in the lines of the text of a text box or a shape, placed
+/// where the lines put their marks, as those of the body are (W106).
+fn text_objects(
+    document: &Document,
+    paragraphs: &[desk_model::Paragraph],
+    lines: &[PlacedLine],
+) -> Vec<PlacedObject> {
+    let marks = desk_model::marks_in(paragraphs);
+    if marks.is_empty() {
+        return Vec::new();
+    }
+    let index: HashMap<desk_model::NodeId, usize> = paragraphs
+        .iter()
+        .enumerate()
+        .map(|(i, p)| (p.id(), i))
+        .collect();
+    let mut out = Vec::new();
+    for (id, at) in marks {
+        let (Some(&paragraph), Some(object)) =
+            (index.get(&at.paragraph), document.objects().get(id))
+        else {
+            continue;
+        };
+        if object.anchor != Anchor::InText {
+            continue;
+        }
+        let Some(line) = lines
+            .iter()
+            .find(|l| l.paragraph == paragraph && l.line.range.contains(&at.offset))
+        else {
+            continue;
+        };
+        let mut placed = PlacedObject::new(object, None, 0.0);
+        placed.x = line.origin.0 + line.line.caret_x(at.offset);
+        placed.y = if hangs(object) {
+            line.top()
+        } else {
+            line.baseline() - placed.height
+        };
+        out.push(placed);
+    }
+    out
 }
 
 /// How much higher than a sound in the text Pages 15.4 makes its line,
@@ -893,15 +968,36 @@ pub fn place_object_text(
             let refs: Vec<&PlacedObject> = boxes.iter().collect();
             let flowed = flow_text_boxes(document, &refs, &paragraphs, system);
             for ((p, i), lines) in chain.into_iter().zip(flowed) {
-                layout.pages[p].objects[i].lines = lines;
+                let placed = &mut layout.pages[p].objects[i];
+                placed.inline = text_objects(document, &paragraphs, &lines);
+                for object in &mut placed.inline {
+                    lay_out_text_within(document, object, system, 1);
+                }
+                placed.lines = lines;
             }
         }
     }
 }
 
 fn lay_out_text(document: &Document, placed: &mut PlacedObject, system: &mut TextSystem) {
+    lay_out_text_within(document, placed, system, 0);
+}
+
+/// How deep the objects in the texts of objects are laid out, each in the
+/// text of the one before (W106): a mark in the text of its own object
+/// goes no deeper.
+const NESTED_TEXT_DEPTH: usize = 16;
+
+/// Lays out the content of an object placed in the texts of `depth`
+/// others.
+fn lay_out_text_within(
+    document: &Document,
+    placed: &mut PlacedObject,
+    system: &mut TextSystem,
+    depth: usize,
+) {
     for child in &mut placed.children {
-        lay_out_text(document, child, system);
+        lay_out_text_within(document, child, system, depth);
     }
     match &placed.object.kind {
         ObjectKind::Table(table) => {
@@ -935,6 +1031,12 @@ fn lay_out_text(document: &Document, placed: &mut PlacedObject, system: &mut Tex
     };
     let paragraphs = text.paragraphs.clone();
     placed.lines = text_box_lines(document, placed, &paragraphs, system);
+    if depth < NESTED_TEXT_DEPTH {
+        placed.inline = text_objects(document, &paragraphs, &placed.lines);
+        for object in &mut placed.inline {
+            lay_out_text_within(document, object, system, depth + 1);
+        }
+    }
 }
 
 /// The lines of paragraphs laid out in a text box placed on a page, as if
@@ -1046,6 +1148,7 @@ fn flow_shown(
     let settings = document.text_settings();
     let items = styles.list_items(paragraphs.iter());
     let hidden = crate::hidden_changes(document);
+    let objects = text_object_sizes(document, paragraphs);
     // Where the next line goes: its slot, and its top from the top of the
     // column.
     let mut slot = 0;
@@ -1059,6 +1162,7 @@ fn flow_shown(
             items[i].as_ref(),
             desk_text::FieldValues {
                 hidden: hidden.clone(),
+                objects: objects.clone(),
                 ..Default::default()
             },
         );
@@ -1517,6 +1621,7 @@ fn shape_lines_from(
     let settings = document.text_settings();
     let items = styles.list_items(paragraphs.iter());
     let hidden = crate::hidden_changes(document);
+    let objects = text_object_sizes(document, paragraphs);
     let origin = (placed.x + space.inset, placed.y);
     let mut out = Vec::new();
     let mut after = 0.0f32;
@@ -1528,6 +1633,7 @@ fn shape_lines_from(
             items[i].as_ref(),
             desk_text::FieldValues {
                 hidden: hidden.clone(),
+                objects: objects.clone(),
                 ..Default::default()
             },
         );
