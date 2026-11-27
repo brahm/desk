@@ -3201,7 +3201,7 @@ paragraph, and objects on a second page.
   decoded, and are no longer mistaken for movies, with HEIC ones.
 - No task moved to another phase.
 
-### 27 November: Enhance and the adjustments of images (step 4 of W4, #PR)
+### 27 November: Enhance and the adjustments of images (step 4 of W4, #265)
 
 - The Image tab shows the adjustments as Pages 15.4 does: Exposure and
   Saturation with a slider, Enhance, which sets them from the histogram

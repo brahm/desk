@@ -11,7 +11,7 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
 * Added: The Image tab shows Exposure and Saturation with sliders and an
   Enhance button that sets them from the picture; Adjust Image opens the
   full window with the levels over the histogram, Auto Levels and
-  sharpness (#PR).
+  sharpness (#265).
 
 * Added: SVG images, drawn sharp at every size, and HEIC photographs
   can be inserted, dragged in and opened from ODT and Pages files; in
