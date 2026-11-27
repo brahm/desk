@@ -3237,7 +3237,7 @@ paragraph, and objects on a second page.
   and the checks of W107 and W109.
 - No task moved to another phase.
 
-### 27 November: the image gallery (step 5 of W4, #PR)
+### 27 November: the image gallery (step 5 of W4, #267)
 
 - Insert > Image Gallery puts an empty gallery on the page. Pictures
   dropped on it, or added with the + of the new Gallery tab, go after

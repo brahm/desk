@@ -12,7 +12,7 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
   stepped through with arrows on the page; the Gallery tab adds, orders
   and removes them, gives each a caption or one for all, and describes
   each; ODT keeps them all and shows the current one to other programs
-  (#PR).
+  (#267).
 
 * Added: The Image tab shows Exposure and Saturation with sliders and an
   Enhance button that sets them from the picture; Adjust Image opens the
