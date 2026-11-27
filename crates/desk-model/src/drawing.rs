@@ -115,21 +115,8 @@ impl DrawingStroke {
 
     /// Whether a point of a frame of a size is inside the area the line
     /// closes, from its last point back to its first.
-    pub fn encloses(&self, (x, y): (f64, f64), width: f64, height: f64) -> bool {
-        let points = self.points_in(width, height);
-        if points.len() < 3 {
-            return false;
-        }
-        let mut inside = false;
-        let mut j = points.len() - 1;
-        for (i, &(xi, yi)) in points.iter().enumerate() {
-            let (xj, yj) = points[j];
-            if (yi > y) != (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi {
-                inside = !inside;
-            }
-            j = i;
-        }
-        inside
+    pub fn encloses(&self, at: (f64, f64), width: f64, height: f64) -> bool {
+        polygon_holds(&self.points_in(width, height), at)
     }
 
     /// Whether the line closes an area by itself: it ends near where it
@@ -157,6 +144,39 @@ impl DrawingStroke {
                 .any(|p| distance_to_segment(at, p[0], p[1]) <= reach),
         }
     }
+}
+
+/// Whether a point is inside a polygon, from its last point back to its
+/// first.
+fn polygon_holds(points: &[(f64, f64)], (x, y): (f64, f64)) -> bool {
+    if points.len() < 3 {
+        return false;
+    }
+    let mut inside = false;
+    let mut j = points.len() - 1;
+    for (i, &(xi, yi)) in points.iter().enumerate() {
+        let (xj, yj) = points[j];
+        if (yi > y) != (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi {
+            inside = !inside;
+        }
+        j = i;
+    }
+    inside
+}
+
+/// The area inside a polygon, however it turns.
+fn area_of(points: &[(f64, f64)]) -> f64 {
+    let n = points.len();
+    if n < 3 {
+        return 0.0;
+    }
+    let twice: f64 = (0..n)
+        .map(|i| {
+            let (a, b) = (points[i], points[(i + 1) % n]);
+            a.0 * b.1 - b.0 * a.1
+        })
+        .sum();
+    twice.abs() / 2.0
 }
 
 /// The distance from a point to a segment.
@@ -307,7 +327,10 @@ impl Drawing {
             }
             // The part of the line drawn so far.
             let points = stroke.points_in(width, height);
-            let mut kept = vec![stroke.points[0]];
+            let Some(&first) = stroke.points.first() else {
+                continue;
+            };
+            let mut kept = vec![first];
             let mut went = 0.0;
             for (i, pair) in points.windows(2).enumerate() {
                 let step = (pair[1].0 - pair[0].0).hypot(pair[1].1 - pair[0].1);
@@ -390,6 +413,7 @@ pub fn drawing_frame(strokes: &[NewStroke]) -> Option<FramedStrokes> {
     let scale = f64::from(POLYGON_SCALE);
     let built = strokes
         .iter()
+        .filter(|s| !s.points.is_empty())
         .map(|s| DrawingStroke {
             tool: s.tool,
             color: s.color,
@@ -440,7 +464,9 @@ impl Edit {
                 points: s.points_in(w, h),
             })
             .collect();
-        let strokes = change(strokes)?;
+        let mut strokes = change(strokes)?;
+        // A line with no points draws nothing.
+        strokes.retain(|s| !s.points.is_empty());
         if strokes.len() > MAX_DRAWING_STROKES
             || strokes.iter().any(|s| s.points.len() > MAX_STROKE_POINTS)
         {
@@ -464,8 +490,8 @@ impl Edit {
                 object.frame = Frame::from_pt(cx - bw / 2.0, cy - bh / 2.0, bw, bh);
                 drawing.strokes = built.into();
             }
-            // A drawing with no lines left keeps its frame.
-            None => drawing.strokes = Arc::from([]),
+            // A drawing with no lines left goes, as Pages takes it away.
+            None => return self.remove_object(id),
         }
         object.kind = ObjectKind::Drawing(Arc::new(drawing));
         self.replace_object(object)
@@ -522,32 +548,37 @@ impl Edit {
             return Err(ModelError::UnknownObject(id));
         };
         let (w, h) = (object.frame.width.to_pt(), object.frame.height.to_pt());
-        let scale = f64::from(POLYGON_SCALE);
-        let (area, behind): (Vec<(f64, f64)>, usize) =
-            match drawing.strokes.iter().rposition(|s| {
-                s.tool != DrawingTool::Fill && s.closes(w, h) && s.encloses(at, w, h)
-            }) {
-                Some(index) => (drawing.strokes[index].points_in(w, h), index),
-                None => match enclosed_area(drawing, at, w, h) {
-                    Some(found) => found,
-                    None => return Ok(false),
-                },
-            };
-        let parts: Vec<(i32, i32)> = area
-            .iter()
-            .map(|&(x, y)| {
-                (
-                    (x / w.max(f64::MIN_POSITIVE) * scale).round() as i32,
-                    (y / h.max(f64::MIN_POSITIVE) * scale).round() as i32,
-                )
-            })
-            .collect();
-        // An area filled already takes the new colour.
-        if let Some(filled) = drawing
+        // The innermost line that closes an area around the point alone.
+        let closed = drawing
             .strokes
             .iter()
-            .position(|s| s.tool == DrawingTool::Fill && *s.points == *parts)
-        {
+            .enumerate()
+            .filter(|(_, s)| s.tool != DrawingTool::Fill && s.closes(w, h) && s.encloses(at, w, h))
+            .min_by(|(_, a), (_, b)| {
+                area_of(&a.points_in(w, h)).total_cmp(&area_of(&b.points_in(w, h)))
+            });
+        let (area, behind): (Vec<(f64, f64)>, usize) = match closed {
+            Some((index, line)) => (line.points_in(w, h), index),
+            None => match enclosed_area(drawing, at, w, h) {
+                Some(found) => found,
+                None => return Ok(false),
+            },
+        };
+        // Behind the lines and fills drawn before it inside the area too.
+        let behind = drawing
+            .strokes
+            .iter()
+            .position(|s| s.points_in(w, h).iter().any(|&p| polygon_holds(&area, p)))
+            .map_or(behind, |inside| inside.min(behind));
+        // An area filled already takes the new colour: a fill around the
+        // point of about the same size, however its outline was traced.
+        let size = area_of(&area);
+        if let Some(filled) = drawing.strokes.iter().rposition(|s| {
+            s.tool == DrawingTool::Fill && {
+                let other = area_of(&s.points_in(w, h));
+                s.encloses(at, w, h) && (other - size).abs() <= 0.1 * size.max(other)
+            }
+        }) {
             if drawing.strokes[filled].color == color {
                 return Ok(true);
             }
@@ -802,11 +833,87 @@ mod tests {
         let drawing = object(&editor, id).drawing().cloned().unwrap();
         assert_eq!(drawing.strokes.len(), 4);
         assert_eq!(drawing.strokes[0].color, blue);
+        // The frame grows; filling again still takes the new colour.
+        editor
+            .edit("Draw", |edit| {
+                edit.add_drawing_stroke(id, line(&[(-80.0, 1.0), (-60.0, 1.0)]))
+            })
+            .unwrap();
+        let o = object(&editor, id);
+        assert!(o.frame.width.to_pt() > w);
+        editor
+            .edit("Fill", |edit| edit.fill_drawing_at(id, (140.0, 50.0), red))
+            .unwrap();
+        let drawing = object(&editor, id).drawing().cloned().unwrap();
+        assert_eq!(drawing.strokes.len(), 5);
+        assert_eq!(drawing.strokes[0].color, red);
         // Below the square, the area is open.
         let filled = editor
-            .edit("Fill", |edit| edit.fill_drawing_at(id, (50.0, 130.0), red))
+            .edit("Fill", |edit| edit.fill_drawing_at(id, (130.0, 130.0), red))
             .unwrap();
         assert!(!filled);
+    }
+
+    #[test]
+    fn w117_a_fill_goes_behind_the_lines_inside_it() {
+        // A small closed square, then a large closed one around it.
+        let (mut editor, id) = with_drawing(line(&[
+            (40.0, 40.0),
+            (60.0, 40.0),
+            (60.0, 60.0),
+            (40.0, 60.0),
+            (40.0, 41.0),
+        ]));
+        editor
+            .edit("Draw", |edit| {
+                edit.add_drawing_stroke(
+                    id,
+                    line(&[
+                        (-50.0, -50.0),
+                        (150.0, -50.0),
+                        (150.0, 150.0),
+                        (-50.0, 150.0),
+                        (-50.0, -49.0),
+                    ]),
+                )
+            })
+            .unwrap();
+        let o = object(&editor, id);
+        let (w, h) = (o.frame.width.to_pt(), o.frame.height.to_pt());
+        let small = o.drawing().unwrap().strokes[0].points_in(w, h);
+        let inside = (
+            (small[0].0 + small[2].0) / 2.0,
+            (small[0].1 + small[2].1) / 2.0,
+        );
+        let between = (small[0].0 - 20.0, small[0].1 - 20.0);
+        let red = Rgba::rgb(255, 0, 0);
+        // Inside the small square, only it is filled.
+        editor
+            .edit("Fill", |edit| edit.fill_drawing_at(id, inside, red))
+            .unwrap();
+        let drawing = object(&editor, id).drawing().cloned().unwrap();
+        assert_eq!(drawing.strokes[0].tool, DrawingTool::Fill);
+        assert!(!drawing.strokes[0].encloses(between, w, h));
+        // Between them, the large square is filled behind the small one.
+        editor
+            .edit("Fill", |edit| edit.fill_drawing_at(id, between, red))
+            .unwrap();
+        let drawing = object(&editor, id).drawing().cloned().unwrap();
+        assert_eq!(drawing.strokes.len(), 4);
+        assert_eq!(drawing.strokes[0].tool, DrawingTool::Fill);
+        assert!(drawing.strokes[0].encloses(between, w, h));
+        assert_eq!(drawing.strokes[1].tool, DrawingTool::Fill);
+    }
+
+    #[test]
+    fn w117_a_drawing_with_no_lines_left_goes() {
+        let (mut editor, id) = with_drawing(line(&[(0.0, 0.0), (100.0, 0.0)]));
+        editor
+            .edit("Erase", |edit| edit.remove_drawing_strokes(id, &[0]))
+            .unwrap();
+        assert!(editor.document().objects().get(id).is_none());
+        editor.undo().unwrap();
+        assert!(editor.document().objects().get(id).is_some());
     }
 
     #[test]

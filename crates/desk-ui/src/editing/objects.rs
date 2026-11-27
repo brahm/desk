@@ -2238,6 +2238,7 @@ impl TextEditor {
                 if self.selected_objects() != [id] {
                     self.select_objects(vec![id]);
                 }
+                // A locked one is only selected.
                 self.edit_drawing();
                 return true;
             }

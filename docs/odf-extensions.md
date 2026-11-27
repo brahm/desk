@@ -487,8 +487,8 @@ These sit on the `style:graphic-properties` of the graphic style of a
   drawn: an open path through the points of a line, with the colour and
   the width of its line, and a closed path around a fill, filled with
   its colour. The group takes the anchor, the wrap and the style of the
-  drawing; the paths are turned as the drawing is, and a flip is in
-  their points.
+  drawing; the paths are turned as the drawing is, which Desk reads back
+  when all of them are turned alike, and a flip is in their points.
 - **Value:** the tool of each path, in order, separated by spaces:
   `pen`, `pencil`, `crayon` or `fill`. A value with a tool Desk does not
   know, or with more or fewer tools than the group has paths, or a path

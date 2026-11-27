@@ -1540,10 +1540,11 @@ fn import_one(
         }
         frame = Frame::from_pt(x0, y0, x1 - x0, y1 - y0);
     }
+    let mut drawing_rotation = 0;
     // A drawing of Pages 15.4, which other programs see as a group of
     // paths (docs/odf-extensions.md: desk:drawing, W117).
     if let (Some(tools), ObjectKind::Group(children)) = (&object.drawing, &kind)
-        && let Some((drawn, drawing)) = drawing_of_group(
+        && let Some((drawn, turn, drawing)) = drawing_of_group(
             children,
             tools,
             object.animation_duration.as_deref(),
@@ -1551,6 +1552,7 @@ fn import_one(
         )
     {
         frame = drawn;
+        drawing_rotation = turn;
         kind = ObjectKind::Drawing(Arc::new(drawing));
     }
     let mut built = Object::new(document.new_id(), kind, frame);
@@ -1565,7 +1567,11 @@ fn import_one(
     if let Some(pages) = master_pages {
         built.anchor = Anchor::Master(None, pages);
     }
-    built.rotation = rotation;
+    built.rotation = if matches!(built.kind, ObjectKind::Drawing(_)) {
+        drawing_rotation
+    } else {
+        rotation
+    };
     built.style = model_look(source, &g);
     built.object_style = object_style_of(source, document, object.style.as_deref()).filter(|id| {
         document.object_styles().get(*id).map(|s| s.kind)
@@ -2571,10 +2577,13 @@ impl Exporter<'_> {
         if let ObjectKind::Drawing(drawing) = &object.kind {
             let group = group_of_drawing(object, drawing);
             let mut out = self.object(&group, anchor, page, dx);
+            // The tools of the paths written: a line with no points has
+            // none.
             out.drawing = Some(
                 drawing
                     .strokes
                     .iter()
+                    .filter(|s| !s.points.is_empty())
                     .map(|s| s.tool.name())
                     .collect::<Vec<_>>()
                     .join(" "),
@@ -3196,7 +3205,7 @@ fn drawing_of_group(
     tools: &str,
     duration: Option<&str>,
     repeat: bool,
-) -> Option<(Frame, desk_model::Drawing)> {
+) -> Option<(Frame, i32, desk_model::Drawing)> {
     let tools: Vec<desk_model::DrawingTool> = tools
         .split_whitespace()
         .map(desk_model::DrawingTool::from_name)
@@ -3204,7 +3213,7 @@ fn drawing_of_group(
     if tools.len() != children.len() || tools.len() > desk_model::MAX_DRAWING_STROKES {
         return None;
     }
-    let mut strokes = Vec::with_capacity(tools.len());
+    let mut strokes: Vec<desk_model::NewStroke> = Vec::with_capacity(tools.len());
     for (child, tool) in children.iter().zip(tools) {
         let ObjectKind::Shape(Shape::Path { points, .. }) = &child.kind else {
             return None;
@@ -3251,7 +3260,43 @@ fn drawing_of_group(
             points: on_page,
         });
     }
+    // Paths turned alike are a drawing turned so much: its points are
+    // turned back around the middle of the paths, and its frame turned
+    // with them.
+    let rotation = children.first().map_or(0, |c| c.rotation);
+    let turned = rotation != 0 && children.iter().all(|c| c.rotation == rotation);
+    let (mut x0, mut y0, mut x1, mut y1) = (f64::MAX, f64::MAX, f64::MIN, f64::MIN);
+    for child in children {
+        let f = child.frame;
+        (x0, y0) = (x0.min(f.x.to_pt()), y0.min(f.y.to_pt()));
+        x1 = x1.max(f.x.to_pt() + f.width.to_pt());
+        y1 = y1.max(f.y.to_pt() + f.height.to_pt());
+    }
+    let middle = ((x0 + x1) / 2.0, (y0 + y1) / 2.0);
+    let (sin, cos) = (f64::from(rotation) / 100.0).to_radians().sin_cos();
+    if turned {
+        for stroke in &mut strokes {
+            for p in &mut stroke.points {
+                let (dx, dy) = (p.0 - middle.0, p.1 - middle.1);
+                *p = (
+                    middle.0 + dx * cos - dy * sin,
+                    middle.1 + dx * sin + dy * cos,
+                );
+            }
+        }
+    }
     let ((x, y, w, h), strokes) = desk_model::drawing_frame(&strokes)?;
+    let (x, y) = if turned {
+        // The middle of the frame, turned onto the page.
+        let (dx, dy) = (x + w / 2.0 - middle.0, y + h / 2.0 - middle.1);
+        let (cx, cy) = (
+            middle.0 + dx * cos + dy * sin,
+            middle.1 - dx * sin + dy * cos,
+        );
+        (cx - w / 2.0, cy - h / 2.0)
+    } else {
+        (x, y)
+    };
     let animation = duration
         .and_then(|d| d.trim().parse::<f64>().ok())
         .filter(|d| d.is_finite() && *d > 0.0)
@@ -3264,6 +3309,7 @@ fn drawing_of_group(
         });
     Some((
         Frame::from_pt(x, y, w, h),
+        if turned { rotation } else { 0 },
         desk_model::Drawing {
             strokes: strokes.into(),
             animation,

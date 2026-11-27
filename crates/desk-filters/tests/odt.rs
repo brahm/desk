@@ -5768,8 +5768,8 @@ fn w117_a_turned_flipped_drawing_shows_where_it_was() {
     let bytes = write_odt(editor.document()).unwrap();
     let read = read_odt(&bytes).unwrap();
     let object = read.objects().iter().next().unwrap();
-    // The turn and the flip are in the points of the drawing read.
-    assert_eq!(object.rotation, 0);
+    // The drawing comes back turned, and its flip is in its points.
+    assert_eq!(object.rotation, 9_000);
     assert!(!object.flip_horizontal);
     let written = editor.document().objects().get(id).unwrap();
     let center = |o: &desk_model::Object| {
@@ -5784,9 +5784,41 @@ fn w117_a_turned_flipped_drawing_shows_where_it_was() {
         (a.0 - b.0).abs() < 0.1 && (a.1 - b.1).abs() < 0.1,
         "{a:?} {b:?}"
     );
-    // Turned a quarter, the drawing is as wide as it was high.
+    // Each line is where it was on the page.
+    let on_page = |o: &desk_model::Object, index: usize| -> Vec<(f64, f64)> {
+        let f = o.frame;
+        let (w, h) = (f.width.to_pt(), f.height.to_pt());
+        let (sin, cos) = (f64::from(o.rotation) / 100.0).to_radians().sin_cos();
+        o.drawing().unwrap().strokes[index]
+            .points_in(w, h)
+            .into_iter()
+            .map(|(x, y)| {
+                let (mut dx, mut dy) = (x - w / 2.0, y - h / 2.0);
+                if o.flip_horizontal {
+                    dx = -dx;
+                }
+                if o.flip_vertical {
+                    dy = -dy;
+                }
+                (
+                    f.x.to_pt() + w / 2.0 + dx * cos + dy * sin,
+                    f.y.to_pt() + h / 2.0 - dx * sin + dy * cos,
+                )
+            })
+            .collect()
+    };
+    for index in 0..4 {
+        for (p, q) in on_page(object, index).iter().zip(on_page(written, index)) {
+            assert!(
+                (p.0 - q.0).abs() < 0.1 && (p.1 - q.1).abs() < 0.1,
+                "{p:?} {q:?}"
+            );
+        }
+    }
+    // It keeps its size, turned as it was.
     assert!(
-        (object.frame.width.to_pt() - written.frame.height.to_pt()).abs() < 0.1,
+        (object.frame.width.to_pt() - written.frame.width.to_pt()).abs() < 0.1
+            && (object.frame.height.to_pt() - written.frame.height.to_pt()).abs() < 0.1,
         "{:?} {:?}",
         object.frame,
         written.frame

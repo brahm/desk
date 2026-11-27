@@ -387,17 +387,29 @@ impl TextEditor {
                 .iter()
                 .map(|&p| super::points::to_frame(placed, p))
                 .collect();
-            drawing
+            let lines: Vec<usize> = drawing
                 .strokes
                 .iter()
                 .enumerate()
-                .filter(|(_, s)| match s.tool {
-                    // A fill goes with a press inside it.
-                    DrawingTool::Fill => way.iter().any(|&p| s.encloses(p, w, h)),
-                    _ => way.iter().any(|&p| s.touches(p, reach, w, h)),
+                .filter(|(_, s)| {
+                    s.tool != DrawingTool::Fill && way.iter().any(|&p| s.touches(p, reach, w, h))
                 })
                 .map(|(i, _)| i)
-                .collect()
+                .collect();
+            if lines.is_empty() {
+                // A fill goes when the eraser touches no line: the
+                // frontmost fill under it.
+                drawing
+                    .strokes
+                    .iter()
+                    .rposition(|s| {
+                        s.tool == DrawingTool::Fill && way.iter().any(|&p| s.encloses(p, w, h))
+                    })
+                    .into_iter()
+                    .collect()
+            } else {
+                lines
+            }
         };
         if !hit.is_empty() {
             self.edit_drawn("Erase", |edit| edit.remove_drawing_strokes(id, &hit));
@@ -407,6 +419,7 @@ impl TextEditor {
     /// Shows the line being drawn as it will be, or the way of the eraser.
     fn show_drawn(&self) {
         let tools = self.drawing_tools();
+        let scale = self.view.scale();
         let mark = self.state.borrow().drawn.as_ref().and_then(|drawn| {
             let page = drawn.page?;
             let (&(x0, y0), rest) = drawn.line.split_first()?;
@@ -417,8 +430,9 @@ impl TextEditor {
             }
             let ink = match tools.pick {
                 DrawingPick::Tool(_) => (tools.color, tools.width),
-                // The eraser shows its way in a light gray.
-                DrawingPick::Eraser => (Rgba::rgb(0xc0, 0xc0, 0xc0), 2.0 * ERASER_REACH / 3.0),
+                // The eraser shows its way in a light gray, as wide as it
+                // reaches on the screen.
+                DrawingPick::Eraser => (Rgba::rgb(0xc0, 0xc0, 0xc0), 2.0 * ERASER_REACH / scale),
             };
             Some(PathMark {
                 page,
