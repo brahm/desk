@@ -29,6 +29,8 @@ pub(super) struct Header {
     pub table_button: gtk::MenuButton,
     /// Chart, whose popover shows the chart styles (W080).
     pub chart_button: gtk::MenuButton,
+    /// Shape, whose popover is the shape library (W113).
+    pub shape_button: gtk::MenuButton,
     /// Find, in step with the find bar.
     pub find_toggle: gtk::ToggleButton,
     /// The main menu, whose View submenu holds Go to Page.
@@ -90,9 +92,9 @@ impl Header {
             &tr("Text Box"),
             "win.insert-text-box",
         ));
+        // Its popover is the shape library (W113).
         let shape_button = gtk::MenuButton::builder()
             .icon_name("desk-shape-symbolic")
-            .menu_model(&shape_menu())
             .tooltip_text(tr("Shape"))
             .build();
         formatting::labelled(&shape_button, &tr("Shape"));
@@ -155,6 +157,7 @@ impl Header {
             media_button,
             table_button,
             chart_button,
+            shape_button,
             find_toggle,
             menu_button,
         }

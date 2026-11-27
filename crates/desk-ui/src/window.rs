@@ -160,6 +160,8 @@ pub struct DocumentWindow {
     table_button: gtk::MenuButton,
     /// Chart, whose popover shows the chart styles (W080).
     chart_button: gtk::MenuButton,
+    /// The shape library in the popover of Shape (W113).
+    shape_library: Rc<crate::shape_popover::ShapePopover>,
     /// The Media Browser, made when first shown (INT-14).
     media_browser: std::cell::OnceCell<Rc<crate::media_browser::MediaBrowser>>,
     ruler: Ruler,
@@ -431,9 +433,12 @@ impl DocumentWindow {
             media_button,
             table_button,
             chart_button,
+            shape_button,
             find_toggle,
             menu_button,
         } = header::Header::new(info, opener.is_some(), &controls.navigation);
+        let shape_library = crate::shape_popover::ShapePopover::new();
+        shape_button.set_popover(Some(shape_library.popover()));
         let leave_fullscreen = gtk::Button::builder()
             .icon_name("view-restore-symbolic")
             .tooltip_text(tr("Leave Fullscreen"))
@@ -771,6 +776,7 @@ impl DocumentWindow {
             media_button,
             table_button,
             chart_button,
+            shape_library,
             media_browser: std::cell::OnceCell::new(),
             ruler,
             vertical_ruler,
