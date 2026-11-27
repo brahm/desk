@@ -12,7 +12,7 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
   charts of Pages 15.4, and nine new rows test the image gallery,
   titles and captions, 3D objects, drawings, combined shapes, the new
   chart types, interactive charts, rounded corners and reference lines
-  (#PR).
+  (#260).
 
 * Added: The plan of phase W4 of Desk Writer, which brings the objects
   and charts of Pages 15.4: the shape library and combined shapes, the
