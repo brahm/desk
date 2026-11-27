@@ -79,6 +79,10 @@ const NAMES: &[&str] = &[
     n_("Insert Connection Line"),
     n_("Insert Field"),
     n_("Insert Image"),
+    // The drawings of Pages 15.4 (W117).
+    n_("Draw"),
+    n_("Erase"),
+    n_("Animate Drawing"),
     // The image gallery of Pages 15.4 (W111).
     n_("Insert Image Gallery"),
     n_("Add Images"),

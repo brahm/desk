@@ -251,7 +251,7 @@ fn to_page(placed: &PlacedObject, (lx, ly): (f64, f64)) -> (f64, f64) {
 }
 
 /// A point of a page in the frame of a placed object.
-fn to_frame(placed: &PlacedObject, (px, py): (f64, f64)) -> (f64, f64) {
+pub(super) fn to_frame(placed: &PlacedObject, (px, py): (f64, f64)) -> (f64, f64) {
     let object = &placed.object;
     let (w, h) = (f64::from(placed.width), f64::from(placed.height));
     let (cx, cy) = (f64::from(placed.x) + w / 2.0, f64::from(placed.y) + h / 2.0);
@@ -388,6 +388,7 @@ impl TextEditor {
                 .flat_map(|p| [p.before, p.after].map(|h| h.map(|h| (page_of(p.at), page_of(h)))))
                 .flatten()
                 .collect(),
+            ink: None,
         }));
     }
 

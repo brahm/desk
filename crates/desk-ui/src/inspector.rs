@@ -36,6 +36,8 @@ pub enum Context {
     Equation,
     /// An image gallery (W111).
     Gallery,
+    /// A drawing (W117).
+    Drawing,
     /// Nothing selected in Desk Slides: the slide itself (KINT-13).
     Slide,
 }
@@ -54,6 +56,7 @@ impl Context {
             Some(ObjectKind::Chart(_)) => Self::Chart,
             Some(ObjectKind::Equation(_)) => Self::Equation,
             Some(ObjectKind::Gallery(_)) => Self::Gallery,
+            Some(ObjectKind::Drawing(_)) => Self::Drawing,
             // A group, or a kind of object that came later.
             Some(_) => Self::Group,
         }
@@ -74,6 +77,7 @@ impl Context {
             Self::Chart => tr("Chart"),
             Self::Equation => tr("Equation"),
             Self::Gallery => tr("Image Gallery"),
+            Self::Drawing => tr("Drawing"),
             Self::Slide => tr("Slide"),
         }
     }
@@ -493,6 +497,8 @@ mod tests {
             Context::Table,
             Context::Chart,
             Context::Equation,
+            Context::Gallery,
+            Context::Drawing,
             Context::Slide,
         ] {
             assert!(!context.title().is_empty());

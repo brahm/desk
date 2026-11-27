@@ -38,4 +38,6 @@ pub use backend::{
 };
 pub use brush::outline as brush_outline;
 pub use contour::{object_contour, object_contours, trace_contour};
-pub use display::{DisplayList, Item, Paint, PathOp, PathStroke, PlacedGlyph, shape_path};
+pub use display::{
+    DisplayList, Item, Paint, PathOp, PathStroke, PlacedGlyph, drawing_items, shape_path,
+};

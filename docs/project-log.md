@@ -3295,6 +3295,25 @@ paragraph, and objects on a second page.
   planned, not moved.
 - No task moved to another phase.
 
+### 27 November: Drawings (step 8 of W4, #271)
+
+- Insert > Drawing, also at the bottom of the shape library, turns
+  drawing on: the pointer or a stylus draws, as the Apple Pencil does in
+  Pages on an iPad (D-005). The bar of drawing, under the header bar,
+  has the pen, the pencil, the crayon, the fill and the eraser, the
+  colour and the width, and Done.
+- The lines drawn go into one drawing, an object that is selected,
+  moved, turned and resized as any other; a double click or Edit
+  Drawing draws on it again. Each line is one step of Undo.
+- The fill fills the area around the click, closed by one line or by
+  several together, behind the lines around it, as in Pages.
+- The Drawing tab animates the drawing, its lines drawn again in their
+  order over a time, once or in a loop, and Play shows it on the page.
+- ODT keeps the drawing as a group of paths that other programs show,
+  with the tool of each path and the animation as Desk's extension
+  (docs/odf-extensions.md).
+- W117 is done. No task moved to another phase.
+
 ## Decisions, with their reasons and consequences
 
 Ids `D-nnn` and `R-nnn` are those of [decisions.md](decisions.md).

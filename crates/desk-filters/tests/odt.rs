@@ -5644,3 +5644,167 @@ fn w113_a_shape_of_several_parts_is_kept_in_odt() {
     assert!(matches!(&object.kind, ObjectKind::Shape(Shape::Compound(parts)) if parts.len() == 2));
     assert_eq!(object.frame, was.frame);
 }
+
+/// A drawing of three lines and a fill, at a place on its page.
+fn drawn() -> (desk_model::Editor, desk_model::NodeId) {
+    use desk_model::{
+        Anchor, Drawing, DrawingTool, Frame, Length, NewStroke, Object, ObjectKind, Rgba,
+        drawing_frame,
+    };
+    let line = |tool, color, points: &[(f64, f64)]| NewStroke {
+        tool,
+        color,
+        width: Length::from_points(3),
+        points: points.to_vec(),
+    };
+    let square = [
+        (100.0, 100.0),
+        (200.0, 100.0),
+        (200.0, 200.0),
+        (100.0, 200.0),
+        (100.0, 101.0),
+    ];
+    let strokes = [
+        line(DrawingTool::Pen, Rgba::BLACK, &square),
+        line(
+            DrawingTool::Pencil,
+            Rgba::rgb(0, 0, 0xff),
+            &[(120.0, 220.0), (180.0, 240.0)],
+        ),
+        line(
+            DrawingTool::Crayon,
+            Rgba::rgb(0, 0x80, 0),
+            &[(150.0, 150.0)],
+        ),
+    ];
+    let mut editor = desk_model::Editor::new(Document::new_word_processing());
+    let id = editor
+        .edit("Draw", |edit| {
+            let ((x, y, w, h), built) = drawing_frame(&strokes).unwrap();
+            let mut object = Object::new(
+                edit.new_id(),
+                ObjectKind::Drawing(std::sync::Arc::new(Drawing {
+                    strokes: built.into(),
+                    animation: None,
+                })),
+                Frame::from_pt(x, y, w, h),
+            );
+            object.anchor = Anchor::Page(0);
+            let id = object.id;
+            edit.add_object(object)?;
+            edit.fill_drawing_at(id, (50.0, 50.0), Rgba::rgb(0xff, 0, 0))?;
+            edit.set_drawing_animation(
+                id,
+                Some(desk_model::DrawingAnimation {
+                    duration: 2_500,
+                    repeat: true,
+                }),
+            )?;
+            Ok(id)
+        })
+        .unwrap();
+    (editor, id)
+}
+
+#[test]
+fn w117_a_drawing_keeps_its_lines_fills_and_animation() {
+    use desk_model::DrawingTool;
+    let (editor, id) = drawn();
+    let written = editor.document().objects().get(id).cloned().unwrap();
+    let bytes = write_odt(editor.document()).unwrap();
+    keep("w117-drawing.odt", &bytes);
+    let mut archive = zip::ZipArchive::new(std::io::Cursor::new(&bytes)).unwrap();
+    let mut content = String::new();
+    std::io::Read::read_to_string(&mut archive.by_name("content.xml").unwrap(), &mut content)
+        .unwrap();
+    // Other programs see a group of paths.
+    assert!(
+        content.contains(r#"desk:drawing="fill pen pencil crayon""#),
+        "{content}"
+    );
+    assert!(content.contains(r#"desk:animation-duration="2.5""#));
+    assert!(content.contains(r#"desk:animation-repeat="true""#));
+    let read = read_odt(&bytes).unwrap();
+    let object = read.objects().iter().next().unwrap();
+    let drawing = object.drawing().unwrap();
+    let tools: Vec<DrawingTool> = drawing.strokes.iter().map(|s| s.tool).collect();
+    assert_eq!(
+        tools,
+        [
+            DrawingTool::Fill,
+            DrawingTool::Pen,
+            DrawingTool::Pencil,
+            DrawingTool::Crayon
+        ]
+    );
+    let near = |a: f64, b: f64| (a - b).abs() < 0.05;
+    let (f, g) = (object.frame, written.frame);
+    assert!(near(f.x.to_pt(), g.x.to_pt()) && near(f.y.to_pt(), g.y.to_pt()));
+    assert!(near(f.width.to_pt(), g.width.to_pt()) && near(f.height.to_pt(), g.height.to_pt()));
+    let before = written.drawing().unwrap();
+    for (a, b) in drawing.strokes.iter().zip(before.strokes.iter()) {
+        assert_eq!(a.color, b.color);
+        assert_eq!(a.width, b.width);
+        assert_eq!(a.points.len().max(2), b.points.len().max(2));
+        let (w, h) = (f.width.to_pt(), f.height.to_pt());
+        for (p, q) in a.points_in(w, h).iter().zip(b.points_in(w, h)) {
+            assert!(near(p.0, q.0) && near(p.1, q.1), "{p:?} {q:?}");
+        }
+    }
+    assert_eq!(drawing.animation, before.animation);
+}
+
+#[test]
+fn w117_a_turned_flipped_drawing_shows_where_it_was() {
+    let (mut editor, id) = drawn();
+    editor
+        .edit("Turn", |edit| {
+            let mut o = edit.document().objects().get(id).cloned().unwrap();
+            o.rotation = 9_000;
+            o.flip_horizontal = true;
+            edit.replace_object(o)
+        })
+        .unwrap();
+    let bytes = write_odt(editor.document()).unwrap();
+    let read = read_odt(&bytes).unwrap();
+    let object = read.objects().iter().next().unwrap();
+    // The turn and the flip are in the points of the drawing read.
+    assert_eq!(object.rotation, 0);
+    assert!(!object.flip_horizontal);
+    let written = editor.document().objects().get(id).unwrap();
+    let center = |o: &desk_model::Object| {
+        let f = o.frame;
+        (
+            f.x.to_pt() + f.width.to_pt() / 2.0,
+            f.y.to_pt() + f.height.to_pt() / 2.0,
+        )
+    };
+    let (a, b) = (center(object), center(written));
+    assert!(
+        (a.0 - b.0).abs() < 0.1 && (a.1 - b.1).abs() < 0.1,
+        "{a:?} {b:?}"
+    );
+    // Turned a quarter, the drawing is as wide as it was high.
+    assert!(
+        (object.frame.width.to_pt() - written.frame.height.to_pt()).abs() < 0.1,
+        "{:?} {:?}",
+        object.frame,
+        written.frame
+    );
+}
+
+#[test]
+fn w117_a_group_changed_by_another_program_stays_a_group() {
+    let (editor, _) = drawn();
+    let bytes = write_odt(editor.document()).unwrap();
+    // One tool too few for the paths of the group.
+    let bytes = with_stream(&bytes, "content.xml", |content| {
+        content.replace(
+            r#"desk:drawing="fill pen pencil crayon""#,
+            r#"desk:drawing="fill pen pencil""#,
+        )
+    });
+    let read = read_odt(&bytes).unwrap();
+    let object = read.objects().iter().next().unwrap();
+    assert!(matches!(object.kind, desk_model::ObjectKind::Group(_)));
+}

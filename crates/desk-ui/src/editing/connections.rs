@@ -162,6 +162,7 @@ impl TextEditor {
                 outline: vec![PathSegment::Move(a.0, a.1), way],
                 points: vec![(a, false), (b, false)],
                 handles: Vec::new(),
+                ink: None,
             }));
         }
         true

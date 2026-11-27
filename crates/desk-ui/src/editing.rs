@@ -34,10 +34,12 @@ mod chart_looks;
 mod comments;
 pub use changes::ChangeBubble;
 pub use comments::{CommentTarget, ReviewItem};
+pub use drawing::{DRAWING_WIDTHS, DrawingPick, DrawingTools};
 pub(crate) use gallery::ARROW_RADIUS as GALLERY_ARROW_RADIUS;
 mod connections;
 mod copies;
 mod custom_formats;
+mod drawing;
 mod equations;
 mod gallery;
 mod guides;
@@ -467,6 +469,12 @@ struct State {
     alpha_pick: Option<(desk_model::NodeId, bool)>,
     /// The shape being drawn while the pen is on (OBJ-09).
     pen: Option<pen::Pen>,
+    /// Drawing, while it is on (W117).
+    drawn: Option<drawing::Drawn>,
+    /// The tool, the colour and the width of the next line of a drawing.
+    drawing_tools: drawing::DrawingTools,
+    /// The drawing whose animation is playing.
+    playing: Option<drawing::Playing>,
     /// A drag of an end or the middle of a connection line (OBJ-31).
     connection_drag: Option<connections::ConnectionDrag>,
     /// The shape whose points show to be edited (OBJ-10).
@@ -694,6 +702,9 @@ impl TextEditor {
                 cell_drag: None,
                 alpha_pick: None,
                 pen: None,
+                drawn: None,
+                drawing_tools: drawing::DrawingTools::default(),
+                playing: None,
                 connection_drag: None,
                 points_edit: None,
                 typing: false,
@@ -3085,6 +3096,13 @@ impl TextEditor {
     }
 
     fn selection_changed(&self) {
+        // An animation plays while its drawing alone is selected (W117).
+        let playing = self.state.borrow().playing.as_ref().map(|p| p.id());
+        if let Some(id) = playing
+            && self.state.borrow().objects != [id]
+        {
+            self.stop_drawing_animation();
+        }
         let callbacks = self.state.borrow().on_select.clone();
         for callback in callbacks {
             callback();
@@ -4162,7 +4180,7 @@ impl TextEditor {
             };
             // Esc takes the cursor from a header, footer or note back to
             // the body.
-            if this.pen_key(key) || this.points_key(key) {
+            if this.drawing_key(key) || this.pen_key(key) || this.points_key(key) {
                 return glib::Propagation::Stop;
             }
             if key == gdk::Key::Escape && this.instant_alpha_on() {
@@ -4285,6 +4303,7 @@ impl TextEditor {
             // While Instant Alpha is on, a click on the picture takes out
             // the color under it (OBJ-06).
             if this.press_alpha(x, y)
+                || this.press_drawing(x, y)
                 || this.press_pen(presses, x, y)
                 || (this.editing_points()
                     && this.press_points(presses, x, y, gesture.current_event_state()))
@@ -4428,6 +4447,7 @@ impl TextEditor {
             let copying = cell_drag::copying(gesture.current_event_state());
             if this.drag_cells(dx, dy, copying)
                 || this.drag_alpha(dx, dy)
+                || this.drag_drawing(dx, dy)
                 || this.drag_pen(dx, dy)
                 || this.drag_points(x + dx, y + dy)
                 || this.drag_connection(x + dx, y + dy)
@@ -4472,6 +4492,7 @@ impl TextEditor {
             this.end_guide_drag();
             this.end_alpha_drag();
             this.end_pen_drag();
+            this.end_drawing_drag();
             this.end_points_drag();
             this.end_connection_drag();
             this.end_item_drag();

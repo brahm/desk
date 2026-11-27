@@ -429,8 +429,13 @@ impl Painter {
                     } else if let Some(stroke) = stroke.as_ref().filter(|s| drawn_width(s.width)) {
                         set_color(cr, stroke.color);
                         cr.set_line_width(f64::from(stroke.width));
-                        cr.set_line_cap(cairo::LineCap::Butt);
-                        cr.set_line_join(cairo::LineJoin::Miter);
+                        if stroke.round {
+                            cr.set_line_cap(cairo::LineCap::Round);
+                            cr.set_line_join(cairo::LineJoin::Round);
+                        } else {
+                            cr.set_line_cap(cairo::LineCap::Butt);
+                            cr.set_line_join(cairo::LineJoin::Miter);
+                        }
                         cr.set_dash(&dash_pattern(&stroke.dashes), 0.0);
                         cr.stroke()?;
                         cr.set_dash(&[], 0.0);

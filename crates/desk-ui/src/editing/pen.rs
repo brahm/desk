@@ -113,6 +113,7 @@ pub(super) fn drawn_shape(points: &[PenPoint], closed: bool) -> Option<(Frame, S
 impl TextEditor {
     /// Turns the pen on, so that clicks draw a shape (OBJ-09).
     pub fn start_pen(&self) {
+        self.finish_drawing();
         self.stop_instant_alpha();
         self.leave_story(None);
         self.state.borrow_mut().objects.clear();
@@ -139,6 +140,7 @@ impl TextEditor {
                     .flat_map(|p| [p.handle, mirror(p)].map(|h| h.map(|h| (p.at, h))))
                     .flatten()
                     .collect(),
+                ink: None,
             })
         });
         self.view.set_path_mark(mark);

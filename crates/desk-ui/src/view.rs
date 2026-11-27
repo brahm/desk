@@ -190,6 +190,10 @@ pub struct PathMark {
     pub points: Vec<((f64, f64), bool)>,
     /// The handles of its curves, from their point.
     pub handles: Vec<((f64, f64), (f64, f64))>,
+    /// The colour and the width, in points, of a line being drawn in a
+    /// drawing, which shows as it will be (W117); none for the thin blue
+    /// line of a shape.
+    pub ink: Option<(desk_model::Rgba, f64)>,
 }
 
 /// An alignment guide, from one point of a page to another.
@@ -321,6 +325,15 @@ impl DocumentView {
             callback();
         }
         self.state.borrow_mut().on_pages = callbacks;
+    }
+
+    /// Shows one page again, drawn otherwise, as a drawing being animated
+    /// draws it (W117): the pages keep their sizes.
+    pub fn set_page(&self, index: usize, page: DisplayList) {
+        if let Some(shown) = self.state.borrow_mut().pages.get_mut(index) {
+            *shown = page;
+        }
+        self.area.queue_draw();
     }
 
     /// The widget that takes the keyboard and the pointer.
@@ -1416,6 +1429,17 @@ fn draw_objects(cr: &gtk::cairo::Context, state: &State, page: usize, rect: &Pag
     if let Some(mark) = state.path.as_ref().filter(|m| m.page == page) {
         use desk_model::PathSegment;
         cr.set_source_rgb(0.21, 0.52, 0.89);
+        if let Some((color, width)) = mark.ink {
+            cr.set_source_rgba(
+                f64::from(color.r) / 255.0,
+                f64::from(color.g) / 255.0,
+                f64::from(color.b) / 255.0,
+                f64::from(color.a) / 255.0,
+            );
+            cr.set_line_width((width * scale).max(1.0));
+            cr.set_line_cap(gtk::cairo::LineCap::Round);
+            cr.set_line_join(gtk::cairo::LineJoin::Round);
+        }
         for segment in &mark.outline {
             match *segment {
                 PathSegment::Move(x, y) => {
@@ -1436,6 +1460,9 @@ fn draw_objects(cr: &gtk::cairo::Context, state: &State, page: usize, rect: &Pag
             }
         }
         cr.stroke().ok();
+        cr.set_line_width(1.0);
+        cr.set_line_cap(gtk::cairo::LineCap::Butt);
+        cr.set_line_join(gtk::cairo::LineJoin::Miter);
         // The handles, in gray, with a dot at their end.
         cr.set_source_rgb(0.45, 0.45, 0.45);
         for &(from, to) in &mark.handles {

@@ -77,6 +77,7 @@ the generator, their id starts with `proprio.`.
 | Colors popover: the palette of the HIG, the colors of the document, the eyedropper, Custom… and None (`crate::color_popover`) | No | Yes | Whether Libadwaita gains a color popover or palette; GTK's own `GtkColorChooser` is deprecated |
 | Shape library popover: categories in a `navigation-sidebar` list, a search entry and a grid of shape pictures, with a context menu on My Shapes (`crate::shape_popover`, W113) | No | Yes | Whether Libadwaita gains a searchable grid picker, such as an emoji or symbol chooser to reuse |
 | Saved Fills popover: a grid of fill swatches with Save Fill and a right-click Delete (`crate::fill_rows`, W121) | No | Yes | Whether Libadwaita gains a swatch grid or color palette widget |
+| Drawing bar: linked toggle buttons for the pen, pencil, crayon, fill and eraser, a colour button, a width and Done, under the header bar while a drawing is drawn (`crate::drawing_bar`, W117) | No | Yes | Whether Libadwaita gains a tool palette or a toolbar of tools for drawing |
 
 The rest is native: `AdwHeaderBar`, `AdwTabView` and `AdwTabBar`,
 `AdwOverlaySplitView`, `AdwToolbarView`, `AdwSidebar`, `AdwToggleGroup`,

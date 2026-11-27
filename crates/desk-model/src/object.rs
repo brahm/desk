@@ -590,6 +590,9 @@ pub enum ObjectKind {
     Equation(Arc<crate::Equation>),
     /// An image gallery: pictures shown one at a time (W111).
     Gallery(Arc<crate::Gallery>),
+    /// A drawing: lines drawn freehand, and the areas they close filled
+    /// (W117).
+    Drawing(Arc<crate::Drawing>),
 }
 
 impl From<Shape> for ObjectKind {

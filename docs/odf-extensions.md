@@ -477,6 +477,40 @@ These sit on the `style:graphic-properties` of the graphic style of a
 - **Value:** the description of the picture, for those who cannot see
   it (Image Description). Absent is none.
 
+#### `desk:drawing`
+
+- **Feature:** a drawing of Pages 15.4: lines drawn freehand with a pen,
+  a pencil or a crayon, and the areas they close filled, as one object
+  that is drawn on again and animated (W117, PXV-26).
+- **On:** a `draw:g` that Desk writes for the drawing, which holds a
+  `draw:custom-shape` for each line or fill, in the order they were
+  drawn: an open path through the points of a line, with the colour and
+  the width of its line, and a closed path around a fill, filled with
+  its colour. The group takes the anchor, the wrap and the style of the
+  drawing; the paths are turned as the drawing is, and a flip is in
+  their points.
+- **Value:** the tool of each path, in order, separated by spaces:
+  `pen`, `pencil`, `crayon` or `fill`. A value with a tool Desk does not
+  know, or with more or fewer tools than the group has paths, or a path
+  that is not one Desk writes, makes the group an ordinary group. Desk
+  reads at most 5000 paths of 20000 points each.
+- **Fallback:** the group of paths, which other programs show as the
+  lines of the drawing, each in its colour and width, drawn solid.
+
+#### `desk:animation-duration`
+
+- **On:** the `draw:g` of a drawing (`desk:drawing`).
+- **Value:** seconds, from 0.1 to 60: how long the animation of the
+  drawing takes, its lines drawn again in their order. Absent is a
+  drawing that is not animated.
+- **Fallback:** none needed; other programs show the drawing whole.
+
+#### `desk:animation-repeat`
+
+- **On:** the `draw:g` of a drawing.
+- **Value:** a boolean: whether the animation starts again when it ends
+  (Loop). Absent is `false`.
+
 ### Tables (`table:table`)
 
 #### `desk:table`
@@ -1141,7 +1175,7 @@ specified here, by the rules above, in the phase that implements it.
 | Versions of the document (browse and restore) | All | ODF has no version history that other producers read | The current version is the document; older ones are extra streams of the package |
 | Live link of a chart or table to another document | All | ODF links an object to a file, without a table and range that update | The last data, embedded |
 | Object, table and chart styles as named presets of the template | All | ODF styles have no "preset gallery" order or thumbnails | Ordinary automatic styles |
-| Shape library entries, combined shapes, editable freehand drawings | All | ODF keeps the resulting path, not the operation | The resulting path |
+| Shape library entries, combined shapes, editable freehand drawings | All | ODF keeps the resulting path, not the operation | The resulting path; a drawing as a group of paths (`desk:drawing`, above, for Writer) |
 | Image gallery (several pictures in one frame, with captions) | All | No standard element | The picture shown, with its caption (`desk:gallery`, above, for Writer) |
 | Captions and titles tied to an object | All | ODF captions are free text frames | A text frame around the object (`desk:captions`, above, for Writer) |
 | 3D objects (models with a view angle) | All | No standard element for a model with a camera | A rendered picture |
