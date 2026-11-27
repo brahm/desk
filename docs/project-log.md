@@ -3188,7 +3188,7 @@ paragraph, and objects on a second page.
   off, in ODF; and showing those of objects inside text boxes, shapes
   and groups, and of a text box that hangs in the line.
 
-### 27 November: SVG and HEIC images (step 4 of W4, #PR)
+### 27 November: SVG and HEIC images (step 4 of W4, #263)
 
 - SVG images and HEIC photographs can be inserted, dragged onto the page
   and read from ODT and Pages files, kept as they are. librsvg draws an
