@@ -53,6 +53,7 @@ mod layout_pane;
 mod links;
 mod links_pane;
 mod lists_pane;
+mod mail_merge;
 mod media;
 mod media_browser;
 mod media_pane;

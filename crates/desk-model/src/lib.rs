@@ -131,7 +131,7 @@ pub use list::{
     NumberFormat, Numbering, detect_marker,
 };
 pub use media::{Media, MediaFormat, Repeat};
-pub use merge::MergeSource;
+pub use merge::{MergeSource, MergeValue, merge_document};
 pub use note::{Note, NoteFormat, NoteKind, NoteNumbering, NoteSettings, Notes};
 pub use object::{
     Adjustments, AlphaOutline, AlphaSeed, Anchor, ContourParts, Fill, Frame, FrameStyle, Gradient,

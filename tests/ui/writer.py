@@ -621,6 +621,7 @@ def main():
     small_screen(work)
     tables_and_charts(work)
     automatic_saving(work)
+    mail_merge(work)
     print("All UI tests passed.")
 
 
@@ -3647,5 +3648,109 @@ def automatic_saving(work):
         writer.terminate()
         writer.wait(timeout=10)
 
+def with_merge_source(letter, kind, source):
+    """Makes a file the source of the mail merge of a saved document, as
+    Populate With does (MAL-04)."""
+    with zipfile.ZipFile(letter) as package:
+        files = {n: package.read(n) for n in package.namelist()}
+    items = (
+        f'<config:config-item config:name="MergeSourceKind" config:type="string">{kind}</config:config-item>'
+        f'<config:config-item config:name="CurrentDatabaseDataSource" config:type="string">{source}</config:config-item>'
+    ).encode()
+    settings = files.get("settings.xml")
+    opening = b'config:name="DeskTextSettings">'
+    if settings and opening in settings:
+        settings = settings.replace(opening, opening + items, 1)
+    else:
+        settings = settings or (
+            b'<?xml version="1.0" encoding="UTF-8"?><office:document-settings '
+            b'xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" '
+            b'xmlns:config="urn:oasis:names:tc:opendocument:xmlns:config:1.0" office:version="1.4">'
+            b"<office:settings></office:settings></office:document-settings>"
+        )
+        settings = settings.replace(
+            b"</office:settings>",
+            b'<config:config-item-set config:name="DeskTextSettings">' + items
+            + b"</config:config-item-set></office:settings>",
+            1,
+        )
+    files["settings.xml"] = settings
+    with zipfile.ZipFile(letter, "w") as package:
+        package.writestr(zipfile.ZipInfo("mimetype"), files.pop("mimetype"))
+        for n, data in files.items():
+            package.writestr(n, data, zipfile.ZIP_DEFLATED)
+
+
+def mail_merge(work):
+    """Mail Merge of the Document tab (MAL-04, MAL-07): a merge field put
+    from the Insert menu shows its name; with a spreadsheet as the source,
+    the Preview shows the data of each record, its arrows step through
+    them, and Merge opens a new document."""
+    name = "MergeLetter.odt"
+    letter = work / name
+    subprocess.run([str(CONVERT), str(FIXTURE), str(letter)], check=True)
+    clients = work / "Clients.csv"
+    clients.write_text("First Name,City\nAna,Lisboa\nBruno,Porto\n")
+    with_merge_source(letter, "spreadsheet", clients)
+    writer = subprocess.Popen([str(WRITER), str(letter)])
+    try:
+        app = wait_for("Desk Writer on the accessibility bus", lambda: app_named("desk-writer"))
+        document = wait_for("the document", lambda: find(app, Atspi.Role.TEXT, name))
+        subprocess.run(
+            ["xdotool", "search", "--sync", "--name", name, "windowfocus", "--sync"],
+            check=True,
+        )
+        press("ctrl+End")
+        activate("insert-merge-field", "First Name")
+        wait_for(
+            "the merge field in the text",
+            lambda: text_of(document) == "US Letter, landscapeFirst Name\n",
+        )
+        check("a merge field without data shows its name (MAL-01, MAL-07)", True)
+        press("ctrl+alt+i")
+        activate("inspector-tab", "document")
+        wait_for("Mail Merge", lambda: showing_named(app, "Populate With"))
+        check(
+            "the Document tab has Mail Merge, with its source (MAL-04)",
+            showing_named(app, "Clients.csv") is not None,
+        )
+        toggle_switch_row(app, "Preview", "the Preview switch")
+        wait_for(
+            "the first record in the field",
+            lambda: text_of(document) == "US Letter, landscapeAna\n",
+        )
+        check("the Preview shows the data of the first record (MAL-04)", True)
+        step = wait_for("the arrow of the next record", lambda: showing_named(app, "Next Record"))
+        Atspi.Action.do_action(step, 0)
+        wait_for(
+            "the second record in the field",
+            lambda: text_of(document) == "US Letter, landscapeBruno\n",
+        )
+        check("the arrows of the Preview step through the records (MAL-04)", True)
+        # An edit ends the preview.
+        activate("insert-merge-field", "City")
+        wait_for(
+            "the fields as they are",
+            lambda: text_of(document) == "US Letter, landscapeFirst NameCity\n",
+        )
+        check("an edit ends the preview (MAL-04)", True)
+        activate("save")
+        wait_for(
+            "the saved field",
+            lambda: saved_content(letter, r'text:column-name="First Name"'),
+        )
+        check(
+            "the merge field is saved as a field of ODF, without the data (MAL-04)",
+            bool(saved_content(letter, r"&lt;First Name&gt;")),
+        )
+        activate("mail-merge")
+        wait_for("the merged document", lambda: window_named("Merged Document"))
+        check("Merge opens a new document (MAL-04)", True)
+    finally:
+        writer.terminate()
+        writer.wait(timeout=10)
+
+
 if __name__ == "__main__":
     main()
+

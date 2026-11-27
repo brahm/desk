@@ -67,6 +67,7 @@ poppler-rs = { version = "0.26.0", features = ["v0_82"] }
 zune-jpeg = "0.5.15"
 
 desk-chart = { path = "crates/desk-chart" }
+desk-contacts = { path = "crates/desk-contacts" }
 desk-filters = { path = "crates/desk-filters" }
 desk-formula = { path = "crates/desk-formula" }
 desk-iwork = { path = "crates/desk-iwork" }

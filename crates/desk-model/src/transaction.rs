@@ -671,6 +671,16 @@ impl Edit {
         file: &str,
         date: Option<crate::header::DateWriter<'_>>,
     ) -> Result<(), ModelError> {
+        self.map_fields(&|field| field.refreshed(file, date))
+    }
+
+    /// Changes the fields that `change` gives a new one for, in the body,
+    /// the headers and footers and the notes; the others stay as they
+    /// are.
+    pub fn map_fields(
+        &mut self,
+        change: &dyn Fn(&crate::Field) -> Option<crate::Field>,
+    ) -> Result<(), ModelError> {
         let refresh = |paragraph: &Paragraph| -> Option<Paragraph> {
             let mut changed = false;
             let runs: Vec<Run> = paragraph
@@ -678,7 +688,7 @@ impl Edit {
                 .map(|run| {
                     let mut run = run.clone();
                     if let Some(Some(field)) = &run.attrs.field
-                        && let Some(new) = field.refreshed(file, date)
+                        && let Some(new) = change(field)
                     {
                         run.attrs.field = Some(Some(new));
                         changed = true;
@@ -706,7 +716,7 @@ impl Edit {
         for (id, len) in body {
             self.map_runs(Position::new(id, 0), Position::new(id, len), |run| {
                 if let Some(Some(field)) = &run.attrs.field
-                    && let Some(new) = field.refreshed(file, date)
+                    && let Some(new) = change(field)
                 {
                     run.attrs.field = Some(Some(new));
                 }
@@ -751,6 +761,27 @@ impl Edit {
                     }),
                 )?;
             }
+        }
+        // The text of text boxes and shapes.
+        let objects: Vec<crate::Object> = self
+            .doc
+            .objects()
+            .iter()
+            .filter(|o| {
+                o.text_box()
+                    .is_some_and(|t| t.paragraphs.iter().any(|p| refresh(p).is_some()))
+            })
+            .cloned()
+            .collect();
+        for mut object in objects {
+            if let Some(text) = object.text_box_mut() {
+                text.paragraphs = text
+                    .paragraphs
+                    .iter()
+                    .map(|p| refresh(p).unwrap_or_else(|| p.clone()))
+                    .collect();
+            }
+            self.replace_object(object)?;
         }
         Ok(())
     }
