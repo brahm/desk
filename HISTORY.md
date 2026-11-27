@@ -16,6 +16,8 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
 * Changed: Writer structure and templates (W3) is done, checked on the
   Mac with Pages 15.4; Writer objects and charts (W4) is the phase in
   progress (#259).
+* Fixed: The dashboard counts the rows of W2 that the validation on the
+  Mac checked as done (#259).
 
 * Changed: The menu of merge fields offers the fields of Pages 15.4 first,
   in its order, and the others under More Fields. (#258)

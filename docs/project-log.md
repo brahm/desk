@@ -3118,6 +3118,12 @@ paragraph, and objects on a second page.
   owner is asked what Desk reads before that step.
 - *How the Mac is used:* one session at the start and one at the end,
   as in W3.
+- *Fixed on the way:* the rows of W2 that its validation on the Mac
+  checked on 26 November (W148, W151 to W155) still asked for a check
+  in the inventory, so the dashboard showed W2 with 2 of 9 rows done.
+  Their check is now recorded, as `corpus/mac-review.tsv` has it; W148
+  and W149 stay partial, since comments and changes in print wait for
+  W5 (B-077).
 
 ## Decisions, with their reasons and consequences
 
