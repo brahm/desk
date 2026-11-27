@@ -36,7 +36,7 @@ jobs:
         run: |
           apt-get update
           apt-get install --yes --no-install-recommends curl ca-certificates git build-essential pkg-config libgtk-4-dev libadwaita-1-dev libpoppler-glib-dev librsvg2-dev libheif-dev libheif-plugin-libde265 fonts-liberation fonts-texgyre fonts-urw-base35 fonts-crosextra-carlito fonts-crosextra-caladea poppler-utils hunspell-en-us hunspell-pt-br hyphen-en-us hyphen-pt-br xvfb xauth
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: dtolnay/rust-toolchain@df2a88e9fe4098bad09cb42c3dec7187f15861fc # master
         with:
           toolchain: stable
@@ -78,7 +78,7 @@ jobs:
         run: |
           apt-get update
           apt-get install --yes --no-install-recommends curl ca-certificates git build-essential pkg-config libgtk-4-dev libadwaita-1-dev libpoppler-glib-dev librsvg2-dev libheif-dev libheif-plugin-libde265
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: dtolnay/rust-toolchain@df2a88e9fe4098bad09cb42c3dec7187f15861fc # master
         with:
           # Keep in sync with rust-version in Cargo.toml.
@@ -97,7 +97,7 @@ jobs:
         run: |
           apt-get update
           apt-get install --yes --no-install-recommends curl ca-certificates git build-essential pkg-config libgtk-4-dev libadwaita-1-dev libpoppler-glib-dev librsvg2-dev libheif-dev libheif-plugin-libde265 fonts-liberation jing unzip
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: dtolnay/rust-toolchain@df2a88e9fe4098bad09cb42c3dec7187f15861fc # master
         with:
           toolchain: stable
@@ -121,7 +121,7 @@ jobs:
         run: |
           apt-get update
           apt-get install --yes --no-install-recommends curl ca-certificates git build-essential pkg-config libgtk-4-dev libadwaita-1-dev libpoppler-glib-dev librsvg2-dev libheif-dev libheif-plugin-libde265 fonts-liberation xvfb xauth xdotool dbus libglib2.0-bin at-spi2-core python3-gi gir1.2-atspi-2.0 hunspell-en-us gstreamer1.0-plugins-good gstreamer1.0-libav
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: dtolnay/rust-toolchain@df2a88e9fe4098bad09cb42c3dec7187f15861fc # master
         with:
           toolchain: stable
@@ -133,7 +133,7 @@ jobs:
     name: Translations and desktop files
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Install the gettext tools and the desktop file validators
         run: |
           sudo apt-get update
@@ -149,7 +149,7 @@ jobs:
     name: Fuzz the readers
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Install Cairo, GLib, FreeType and Fontconfig
         run: |
           sudo apt-get update
@@ -176,7 +176,7 @@ jobs:
     name: Backlog register and notes in the code
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Check the register and that every note in the code cites an open row
         run: python3 ci/check-backlog.py
 
@@ -184,7 +184,7 @@ jobs:
     name: Crates of the Flatpak build
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Check that the Flatpak build vendors the crates of Cargo.lock
         run: python3 ci/flatpak-cargo-sources.py --check
 
@@ -192,11 +192,11 @@ jobs:
     name: Licenses and advisories of dependencies
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: EmbarkStudios/cargo-deny-action@81891abc19297b21343b15ef67dc61e4aea74fda # v2
   reuse:
     name: REUSE compliance
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: fsfe/reuse-action@bb774aa972c2a89ff34781233d275075cbddf542 # v5
