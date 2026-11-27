@@ -880,6 +880,8 @@ fn object_item(placed: &PlacedObject) -> Item {
                     items: vec![path],
                 });
                 list.lines(placed.lines.iter());
+                // And the objects in its lines (W106).
+                list.items.extend(placed.inline.iter().map(object_item));
             }
         }
         ObjectKind::Image(picture) => {
@@ -957,6 +959,14 @@ fn object_item(placed: &PlacedObject) -> Item {
                     .lines
                     .iter()
                     .filter(|line| line.top() + line.line.height <= y + h + 0.5),
+            );
+            // And the objects in those lines (W106).
+            list.items.extend(
+                placed
+                    .inline
+                    .iter()
+                    .filter(|o| o.y + o.height <= y + h + 0.5)
+                    .map(object_item),
             );
         }
         ObjectKind::Group(_) => {

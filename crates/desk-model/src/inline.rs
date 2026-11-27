@@ -12,7 +12,8 @@
 //! object, and deleting the object deletes its mark.
 //!
 //! Headers, footers and notes hold objects in their lines too (EST-12,
-//! EST-13): their marks are in the paragraphs of those stories.
+//! EST-13): their marks are in the paragraphs of those stories. So do the
+//! texts of text boxes and shapes (W106).
 
 use std::collections::HashMap;
 
@@ -45,8 +46,9 @@ impl Document {
     }
 
     /// Where the marks of the objects in the lines of the headers, the
-    /// footers and the notes are: by object, the story and the position
-    /// in its paragraphs (EST-12, EST-13).
+    /// footers, the notes and the texts of text boxes and shapes are: by
+    /// object, the story and the position in its paragraphs (EST-12,
+    /// EST-13, W106).
     pub fn story_object_marks(&self) -> HashMap<NodeId, (Story, Position)> {
         let mut marks = HashMap::new();
         let mut scan = |story: Story, paragraphs: &[Paragraph]| {
@@ -61,6 +63,15 @@ impl Document {
         }
         for note in self.notes().iter() {
             scan(Story::Note(note.id), &note.paragraphs);
+        }
+        // A text shows in the first of the boxes linked with it.
+        let heads = self.text_box_heads();
+        for object in self.objects().iter() {
+            if let Some(text) = object.text_box()
+                && heads.get(&object.id).is_none_or(|head| *head == object.id)
+            {
+                scan(Story::TextBox(object.id), &text.paragraphs);
+            }
         }
         marks
     }
@@ -87,6 +98,44 @@ pub fn marks_in(paragraphs: &[Paragraph]) -> Vec<(NodeId, Position)> {
     marks
 }
 
+/// The objects whose marks are in the texts of objects, those of the
+/// objects of groups too, in order (W106).
+pub fn objects_in_texts<'a>(objects: impl IntoIterator<Item = &'a Object>) -> Vec<NodeId> {
+    let mut out = Vec::new();
+    for object in objects {
+        if let Some(text) = object.text_box() {
+            out.extend(marks_in(&text.paragraphs).into_iter().map(|(id, _)| id));
+        }
+        if let crate::ObjectKind::Group(members) = &object.kind {
+            out.extend(objects_in_texts(members.iter()));
+        }
+    }
+    out
+}
+
+impl Document {
+    /// The objects of the document in the texts of objects, and in theirs
+    /// in turn, each once, to copy them with those objects (W106).
+    pub fn objects_in_texts_of(&self, objects: &[Object]) -> Vec<Object> {
+        let mut out: Vec<Object> = Vec::new();
+        let mut seen: std::collections::HashSet<NodeId> = objects.iter().map(|o| o.id).collect();
+        let mut next = objects_in_texts(objects.iter());
+        while !next.is_empty() {
+            let mut found = Vec::new();
+            for id in next {
+                if seen.insert(id)
+                    && let Some(object) = self.objects().get(id)
+                {
+                    found.push(object.clone());
+                }
+            }
+            next = objects_in_texts(found.iter());
+            out.extend(found);
+        }
+        out
+    }
+}
+
 impl Edit {
     /// Takes the objects in the lines of a story as a copy of the document
     /// has them, after the text of the story was edited in its body with
@@ -99,34 +148,29 @@ impl Edit {
         before: &[Paragraph],
     ) -> Result<(), ModelError> {
         let now = from.object_marks();
-        for id in now.keys() {
-            let Some(object) = from.objects().get(*id) else {
-                continue;
-            };
-            if object.anchor != Anchor::InText {
-                continue;
-            }
-            match self.document().objects().get(*id) {
+        let marked: Vec<Object> = now
+            .keys()
+            .filter_map(|id| from.objects().get(*id))
+            .filter(|o| o.anchor == Anchor::InText)
+            .cloned()
+            .collect();
+        for object in &marked {
+            match self.document().objects().get(object.id) {
                 Some(same) if same == object => {}
                 Some(_) => self.replace_object(object.clone())?,
                 None => self.add_object(object.clone())?,
             }
         }
-        let body = self.document().object_marks();
-        let stories = self.document().story_object_marks();
-        for (id, _) in marks_in(before) {
-            let gone =
-                !now.contains_key(&id) && !body.contains_key(&id) && !stories.contains_key(&id);
-            let in_text = self
-                .document()
-                .objects()
-                .get(id)
-                .is_some_and(|o| o.anchor == Anchor::InText);
-            if gone && in_text {
-                self.remove_object(id)?;
+        // With the objects in their texts pasted with them, which the
+        // document does not have yet (W106).
+        for object in from.objects_in_texts_of(&marked) {
+            if object.anchor == Anchor::InText && self.document().objects().get(object.id).is_none()
+            {
+                self.add_object(object)?;
             }
         }
-        Ok(())
+        let before: Vec<NodeId> = marks_in(before).into_iter().map(|(id, _)| id).collect();
+        self.remove_unmarked_objects(&before)
     }
 
     /// Puts an object in the line of the text, at a position of the body,
@@ -322,22 +366,31 @@ impl Edit {
         })
     }
 
-    /// Removes the objects in the text whose marks are gone.
+    /// Removes the objects in the text whose marks are gone, and those in
+    /// their texts.
     pub(crate) fn remove_unmarked_objects(&mut self, ids: &[NodeId]) -> Result<(), ModelError> {
-        if ids.is_empty() {
-            return Ok(());
-        }
-        let marks = self.document().object_marks();
-        let stories = self.document().story_object_marks();
-        for &id in ids {
-            let in_text = self
-                .document()
-                .objects()
-                .get(id)
-                .is_some_and(|o| o.anchor == Anchor::InText);
-            if in_text && !marks.contains_key(&id) && !stories.contains_key(&id) {
+        // Those in the texts of the objects removed go after them, as
+        // their marks go with those texts (W106).
+        let mut next = ids.to_vec();
+        let mut seen = std::collections::HashSet::new();
+        while !next.is_empty() {
+            let marks = self.document().object_marks();
+            let stories = self.document().story_object_marks();
+            let mut inner = Vec::new();
+            for id in next {
+                if !seen.insert(id) || marks.contains_key(&id) || stories.contains_key(&id) {
+                    continue;
+                }
+                let Some(object) = self.document().objects().get(id) else {
+                    continue;
+                };
+                if object.anchor != Anchor::InText {
+                    continue;
+                }
+                inner.extend(objects_in_texts([object]));
                 self.remove_object(id)?;
             }
+            next = inner;
         }
         Ok(())
     }
@@ -421,6 +474,239 @@ mod tests {
             editor.undo().unwrap();
         }
         assert_eq!(editor.document(), &empty);
+    }
+
+    /// A document with a text box on its first page, and the box.
+    fn with_text_box() -> (Editor, NodeId) {
+        let mut editor = Editor::new(Document::new_word_processing());
+        let id = editor
+            .edit("Box", |edit| {
+                let style = edit.document().styles().default_paragraph();
+                let paragraph = crate::Paragraph::new(edit.new_id(), style);
+                let mut text_box = Object::new(
+                    edit.new_id(),
+                    ObjectKind::TextBox(crate::TextBox::new(
+                        std::sync::Arc::from([paragraph]),
+                        Length::from_points(4),
+                    )),
+                    Frame::from_pt(10.0, 10.0, 200.0, 100.0),
+                );
+                text_box.anchor = Anchor::Page(0);
+                let id = text_box.id;
+                edit.add_object(text_box)?;
+                Ok(id)
+            })
+            .unwrap();
+        (editor, id)
+    }
+
+    #[test]
+    fn w106_objects_go_in_the_text_of_a_text_box_and_out_with_it() {
+        let (mut editor, boxed) = with_text_box();
+        let before = editor.document().clone();
+        let story = Story::TextBox(boxed);
+        let inner = editor
+            .edit("Inline", |edit| {
+                edit.edit_story(story, |edit| {
+                    let start = edit.document().start();
+                    let at = edit.insert_text(start, "ab")?;
+                    let id = edit.new_id();
+                    edit.insert_object_in_text(Position::new(at.paragraph, 1), shape(id))?;
+                    Ok(id)
+                })
+            })
+            .unwrap();
+        let document = editor.document();
+        assert_eq!(
+            document.objects().get(inner).unwrap().anchor,
+            Anchor::InText
+        );
+        let marks = document.story_object_marks();
+        assert_eq!(marks.get(&inner).map(|m| m.0), Some(story));
+        assert_eq!(objects_in_texts(document.objects().iter()), [inner]);
+        // A copy of the box has a copy of the object in its text.
+        let copies = editor
+            .edit("Duplicate", |edit| {
+                edit.duplicate_objects(&[boxed], Length::ZERO, Length::ZERO)
+            })
+            .unwrap();
+        let copy = editor.document().objects().get(copies[0]).unwrap().clone();
+        let copied = objects_in_texts([&copy]);
+        assert_eq!(copied.len(), 1);
+        assert_ne!(copied[0], inner);
+        assert_eq!(
+            editor.document().objects().get(copied[0]).unwrap().anchor,
+            Anchor::InText
+        );
+        // Deleting the copy deletes the object in its text, and only it.
+        editor
+            .edit("Delete", |edit| edit.delete_objects(&copies))
+            .unwrap();
+        assert!(editor.document().objects().get(copied[0]).is_none());
+        assert!(editor.document().objects().get(inner).is_some());
+        // Deleting its mark in the text deletes it.
+        editor
+            .edit("Delete", |edit| {
+                edit.edit_story(story, |edit| {
+                    let first = edit.document().start().paragraph;
+                    let end = Position::new(first, 1 + FIELD_CHARACTER.len_utf8());
+                    edit.delete(Position::new(first, 1), end).map(|_| ())
+                })
+            })
+            .unwrap();
+        assert!(editor.document().objects().get(inner).is_none());
+        assert_eq!(editor.document().story_paragraphs(story)[0].text(), "ab");
+        for _ in 0..4 {
+            editor.undo().unwrap();
+        }
+        assert_eq!(editor.document(), &before);
+    }
+
+    /// A shape with a mark of an object as its text.
+    fn holding(id: NodeId, inner: NodeId, edit: &mut Edit) -> Result<Object, ModelError> {
+        let mut holder = shape(id);
+        let style = edit.document().styles().default_paragraph();
+        let runs = [crate::Run::with_attrs(
+            &FIELD_CHARACTER.to_string(),
+            None,
+            crate::CharAttrs {
+                field: Some(Some(Field::ObjectMark { object: inner })),
+                ..crate::CharAttrs::default()
+            },
+        )];
+        let paragraph =
+            Paragraph::from_runs(edit.new_id(), style, crate::ParaAttrs::default(), runs)?;
+        holder.text = Some(crate::TextBox::in_shape(std::sync::Arc::from([paragraph])));
+        holder.anchor = Anchor::InText;
+        Ok(holder)
+    }
+
+    #[test]
+    fn w106_objects_in_texts_in_texts_are_copied_and_deleted_with_them() {
+        let (mut editor, boxed) = with_text_box();
+        let story = Story::TextBox(boxed);
+        // A shape in the box, and a square in the text of the shape.
+        let (outer, inner) = editor
+            .edit("Nest", |edit| {
+                let inner = edit.new_id();
+                let mut square = shape(inner);
+                square.anchor = Anchor::InText;
+                edit.add_object(square)?;
+                let outer = edit.new_id();
+                let holder = holding(outer, inner, edit)?;
+                edit.add_object(holder)?;
+                edit.edit_story(story, |edit| {
+                    let start = edit.document().start();
+                    edit.put_object_in_text(outer, start)
+                })?;
+                Ok((outer, inner))
+            })
+            .unwrap();
+        let all = editor.document().objects().len();
+        // Copied into another document, from the objects alone.
+        let objects: Vec<Object> = [boxed, outer, inner]
+            .iter()
+            .map(|id| editor.document().objects().get(*id).unwrap().clone())
+            .collect();
+        let mut other = Editor::new(Document::new_word_processing());
+        let ids = other
+            .edit("Paste", |edit| edit.add_copies(&objects))
+            .unwrap();
+        assert_eq!(ids.len(), 1);
+        let pasted = other.document();
+        assert_eq!(pasted.objects().len(), 3);
+        let copy = pasted.objects().get(ids[0]).unwrap();
+        let [shape_copy] = objects_in_texts([copy])[..] else {
+            panic!("one object in the box");
+        };
+        let shape_copy = pasted.objects().get(shape_copy).unwrap();
+        let [square_copy] = objects_in_texts([shape_copy])[..] else {
+            panic!("one object in the shape");
+        };
+        assert!(pasted.objects().get(square_copy).is_some());
+        // Duplicated, with both.
+        editor
+            .edit("Duplicate", |edit| {
+                edit.duplicate_objects(&[boxed], Length::ZERO, Length::ZERO)
+            })
+            .unwrap();
+        assert_eq!(editor.document().objects().len(), all * 2);
+        // Deleting the box deletes the shape and the square in it.
+        editor
+            .edit("Delete", |edit| edit.delete_objects(&[boxed]))
+            .unwrap();
+        let document = editor.document();
+        assert_eq!(document.objects().len(), all);
+        assert!(document.objects().get(outer).is_none());
+        assert!(document.objects().get(inner).is_none());
+    }
+
+    #[test]
+    fn w106_objects_pasted_in_a_story_come_with_those_in_their_texts() {
+        let (mut editor, boxed) = with_text_box();
+        let pasted = editor
+            .edit("Paste", |edit| {
+                let inner = edit.new_id();
+                let square = shape(inner);
+                let outer = edit.new_id();
+                let mut holder = holding(outer, inner, edit)?;
+                holder.anchor = Anchor::Page(0);
+                edit.edit_story(Story::TextBox(boxed), |edit| {
+                    let start = edit.document().start();
+                    let ids = edit.add_copies(&[holder, square])?;
+                    edit.put_object_in_text(ids[0], start)?;
+                    Ok(ids[0])
+                })
+            })
+            .unwrap();
+        let document = editor.document();
+        let holder = document.objects().get(pasted).unwrap();
+        let [inner] = objects_in_texts([holder])[..] else {
+            panic!("one object in the shape");
+        };
+        assert_eq!(
+            document.objects().get(inner).unwrap().anchor,
+            Anchor::InText
+        );
+    }
+
+    #[test]
+    fn w106_a_mark_in_the_text_of_its_own_object_is_copied_once() {
+        let (mut editor, boxed) = with_text_box();
+        editor
+            .edit("Nest", |edit| {
+                // A shape in the box, whose text holds the box: a loop.
+                let id = edit.new_id();
+                let mut shape_with_text = shape(id);
+                let style = edit.document().styles().default_paragraph();
+                let runs = [crate::Run::with_attrs(
+                    &FIELD_CHARACTER.to_string(),
+                    None,
+                    crate::CharAttrs {
+                        field: Some(Some(Field::ObjectMark { object: boxed })),
+                        ..crate::CharAttrs::default()
+                    },
+                )];
+                let paragraph =
+                    Paragraph::from_runs(edit.new_id(), style, crate::ParaAttrs::default(), runs)?;
+                shape_with_text.text =
+                    Some(crate::TextBox::in_shape(std::sync::Arc::from([paragraph])));
+                shape_with_text.anchor = Anchor::InText;
+                edit.add_object(shape_with_text)?;
+                edit.edit_story(Story::TextBox(boxed), |edit| {
+                    let start = edit.document().start();
+                    edit.put_object_in_text(id, start)
+                })
+            })
+            .unwrap();
+        let count = editor.document().objects().len();
+        editor
+            .edit("Duplicate", |edit| {
+                edit.duplicate_objects(&[boxed], Length::ZERO, Length::ZERO)
+            })
+            .unwrap();
+        // The box and the shape in it, whose text leaves the box out.
+        assert_eq!(editor.document().objects().len(), count + 2);
     }
 
     #[test]

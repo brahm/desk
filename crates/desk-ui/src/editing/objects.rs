@@ -1876,7 +1876,18 @@ impl TextEditor {
         let (width, height) = {
             let state = self.state.borrow();
             let setup = state.layout.setup;
-            (setup.body_width().to_pt(), setup.body_height().to_pt())
+            // In a text box or a shape, no wider than its text (W106).
+            let room = match self.story() {
+                Some(Story::TextBox(id)) => state.editor.document().objects().get(id).map(|o| {
+                    let inset = o.text_box().map_or(0.0, |t| t.inset.to_pt());
+                    (
+                        o.frame.width.to_pt() - 2.0 * inset,
+                        o.frame.height.to_pt() - 2.0 * inset,
+                    )
+                }),
+                _ => None,
+            };
+            room.unwrap_or((setup.body_width().to_pt(), setup.body_height().to_pt()))
         };
         // In a header, a footer or a note, no taller than two inches; in
         // the body, as tall as the page lets it be.

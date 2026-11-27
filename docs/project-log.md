@@ -3159,6 +3159,18 @@ paragraph, and objects on a second page.
   an iPad and of a 3D model; their rows follow the Pages User Guide and
   are seen in the validation at the end.
 
+### 27 November: objects inside boxes and shapes (step 3 of W4, #261)
+
+- Pictures, shapes and equations pasted while the text of a text box or
+  a shape is being edited go in its lines at the cursor, as Pages 15.4
+  nests them. They stand on the baseline, turn with the box, are copied
+  and deleted with it, and are written in ODF as LibreOffice writes
+  objects in the text of a frame.
+- The rest of W106, objects in table cells, is the next pull request of
+  step 3, then titles and captions (W122). Inserting into a box with the
+  Insert menu, and dragging into it, are checked on the Mac at the end.
+- No task moved to another phase.
+
 ## Decisions, with their reasons and consequences
 
 Ids `D-nnn` and `R-nnn` are those of [decisions.md](decisions.md).

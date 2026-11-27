@@ -258,9 +258,11 @@ impl Edit {
 
     /// Removes objects, leaving the locked ones. A linked text box
     /// leaves the boxes before and after it linked to each other, and the
-    /// first of linked boxes leaves its text to the next (OBJ-13).
+    /// first of linked boxes leaves its text to the next (OBJ-13). The
+    /// objects in the text of an object go with it (W106).
     pub fn delete_objects(&mut self, ids: &[NodeId]) -> Result<(), ModelError> {
         for object in self.unlocked(ids)? {
+            let inner = crate::objects_in_texts([&object]);
             if let ObjectKind::TextBox(text) = &object.kind {
                 self.unlink_text_box(object.id, text)?;
             }
@@ -272,6 +274,7 @@ impl Edit {
                 self.remove_story_mark(story, mark)?;
             }
             self.remove_object(object.id)?;
+            self.remove_unmarked_objects(&inner)?;
         }
         Ok(())
     }
@@ -541,7 +544,9 @@ impl Edit {
     /// of their own, and returns those identifiers in the same order
     /// (OBJ-22). A connection line among them stays joined to the copies
     /// of the objects it joined. Objects in the text are not copied, as
-    /// each is a character of it. Each copy shares its origin with the
+    /// each is a character of it, but those among them in the texts of
+    /// the others, which the copies of those texts hold copies of
+    /// (W106). Each copy shares its origin with the
     /// object it copies, which takes one if it has none and is in the
     /// document (IOP-33).
     /// A copy copies no object of a page template, so that Reapply Page
@@ -565,6 +570,9 @@ impl Edit {
         objects: &[Object],
         templates: bool,
     ) -> Result<Vec<NodeId>, ModelError> {
+        // The objects in the texts of those copied, given with them in the
+        // text, which the copies of their texts take copies of (W106).
+        let given = objects;
         let objects: Vec<Object> = objects
             .iter()
             .filter(|o| o.anchor != Anchor::InText)
@@ -596,17 +604,75 @@ impl Edit {
             })
             .collect();
         let mut ids = Vec::with_capacity(copies.len());
-        for (mut copy, joined) in copies.into_iter().zip(joined) {
+        for ((mut copy, joined), source) in copies.into_iter().zip(joined).zip(&objects) {
             if let (Some((start, end)), ObjectKind::Shape(crate::Shape::Connection(line))) =
                 (joined, &mut copy.kind)
             {
                 line.start = start;
                 line.end = end;
             }
+            self.copy_text_objects(&mut copy, given, &mut vec![source.id])?;
             ids.push(copy.id);
             self.add_object(copy)?;
         }
         Ok(ids)
+    }
+
+    /// Gives the marks in the text of a copy of an object, and in those of
+    /// the objects of a group, copies of the objects they hold, added to
+    /// the document: those of `given` (W106). A mark whose object is not
+    /// given goes, and so does one whose object holds the text it is in,
+    /// as `within` has them.
+    fn copy_text_objects(
+        &mut self,
+        copy: &mut Object,
+        given: &[Object],
+        within: &mut Vec<NodeId>,
+    ) -> Result<(), ModelError> {
+        if let ObjectKind::Group(members) = &copy.kind {
+            let mut members = members.to_vec();
+            for member in &mut members {
+                self.copy_text_objects(member, given, within)?;
+            }
+            copy.kind = ObjectKind::Group(members.into());
+        }
+        let Some(text) = copy.text_box() else {
+            return Ok(());
+        };
+        if crate::marks_in(&text.paragraphs).is_empty() {
+            return Ok(());
+        }
+        let mut paragraphs = text.paragraphs.to_vec();
+        for paragraph in &mut paragraphs {
+            let mut runs = Vec::new();
+            for mut run in paragraph.runs().cloned() {
+                if let Some(Some(crate::Field::ObjectMark { object })) = run.attrs.field {
+                    let source = given.iter().find(|o| o.id == object).cloned();
+                    let Some(source) = source.filter(|s| !within.contains(&s.id)) else {
+                        continue;
+                    };
+                    let mut inner = self.renumbered_object(&source)?;
+                    inner.anchor = Anchor::InText;
+                    inner.template_object = None;
+                    within.push(source.id);
+                    self.copy_text_objects(&mut inner, given, within)?;
+                    within.pop();
+                    run.attrs.field = Some(Some(crate::Field::ObjectMark { object: inner.id }));
+                    self.add_object(inner)?;
+                }
+                runs.push(run);
+            }
+            *paragraph = crate::Paragraph::from_runs(
+                paragraph.id(),
+                paragraph.style(),
+                paragraph.attrs().clone(),
+                runs,
+            )?;
+        }
+        if let Some(text) = copy.text_box_mut() {
+            text.paragraphs = paragraphs.into();
+        }
+        Ok(())
     }
 
     /// An object to copy, with an origin: its own, or a new one, which
@@ -653,13 +719,16 @@ impl Edit {
         for &id in ids {
             self.object(id)?;
         }
-        let objects: Vec<Object> = self
+        let mut objects: Vec<Object> = self
             .document()
             .objects()
             .iter()
             .filter(|o| ids.contains(&o.id))
             .map(|o| translated(o, dx, dy))
             .collect();
+        // With the objects in their texts (W106).
+        let nested = self.document().objects_in_texts_of(&objects);
+        objects.extend(nested);
         self.add_copies(&objects)
     }
 

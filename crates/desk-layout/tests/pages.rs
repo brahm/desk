@@ -1912,3 +1912,126 @@ fn w094_a_section_hides_its_headers_on_its_first_page() {
     assert!(desk_layout::hides_margins(&layout, 1));
     assert!(!desk_layout::hides_margins(&layout, 2));
 }
+
+#[test]
+fn w106_an_object_in_the_text_of_a_box_stands_on_its_line() {
+    use desk_model::{Anchor, Editor, Frame, Object, ObjectKind, Position, Story, TextBox};
+    let mut system = TextSystem::new();
+    let mut editor = Editor::new(Document::new_word_processing());
+    let (boxed, inner) = editor
+        .edit("Box", |edit| {
+            let style = edit.document().styles().default_paragraph();
+            let paragraph = desk_model::Paragraph::new(edit.new_id(), style);
+            let mut text_box = Object::new(
+                edit.new_id(),
+                ObjectKind::TextBox(TextBox::new(
+                    Arc::from([paragraph]),
+                    desk_model::Length::from_points(4),
+                )),
+                Frame::from_pt(100.0, 100.0, 300.0, 150.0),
+            );
+            text_box.anchor = Anchor::Page(0);
+            let boxed = text_box.id;
+            edit.add_object(text_box)?;
+            let inner = edit.edit_story(Story::TextBox(boxed), |edit| {
+                let start = edit.document().start();
+                let at = edit.insert_text(start, "Before after")?;
+                let object = Object::new(
+                    edit.new_id(),
+                    desk_model::Shape::Rectangle.into(),
+                    Frame::from_pt(0.0, 0.0, 40.0, 30.0),
+                );
+                let id = object.id;
+                edit.insert_object_in_text(Position::new(at.paragraph, 7), object)?;
+                Ok(id)
+            })?;
+            Ok((boxed, inner))
+        })
+        .unwrap();
+    let layout = paginate(editor.document(), &mut system);
+    let page = &layout.pages[0];
+    // On the page, only the box: the object is in its text.
+    assert_eq!(page.objects.len(), 1);
+    let placed = &page.objects[0];
+    assert_eq!(placed.object.id, boxed);
+    assert_eq!(placed.inline.len(), 1);
+    let object = &placed.inline[0];
+    assert_eq!(object.object.id, inner);
+    let line = &placed.lines[0];
+    assert!((object.x - (line.origin.0 + line.line.caret_x(7))).abs() < 0.01);
+    assert!((object.y + object.height - line.baseline()).abs() < 0.01);
+    // The line is as tall as the object, and the words after it make room.
+    assert!(line.line.baseline - line.line.top >= 30.0 - 0.01);
+    assert!(
+        line.line
+            .caret_x(7 + desk_model::FIELD_CHARACTER.len_utf8())
+            - line.line.caret_x(7)
+            >= 40.0 - 0.01
+    );
+    // Inside the box.
+    assert!(object.x >= 104.0 && object.y >= 104.0);
+}
+
+#[test]
+fn w106_a_loop_of_objects_in_texts_is_laid_out_to_an_end() {
+    use desk_model::{
+        Anchor, CharAttrs, Editor, FIELD_CHARACTER, Field, Frame, Object, ObjectKind, ParaAttrs,
+        Paragraph, Run, Story, TextBox,
+    };
+    let mut system = TextSystem::new();
+    let mut editor = Editor::new(Document::new_word_processing());
+    let start = editor.document().start();
+    editor
+        .edit("Loop", |edit| {
+            let style = edit.document().styles().default_paragraph();
+            // A text box in the body, a shape in its text, and the box
+            // again in the text of the shape.
+            let boxed = Object::new(
+                edit.new_id(),
+                ObjectKind::TextBox(TextBox::new(
+                    Arc::from([Paragraph::new(edit.new_id(), style)]),
+                    desk_model::Length::from_points(4),
+                )),
+                Frame::from_pt(0.0, 0.0, 200.0, 80.0),
+            );
+            let id = boxed.id;
+            edit.insert_object_in_text(start, boxed)?;
+            let mut shape = Object::new(
+                edit.new_id(),
+                desk_model::Shape::Rectangle.into(),
+                Frame::from_pt(0.0, 0.0, 60.0, 40.0),
+            );
+            let runs = [Run::with_attrs(
+                &FIELD_CHARACTER.to_string(),
+                None,
+                CharAttrs {
+                    field: Some(Some(Field::ObjectMark { object: id })),
+                    ..CharAttrs::default()
+                },
+            )];
+            let text = Paragraph::from_runs(edit.new_id(), style, ParaAttrs::default(), runs)?;
+            shape.text = Some(TextBox::in_shape(Arc::from([text])));
+            shape.anchor = Anchor::InText;
+            let shape_id = shape.id;
+            edit.add_object(shape)?;
+            edit.edit_story(Story::TextBox(id), |edit| {
+                let start = edit.document().start();
+                edit.put_object_in_text(shape_id, start)
+            })
+        })
+        .unwrap();
+    let layout = paginate(editor.document(), &mut system);
+    let boxed = layout.pages[0]
+        .objects
+        .iter()
+        .find(|o| matches!(o.object.kind, ObjectKind::TextBox(_)))
+        .unwrap();
+    // Each in the other, to a depth, and no further.
+    let mut depth = 0;
+    let mut at = boxed;
+    while let Some(inner) = at.inline.first() {
+        depth += 1;
+        at = inner;
+    }
+    assert!((1..=16).contains(&depth), "{depth}");
+}

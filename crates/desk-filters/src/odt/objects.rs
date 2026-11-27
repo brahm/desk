@@ -917,6 +917,15 @@ fn kind(
             for p in paragraphs {
                 built.push(paragraph(document, p)?);
             }
+            // The objects in its lines (W106).
+            import_text_objects(
+                source,
+                document,
+                paragraphs,
+                &mut built,
+                paragraph,
+                depth + 1,
+            )?;
             if built.is_empty() {
                 let style = document.styles().default_paragraph();
                 built.push(Paragraph::new(document.new_id(), style));
@@ -1464,6 +1473,15 @@ fn import_one(
         for p in &object.text {
             paragraphs.push(paragraph(document, p)?);
         }
+        // The objects in its lines (W106).
+        import_text_objects(
+            source,
+            document,
+            &object.text,
+            &mut paragraphs,
+            paragraph,
+            depth + 1,
+        )?;
         let mut text = TextBox::in_shape(Arc::from(paragraphs));
         if let Some(padding) = g.padding {
             text.inset = length(padding);
@@ -1558,6 +1576,24 @@ pub(super) fn import_story_inline_objects(
     model: &mut [Paragraph],
     paragraph: &mut dyn FnMut(&mut Document, &odf::Paragraph) -> Result<Paragraph, FilterError>,
 ) -> Result<(), FilterError> {
+    import_text_objects(source, document, odf, model, paragraph, 0)
+}
+
+/// How deep objects in the texts of objects are read, each in the text of
+/// the one before (W106): those deeper are left out.
+const NESTED_TEXT_DEPTH: usize = 16;
+
+/// Adds the objects in the lines of a text as
+/// [`import_story_inline_objects`] does, those of a text inside `depth`
+/// objects, which leaves out those too deep (W106).
+fn import_text_objects(
+    source: &odf::TextDocument,
+    document: &mut Document,
+    odf: &[odf::Paragraph],
+    model: &mut [Paragraph],
+    paragraph: &mut dyn FnMut(&mut Document, &odf::Paragraph) -> Result<Paragraph, FilterError>,
+    depth: usize,
+) -> Result<(), FilterError> {
     let setup = *document.page_setup();
     for (p, built) in odf.iter().zip(model.iter_mut()) {
         let inline: Vec<&odf::DrawObject> = p
@@ -1572,8 +1608,10 @@ pub(super) fn import_story_inline_objects(
         let mut gone = Vec::new();
         for (i, &(id, at)) in marks.iter().enumerate() {
             let object = match inline.get(i) {
-                Some(object) => import_one(source, document, object, None, &setup, paragraph, 0)?,
-                None => None,
+                Some(object) if depth < NESTED_TEXT_DEPTH => {
+                    import_one(source, document, object, None, &setup, paragraph, depth)?
+                }
+                _ => None,
             };
             match object {
                 Some(mut object) => {
@@ -2626,6 +2664,97 @@ fn drop_placeholders<'a>(
     }
 }
 
+/// The objects in the texts of the objects written (W106), each written
+/// as a character once, when a text first marks it.
+struct Nested {
+    /// The object in the text that each place names, and where it is
+    /// among the objects, from the back.
+    names: HashMap<String, (NodeId, usize)>,
+    /// Those written already, by the names of their places.
+    drawn: HashMap<String, odf::DrawObject>,
+    /// The names of the objects whose texts are being written, each in
+    /// the text of the one before.
+    within: Vec<String>,
+}
+
+impl Nested {
+    fn new(document: &Document) -> Self {
+        let names = document
+            .objects()
+            .iter()
+            .enumerate()
+            .filter(|(_, o)| o.anchor == Anchor::InText)
+            .map(|(z, o)| (inline_placeholder(o.id), (o.id, z)))
+            .collect();
+        Self {
+            names,
+            drawn: HashMap::new(),
+            within: Vec::new(),
+        }
+    }
+
+    /// The object in the text that a place names, written as a character
+    /// with the objects in its own text; none for one not in the
+    /// document, for one whose text is being written, and deeper than
+    /// [`NESTED_TEXT_DEPTH`].
+    fn object(&mut self, exporter: &mut Exporter<'_>, name: &str) -> Option<odf::DrawObject> {
+        if self.within.iter().any(|w| w == name) || self.within.len() >= NESTED_TEXT_DEPTH {
+            return None;
+        }
+        if let Some(drawn) = self.drawn.get(name) {
+            return Some(drawn.clone());
+        }
+        let &(id, z) = self.names.get(name)?;
+        let document = exporter.document;
+        let object = document.objects().get(id)?;
+        let mut drawn = exporter.object(object, "as-char", None, 0.0);
+        drawn.x = None;
+        drawn.y = None;
+        drawn.z_index = Some(z as u32);
+        self.within.push(name.to_owned());
+        self.fill(exporter, &mut drawn);
+        self.within.pop();
+        self.drawn.insert(name.to_owned(), drawn.clone());
+        Some(drawn)
+    }
+
+    /// Writes in the places of the marks in the text of a drawn object,
+    /// and in those of the objects of a group, the objects they hold, and
+    /// takes out the places of the others.
+    fn fill(&mut self, exporter: &mut Exporter<'_>, drawn: &mut odf::DrawObject) {
+        self.fill_paragraphs(exporter, &mut drawn.text);
+        match &mut drawn.kind {
+            odf::DrawKind::TextBox { paragraphs, .. } => self.fill_paragraphs(exporter, paragraphs),
+            odf::DrawKind::Group(members) => {
+                for member in members {
+                    self.fill(exporter, member);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    fn fill_paragraphs(&mut self, exporter: &mut Exporter<'_>, paragraphs: &mut [odf::Paragraph]) {
+        for paragraph in paragraphs {
+            paragraph.spans.retain_mut(|span| {
+                let Some(odf::Field::Object(placeholder)) = &span.field else {
+                    return true;
+                };
+                let Some(name) = placeholder.name.clone() else {
+                    return true;
+                };
+                match self.object(exporter, &name) {
+                    Some(drawn) => {
+                        span.field = Some(odf::Field::Object(Box::new(drawn)));
+                        true
+                    }
+                    None => false,
+                }
+            });
+        }
+    }
+}
+
 /// The paragraphs of the headers and footers of a master page.
 fn master_paragraphs(page: &mut odf::MasterPage) -> impl Iterator<Item = &mut odf::Paragraph> {
     [
@@ -2707,15 +2836,14 @@ pub(super) fn export_objects(exporter: &mut Exporter<'_>, out: &mut odf::TextDoc
     // body and its notes.
     let mut placeholders: HashMap<String, Vec<&mut odf::Span>> = HashMap::new();
     collect_placeholders(out.body.iter_mut(), &mut placeholders);
+    let mut nested = Nested::new(document);
     let mut floating = Vec::new();
     for (z, object) in document.objects().iter().enumerate() {
         if object.anchor == Anchor::InText {
             // In the line of the text, where its mark is (OBJ-01).
-            if let Some(spans) = placeholders.remove(&inline_placeholder(object.id)) {
-                let mut drawn = exporter.object(object, "as-char", None, 0.0);
-                drawn.x = None;
-                drawn.y = None;
-                drawn.z_index = Some(z as u32);
+            if let Some(spans) = placeholders.remove(&inline_placeholder(object.id))
+                && let Some(drawn) = nested.object(exporter, &inline_placeholder(object.id))
+            {
                 for span in spans {
                     span.field = Some(odf::Field::Object(Box::new(drawn.clone())));
                 }
@@ -2745,6 +2873,7 @@ pub(super) fn export_objects(exporter: &mut Exporter<'_>, out: &mut odf::TextDoc
             (Anchor::InText | Anchor::Master(..), _) => continue,
         };
         drawn.z_index = Some(z as u32);
+        nested.fill(exporter, &mut drawn);
         match at.and_then(|i| out.body.get_mut(i)) {
             Some(paragraph) => paragraph.frames.push(drawn),
             None => out.page_objects.push(drawn),
@@ -2843,21 +2972,20 @@ pub(super) fn export_master_objects(
     };
     // The objects in the lines of the headers and footers (EST-12), with
     // the styles of the master pages.
+    let mut nested = Nested::new(document);
     {
         let mut placeholders: HashMap<String, Vec<&mut odf::Span>> = HashMap::new();
         collect_placeholders(master_paragraphs(&mut out.master), &mut placeholders);
         for (_, page) in &mut out.masters {
             collect_placeholders(master_paragraphs(page), &mut placeholders);
         }
-        for (z, object) in document.objects().iter().enumerate() {
+        for object in document.objects().iter() {
             if object.anchor != Anchor::InText {
                 continue;
             }
-            if let Some(spans) = placeholders.remove(&inline_placeholder(object.id)) {
-                let mut drawn = exporter.object(object, "as-char", None, 0.0);
-                drawn.x = None;
-                drawn.y = None;
-                drawn.z_index = Some(z as u32);
+            if let Some(spans) = placeholders.remove(&inline_placeholder(object.id))
+                && let Some(drawn) = nested.object(&mut exporter, &inline_placeholder(object.id))
+            {
                 for span in spans {
                     span.field = Some(odf::Field::Object(Box::new(drawn.clone())));
                 }
@@ -2879,6 +3007,7 @@ pub(super) fn export_master_objects(
         };
         let mut drawn = exporter.object(object, "page", None, 0.0);
         drawn.z_index = Some(z as u32);
+        nested.fill(&mut exporter, &mut drawn);
         for (copy, _) in copies.iter().filter(|(_, of)| **of == section) {
             if let Some(name) = masters.get(copy)
                 && let Some((_, page)) = out.masters.iter_mut().find(|(n, _)| n == name)

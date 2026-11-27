@@ -52,11 +52,19 @@ pub fn write_objects(from: &Document, objects: &[Object]) -> Result<Vec<u8>, Fil
     };
     editor.edit("Copy", |edit| {
         edit.set_page_setup(setup)?;
+        // Those in the texts of the others stay in them (W106).
+        let nested: std::collections::HashSet<desk_model::NodeId> =
+            desk_model::objects_in_texts(objects.iter())
+                .into_iter()
+                .collect();
         let objects: Vec<Object> = objects
             .iter()
-            .map(|o| Object {
-                anchor: Anchor::Page(0),
-                ..o.clone()
+            .map(|o| match o.anchor {
+                Anchor::InText if nested.contains(&o.id) => o.clone(),
+                _ => Object {
+                    anchor: Anchor::Page(0),
+                    ..o.clone()
+                },
             })
             .collect();
         let objects = edit.adopt_object_styles(from, &objects)?;
