@@ -346,7 +346,7 @@ impl<'a> Texts<'a> {
             },
             None if place.object.is_some() => 2,
             None => 1,
-            Some(Story::TextBox(_)) => 2,
+            Some(Story::TextBox(_) | Story::Caption { .. }) => 2,
             Some(Story::Note(_)) => 3,
         };
         // Outside the body, by where the text or the object is on the

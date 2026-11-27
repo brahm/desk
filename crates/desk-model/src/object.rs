@@ -94,6 +94,9 @@ pub struct Object {
     /// The object of a page template that it is a copy of, which Reapply
     /// Page Template puts back (W095).
     pub template_object: Option<NodeId>,
+    /// Its title and caption, which show above and below it (W122); none
+    /// when it never had one.
+    pub captions: Option<Arc<crate::Captions>>,
 }
 
 impl Object {
@@ -305,6 +308,7 @@ impl Object {
             link: None,
             placeholder: None,
             template_object: None,
+            captions: None,
         }
     }
 

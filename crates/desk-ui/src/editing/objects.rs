@@ -1444,6 +1444,33 @@ impl TextEditor {
         });
     }
 
+    /// Turns the title or the caption of the selected objects on or off,
+    /// as the Style tab of Pages 15.4 does (W122).
+    pub fn show_captions(&self, title: bool, shown: bool) {
+        let name = if title { "Title" } else { "Caption" };
+        self.arrange_objects(name, |edit, ids| {
+            for &id in ids {
+                if edit.document().objects().get(id).is_some_and(|o| !o.locked) {
+                    edit.show_caption(id, title, shown)?;
+                }
+            }
+            Ok(None)
+        });
+    }
+
+    /// Puts the titles of the selected objects below them, or above
+    /// (W122).
+    pub fn set_titles_below(&self, below: bool) {
+        self.arrange_objects("Title Position", |edit, ids| {
+            for &id in ids {
+                if edit.document().objects().get(id).is_some_and(|o| !o.locked) {
+                    edit.set_title_below(id, below)?;
+                }
+            }
+            Ok(None)
+        });
+    }
+
     /// Masks the selected picture with a shape, as Mask with Shape of the
     /// Arrange menu does (OBJ-04): a picture not masked yet shows whole in
     /// the shape at first.

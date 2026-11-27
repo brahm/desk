@@ -799,9 +799,26 @@ impl DisplayList {
     }
 }
 
+/// The items that draw an object, and its title and caption upright
+/// above and below it (W122).
+fn object_item(placed: &PlacedObject) -> Item {
+    let body = object_body_item(placed);
+    if placed.title.is_empty() && placed.caption.is_empty() {
+        return body;
+    }
+    let mut list = DisplayList::default();
+    list.items.push(body);
+    list.lines(placed.title.iter().chain(&placed.caption));
+    Item::Group {
+        transform: [1.0, 0.0, 0.0, 1.0, 0.0, 0.0],
+        opacity: 1.0,
+        items: list.items,
+    }
+}
+
 /// The items that draw an object: its shape, picture or text, with its
 /// rotation, flips and opacity (OBJ-01, OBJ-08, OBJ-13).
-fn object_item(placed: &PlacedObject) -> Item {
+fn object_body_item(placed: &PlacedObject) -> Item {
     let object = &placed.object;
     let (x, y, w, h) = (placed.x, placed.y, placed.width, placed.height);
     let mut list = DisplayList::default();

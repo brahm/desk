@@ -49,6 +49,8 @@ mod aside;
 mod author;
 mod auto_numbers;
 mod autocorrect;
+mod captions;
+pub use captions::{CAPTION_STYLE, Caption, Captions};
 mod case_change;
 mod change;
 mod chart_style;

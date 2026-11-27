@@ -3171,6 +3171,23 @@ paragraph, and objects on a second page.
   Insert menu, and dragging into it, are checked on the Mac at the end.
 - No task moved to another phase.
 
+### 27 November: titles and captions of objects (step 3 of W4, #262)
+
+- The owner chose to keep objects in table cells in W4, as a step of its
+  own at the end of the phase, as they need rich text in cells and a new
+  cell editor.
+- Any object can show a title, above or below it, and a caption, turned
+  on in the Style tab. Each is text in the Caption paragraph style,
+  edited in place with a click, which moves with the object; the text
+  of the page goes around it, and an object in the line grows its line.
+- In ODF the object goes in a frame of text with its title and caption,
+  as LibreOffice writes a caption; the new attribute `desk:captions`
+  says which paragraphs are which.
+- Moved to W5 (B-081): titles and captions of the objects of master
+  pages and page templates, and the text of a title or caption turned
+  off, in ODF; and showing those of objects inside text boxes, shapes
+  and groups, and of a text box that hangs in the line.
+
 ## Decisions, with their reasons and consequences
 
 Ids `D-nnn` and `R-nnn` are those of [decisions.md](decisions.md).

@@ -51,7 +51,10 @@ pub(crate) fn hidden_changes(
 pub use equations::{
     EQUATION_FONT, EQUATION_SIZE, EquationLayout, equation_size, lay_out_equation,
 };
-pub use objects::{PlacedObject, flow_text_boxes, object_at, place_object_text, text_box_lines};
+pub use objects::{
+    CAPTION_GAP, CaptionRoom, PlacedObject, caption_at, caption_lines, flow_text_boxes, object_at,
+    place_object_text, text_box_lines,
+};
 pub use outline::{outline_document, paginate_outline, paginate_view};
 pub use screen::{SCREEN_MARGIN, paginate_screen, screen_document};
 pub use tables::{

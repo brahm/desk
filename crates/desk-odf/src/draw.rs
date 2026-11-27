@@ -408,6 +408,11 @@ pub struct DrawObject {
     /// `desk:template-object`: the `xml:id` of the object of the page
     /// template that this object of a page copies (W095).
     pub template_object: Option<String>,
+    /// `desk:captions` of a frame that Desk writes around an object with
+    /// a title or a caption: the parts of its text in order, `title=N`,
+    /// `object` and `caption=N`, each with its number of paragraphs (W122,
+    /// odf-extensions.md).
+    pub captions: Option<String>,
 }
 
 /// The `svg:viewBox` side that Desk writes a `draw:contour-polygon` in.
@@ -442,6 +447,7 @@ impl DrawObject {
             placeholder: None,
             placeholder_tag: None,
             template_object: None,
+            captions: None,
         }
     }
 
@@ -1071,6 +1077,7 @@ fn draw_object_at(
             .filter(|t| !t.is_empty())
             .map(|t| t.chars().take(MAX_NAME).collect()),
         template_object: e.attr(DESK, "template-object").map(str::to_owned),
+        captions: e.attr(DESK, "captions").map(str::to_owned),
     })
 }
 
@@ -1234,6 +1241,7 @@ fn write_shape(w: &mut Writer, object: &DrawObject, paragraph: &dyn Fn(&mut Writ
     w.attr_opt("desk:placeholder", object.placeholder.as_deref());
     w.attr_opt("desk:placeholder-tag", object.placeholder_tag.as_deref());
     w.attr_opt("desk:template-object", object.template_object.as_deref());
+    w.attr_opt("desk:captions", object.captions.as_deref());
     if !matches!(
         object.kind,
         DrawKind::Line { .. } | DrawKind::Connector { .. } | DrawKind::Group(_)

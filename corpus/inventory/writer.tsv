@@ -122,7 +122,7 @@ W118	3.8 Objects: images, shapes, media	Sound and video 🌐 (in 15)	Different	1
 W119	3.8 Objects: images, shapes, media	Media formats	Different	15.4	D-001	In	Partial	-	W4	Reduces media (OBJ-20); optimizing on insert is missing
 W120	3.8 Objects: images, shapes, media	Borders, picture frames, shadow, reflection, opacity	Equal	Equal in both	-	In	Done	-	done	Borders, picture frames, shadow, reflection and opacity (OBJ-35 to OBJ-39); the five artistic lines of Pages 15.4, chalk, thick brush, chisel pen, dry brush and uneven ink, drawn in Desk's own way (B-044)
 W121	3.8 Objects: images, shapes, media	Fill	Different	15.4	D-001	In	Partial	-	W4	Color, gradient and image (OBJ-40 to OBJ-42); advanced gradient and saving a fill are missing
-W122	3.8 Objects: images, shapes, media	Object caption and title	Only 15	15.4	D-001	In	Missing	-	W4	Object caption and title
+W122	3.8 Objects: images, shapes, media	Object caption and title	Only 15	15.4	D-001	In	Done	-	W4	Title above or below and caption of any object, in the Style tab, edited in place in the Caption style; in ODF as a frame around the object, desk:captions (#262); on master pages and page templates B-081
 W123	3.8 Objects: images, shapes, media	Exact position, align and distribute	Equal	Equal in both	-	In	Done	-	done	Position, align and distribute (OBJ-26, OBJ-29)
 W124	3.8 Objects: images, shapes, media	Alignment guides	Different	15.4	D-001	In	Partial	-	W4	Dynamic and fixed guides (OBJ-27, OBJ-28); their own color is missing
 W125	3.8 Objects: images, shapes, media	Layers, group, lock	Equal	Equal in both	-	In	Done	-	done	Layers, group, lock (OBJ-24, OBJ-30, OBJ-32)

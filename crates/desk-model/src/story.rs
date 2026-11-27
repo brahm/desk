@@ -33,6 +33,13 @@ pub enum Story {
     /// The text of a text box on the pages, by the identifier of the
     /// object (OBJ-13).
     TextBox(NodeId),
+    /// The title or the caption of an object, when it shows (W122).
+    Caption {
+        /// The object.
+        object: NodeId,
+        /// Whether it is the title rather than the caption.
+        title: bool,
+    },
 }
 
 impl Document {
@@ -55,6 +62,12 @@ impl Document {
                     .map(|text| text.paragraphs.to_vec())
                     .unwrap_or_default()
             }
+            Story::Caption { object, title } => self
+                .objects()
+                .get(object)
+                .and_then(|o| o.shown_caption(title))
+                .map(|c| c.paragraphs.to_vec())
+                .unwrap_or_default(),
         }
     }
 
@@ -260,7 +273,25 @@ impl Document {
             }
         }
         out.extend(self.text_box_stories());
+        out.extend(self.caption_stories());
         out
+    }
+
+    /// The titles and captions that show, of the objects of the page from
+    /// back to front, each title before its caption (W122).
+    pub fn caption_stories(&self) -> Vec<Story> {
+        self.objects()
+            .iter()
+            .flat_map(|o| {
+                [true, false]
+                    .into_iter()
+                    .filter(|&title| o.shown_caption(title).is_some())
+                    .map(|title| Story::Caption {
+                        object: o.id,
+                        title,
+                    })
+            })
+            .collect()
     }
 
     /// The same document with other paragraphs in its body, to edit the
@@ -366,6 +397,7 @@ impl Edit {
                 Story::TextBox(id) => ModelError::UnknownObject(id),
                 Story::Note(id) => ModelError::UnknownParagraph(id),
                 Story::Margin { .. } => ModelError::EmptyRange,
+                Story::Caption { object, .. } => ModelError::UnknownObject(object),
             });
         }
         let before = paragraphs.clone();
@@ -436,6 +468,7 @@ impl Edit {
                 }
                 self.replace_object(object)
             }
+            Story::Caption { object, title } => self.set_caption(object, title, paragraphs),
         }
     }
 
