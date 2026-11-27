@@ -91,6 +91,13 @@ impl TextEditor {
             let (Some(this), Ok(files)) = (weak.upgrade(), value.get::<gdk::FileList>()) else {
                 return false;
             };
+            // A card dropped on a merge field fills the fields (MAL-02,
+            // MAL-03).
+            if let [file] = &files.files()[..]
+                && this.drop_card(file, x, y)
+            {
+                return true;
+            }
             let at = this.view.page_at(x, y);
             let mut used = false;
             for (i, file) in files.files().iter().enumerate() {

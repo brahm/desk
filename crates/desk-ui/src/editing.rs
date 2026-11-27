@@ -746,6 +746,16 @@ impl TextEditor {
         }
     }
 
+    /// The pages as a saved file shows them: without the data of the
+    /// preview of a mail merge, which is not in the document (MAL-04).
+    pub fn saved_pages(&self) -> Vec<DisplayList> {
+        let state = self.state.borrow();
+        if state.merge_preview.is_some() {
+            return DisplayList::pages(&crate::lay_out(Self::main_document(&state)));
+        }
+        DisplayList::pages(Self::main_layout(&state))
+    }
+
     /// The pages as they are now.
     pub fn pages(&self) -> Vec<DisplayList> {
         let state = self.state.borrow();

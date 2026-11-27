@@ -3016,6 +3016,33 @@ paragraph, and objects on a second page.
   sender's own card, and a card dragged onto a field. No task moved to
   another phase.
 
+### 27 November: the contacts of the desktop (step 11 of W3, last part)
+
+- Populate With offers the contacts of the desktop, every one or those
+  of a group, as GNOME Contacts and Evolution keep them in Evolution
+  Data Server. Desk asks the server on the session bus for its address
+  books and their cards, as vCard, without a library of its own; the
+  groups are the categories of the cards. The Flatpak may now talk to
+  the server.
+- The Preview and Merge fill the sender fields with the person's own
+  card, and Fill With My Card, in the menu of a sender field, writes it
+  in them. GNOME keeps no card marked as one's own, so it is the card of
+  the name the system gives the person. A sender field that a card
+  filled keeps it.
+- Pages '09 filled the sender fields as a document opened. Desk does
+  not: the security review showed that a document could put the card
+  in fields too pale to see, and the thumbnail saved in the file would
+  carry it. The desktop is asked for contacts only when the person
+  acts, away from the window so that it never waits, and the thumbnail
+  of a saved file never shows the data of a Preview.
+- A vCard file dropped on a merge field fills the fields, as dragging a
+  card did in both Pages: on a sender field the sender fields, on
+  another field the fields of the recipient. Undo takes the data away.
+  GNOME Contacts does not drag its cards out, so the card comes as a
+  file.
+- The UI tests run against a small stand-in of the server.
+- W105 is done. No task moved to another phase.
+
 ## Decisions, with their reasons and consequences
 
 Ids `D-nnn` and `R-nnn` are those of [decisions.md](decisions.md).

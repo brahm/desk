@@ -9,7 +9,9 @@
 //!
 //! A source is a file that the document names. It is read only when the
 //! person asks for its data, by choosing it, opening Add Merge Field,
-//! turning the Preview on or merging, never when the document opens.
+//! turning the Preview on or merging, never when the document opens; so
+//! are the contacts of the desktop, which the Preview and Merge also ask
+//! for the person's own card, for the sender fields.
 
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
@@ -39,17 +41,23 @@ pub const COMMON_FIELDS: [&str; 10] = [
     "Birthday",
 ];
 
-/// The records of a source: those of a file, read now.
+/// The records of a source: those of a file, read now, or the contacts
+/// that the desktop gave last ([`crate::desktop_contacts::with_cards`]).
 pub fn read_records(source: &MergeSource) -> Result<Records, SourceError> {
+    if let MergeSource::Contacts { group } = source {
+        let cards = crate::desktop_contacts::cards_now().ok_or(SourceError::Desktop)?;
+        let cards = crate::desktop_contacts::in_group(cards.to_vec(), group.as_deref());
+        return Ok(Records::of_cards(&cards));
+    }
     desk_contacts::read_source(source, |path| std::fs::File::open(path))
 }
 
 /// The datum that a field of a record shows: a recipient field takes
-/// that of the record, or nothing when it has none; a sender field stays
-/// as it is until the sender's own card fills it.
+/// that of the record, or nothing when it has none; a sender field that
+/// of the person's own card, once the desktop gave it (MAL-01).
 fn datum(records: &Records, record: usize, name: &str, sender: bool) -> Option<String> {
     if sender {
-        return None;
+        return crate::desktop_contacts::own_card_now().and_then(|c| c.get(name));
     }
     Some(records.datum(record, name).unwrap_or_default().to_owned())
 }
@@ -74,7 +82,7 @@ pub fn merged(editor: &TextEditor) -> Result<Document, String> {
 /// Why a source could not be read, for the person.
 fn describe_error(error: &SourceError) -> String {
     match error {
-        SourceError::Desktop => tr("The contacts of the desktop cannot be read yet."),
+        SourceError::Desktop => tr("The contacts of the desktop cannot be read."),
         SourceError::TooLarge => tr("The file is too large."),
         SourceError::Unsupported => tr("The file is not a vCard, ODS or CSV file."),
         SourceError::NoTable(name) => {
@@ -155,8 +163,38 @@ impl MailMergeGroup {
         let choose = gtk::MenuButton::builder()
             .label(tr("Choose"))
             .valign(gtk::Align::Center)
-            .menu_model(&source_menu())
+            .menu_model(&source_menu(&[]))
             .build();
+        // The groups of the contacts, as the desktop gave them last; the
+        // menu asks it again as it opens, away from the window, and shows
+        // the groups once they come.
+        let asked = Rc::new(Cell::new(false));
+        choose.set_create_popup_func(move |button| {
+            let groups = || {
+                crate::desktop_contacts::cards_now()
+                    .map(|cards| crate::desktop_contacts::groups(&cards))
+                    .unwrap_or_default()
+            };
+            let before = groups();
+            button.set_menu_model(Some(&source_menu(&before)));
+            if asked.replace(true) {
+                // The menu opened again as the groups came.
+                asked.set(false);
+                return;
+            }
+            let button = button.downgrade();
+            let asked = asked.clone();
+            crate::desktop_contacts::with_cards(move |_| {
+                let now = groups();
+                match button.upgrade() {
+                    Some(button) if now != before && button.is_active() => {
+                        button.popdown();
+                        button.popup();
+                    }
+                    _ => asked.set(false),
+                }
+            });
+        });
         let source = compact::ActionRow::builder()
             .title(tr("Populate With"))
             .build();
@@ -238,12 +276,25 @@ impl MailMergeGroup {
             }
         });
         let weak = Rc::downgrade(&this);
-        this.preview.connect_active_notify(move |_| {
-            if let Some(this) = weak.upgrade()
-                && !this.updating.get()
-            {
-                this.show_preview();
+        this.preview.connect_active_notify(move |row| {
+            let Some(this) = weak.upgrade() else {
+                return;
+            };
+            if this.updating.get() {
+                return;
             }
+            if !row.is_active() {
+                this.show_preview();
+                return;
+            }
+            // The contacts and the person's own card, for the sender
+            // fields, come first.
+            let weak = Rc::downgrade(&this);
+            crate::desktop_contacts::with_cards(move |_| {
+                if let Some(this) = weak.upgrade() {
+                    this.show_preview();
+                }
+            });
         });
         for (button, step) in [(&this.previous, -1isize), (&this.next, 1)] {
             let weak = Rc::downgrade(&this);
@@ -279,6 +330,12 @@ impl MailMergeGroup {
             let (Some(this), Some(kind)) = (weak.upgrade(), kind.and_then(|k| k.str())) else {
                 return;
             };
+            if let Some(group) = kind.strip_prefix("group:") {
+                this.set_source(Some(MergeSource::Contacts {
+                    group: Some(group.into()),
+                }));
+                return;
+            }
             match kind {
                 "contacts" => this.set_source(Some(MergeSource::Contacts { group: None })),
                 "none" => this.set_source(None),
@@ -346,8 +403,25 @@ impl MailMergeGroup {
         };
         editor.set_merge_preview(None);
         editor.set_merge_source(source.clone());
-        if let Some(source) = source {
-            self.load(&source);
+        let Some(source) = source else {
+            return;
+        };
+        *self.records.borrow_mut() = None;
+        let weak = Rc::downgrade(self);
+        self.with_contacts(&source.clone(), move || {
+            if let Some(this) = weak.upgrade() {
+                this.load(&source);
+            }
+        });
+    }
+
+    /// Calls `then` once the contacts of the desktop came, when the source
+    /// is the contacts, or at once.
+    fn with_contacts(&self, source: &MergeSource, then: impl FnOnce() + 'static) {
+        if matches!(source, MergeSource::Contacts { .. }) {
+            crate::desktop_contacts::with_cards(move |_| then());
+        } else {
+            then();
         }
     }
 
@@ -540,18 +614,25 @@ impl MailMergeGroup {
     }
 }
 
-/// The menu of Populate With.
-fn source_menu() -> gio::Menu {
-    let menu = gio::Menu::new();
-    for (label, kind) in [
-        (tr("_Contacts"), "contacts"),
-        (tr("_vCard File…"), "vcard"),
-        (tr("_Spreadsheet…"), "spreadsheet"),
-    ] {
-        let item = gio::MenuItem::new(Some(&label), None);
+/// The menu of Populate With: every contact or those of a group, a
+/// vCard file or a spreadsheet.
+fn source_menu(groups: &[String]) -> gio::Menu {
+    let item = |label: &str, kind: &str| {
+        let item = gio::MenuItem::new(Some(label), None);
         item.set_action_and_target_value(Some("merge.source"), Some(&kind.to_variant()));
-        menu.append_item(&item);
+        item
+    };
+    let menu = gio::Menu::new();
+    let contacts = gio::Menu::new();
+    contacts.append_item(&item(&tr("_All Contacts"), "contacts"));
+    for group in groups {
+        contacts.append_item(&item(&group.replace('_', "__"), &format!("group:{group}")));
     }
+    menu.append_section(Some(&tr("Contacts")), &contacts);
+    let files = gio::Menu::new();
+    files.append_item(&item(&tr("_vCard File…"), "vcard"));
+    files.append_item(&item(&tr("_Spreadsheet…"), "spreadsheet"));
+    menu.append_section(None, &files);
     let remove = gio::Menu::new();
     let item = gio::MenuItem::new(Some(&tr("_Remove Source")), None);
     item.set_action_and_target_value(Some("merge.source"), Some(&"none".to_variant()));

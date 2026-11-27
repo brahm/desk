@@ -8,6 +8,11 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
 
 ## Changes since 0.7.0 (unreleased)
 
+* Added: A mail merge can take the contacts of GNOME, all of them or a
+  group, and the Preview, Merge and Fill With My Card put your own card
+  in the sender fields. A vCard file dropped on a merge field fills the
+  fields. (#256)
+
 * Added: Mail Merge in the Document tab: Populate With a vCard file or a
   spreadsheet, Add Merge Field, a Preview that steps through the
   records, and Merge, which opens a new document with a letter for each

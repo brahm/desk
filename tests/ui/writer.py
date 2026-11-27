@@ -622,6 +622,7 @@ def main():
     tables_and_charts(work)
     automatic_saving(work)
     mail_merge(work)
+    contacts_of_the_desktop(work)
     print("All UI tests passed.")
 
 
@@ -3750,6 +3751,77 @@ def mail_merge(work):
         writer.terminate()
         writer.wait(timeout=10)
 
+
+
+def contacts_of_the_desktop(work):
+    """The contacts of the desktop as the source of a mail merge, from
+    Evolution Data Server: those of a group fill the Preview, and the
+    person's own card the sender fields (MAL-01, MAL-04)."""
+    name = "ContactsLetter.odt"
+    letter = work / name
+    subprocess.run([str(CONVERT), str(FIXTURE), str(letter)], check=True)
+    with_merge_source(letter, "contacts", "Clients")
+    eds = subprocess.Popen(
+        [sys.executable, "-I", str(Path(__file__).parent / "helpers" / "fake_eds.py")],
+        stdout=subprocess.PIPE,
+        text=True,
+    )
+    writer = None
+    try:
+        check("the contacts of the desktop are ready", eds.stdout.readline().strip() == "ready")
+        writer = subprocess.Popen([str(WRITER), str(letter)])
+        app = wait_for("Desk Writer on the accessibility bus", lambda: app_named("desk-writer"))
+        document = wait_for("the document", lambda: find(app, Atspi.Role.TEXT, name))
+        subprocess.run(
+            ["xdotool", "search", "--sync", "--name", name, "windowfocus", "--sync"],
+            check=True,
+        )
+        press("ctrl+End")
+        activate("insert-merge-field", "First Name")
+        activate("insert-sender-field", "Company")
+        wait_for(
+            "the fields with their names",
+            lambda: text_of(document) == "US Letter, landscapeFirst NameCompany\n",
+        )
+        check("the sender fields show their names until the person asks for their card (MAL-01)", True)
+        # GNOME keeps no card marked as one's own: it is the card of the
+        # name the system gives the person, when it gives one.
+        own = GLib.get_real_name() not in ("", "Unknown")
+        sender = "Desk & Co." if own else "Company"
+        press("ctrl+alt+i")
+        activate("inspector-tab", "document")
+        wait_for("Mail Merge", lambda: showing_named(app, "Populate With"))
+        check(
+            "the source is a group of the contacts (MAL-04)",
+            showing_named(app, "Clients") is not None,
+        )
+        toggle_switch_row(app, "Preview", "the Preview switch")
+        wait_for(
+            "the contact of the group in the field",
+            lambda: text_of(document) == f"US Letter, landscapeAna{sender}\n",
+        )
+        check(
+            "the Preview shows the contacts of the group alone (MAL-04)",
+            showing_named(app, "1 of 1") is not None,
+        )
+        check("the Preview fills the sender fields with the person's own card (MAL-01)", own)
+        toggle_switch_row(app, "Preview", "the Preview switch")
+        wait_for(
+            "the fields as they are",
+            lambda: text_of(document) == "US Letter, landscapeFirst NameCompany\n",
+        )
+        activate("field-merge-own-card")
+        wait_for(
+            "the sender field filled",
+            lambda: text_of(document) == f"US Letter, landscapeFirst Name{sender}\n",
+        )
+        check("Fill With My Card fills the sender fields (MAL-01)", True)
+    finally:
+        if writer is not None:
+            writer.terminate()
+            writer.wait(timeout=10)
+        eds.terminate()
+        eds.wait(timeout=10)
 
 if __name__ == "__main__":
     main()
