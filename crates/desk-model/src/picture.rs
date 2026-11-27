@@ -4,7 +4,8 @@
 #![cfg_attr(not(test), deny(clippy::indexing_slicing, clippy::unwrap_used))]
 
 //! Pictures: the image bullets of lists (LST-03) and the images of
-//! documents (OBJ-01), kept as PNG or, as they came, JPEG.
+//! documents (OBJ-01), kept as PNG or, as they came, JPEG, PDF, SVG and
+//! HEIC (W108).
 
 use std::hash::{Hash, Hasher};
 use std::sync::Arc;
@@ -21,6 +22,13 @@ pub enum PictureFormat {
     /// PDF, its first page, drawn as it is so that it stays sharp at any
     /// size; its width and height are in points.
     Pdf,
+    /// SVG, drawn as it is so that it stays sharp at any size; its width
+    /// and height are in pixels of a CSS inch of 96, as it declares them
+    /// (W108).
+    Svg,
+    /// HEIC, the photographs of iPhones, kept as it came and decoded only
+    /// to draw it (W108).
+    Heic,
 }
 
 impl PictureFormat {
@@ -30,6 +38,8 @@ impl PictureFormat {
             Self::Png => "image/png",
             Self::Jpeg => "image/jpeg",
             Self::Pdf => "application/pdf",
+            Self::Svg => "image/svg+xml",
+            Self::Heic => "image/heic",
         }
     }
 
@@ -39,7 +49,15 @@ impl PictureFormat {
             Self::Png => "png",
             Self::Jpeg => "jpg",
             Self::Pdf => "pdf",
+            Self::Svg => "svg",
+            Self::Heic => "heic",
         }
+    }
+
+    /// Whether it is drawn as lines and text rather than pixels: PDF and
+    /// SVG.
+    pub fn is_vector(self) -> bool {
+        matches!(self, Self::Pdf | Self::Svg)
     }
 }
 
@@ -142,6 +160,39 @@ impl Picture {
         })
     }
 
+    /// A picture from the bytes of an SVG file, `width` by `height` as an
+    /// SVG library measured it; `None` when they do not look like SVG or
+    /// the picture is empty (W108).
+    pub fn from_svg(svg: impl Into<Arc<[u8]>>, width: f64, height: f64) -> Option<Self> {
+        let svg = svg.into();
+        if !is_svg(&svg) || !(width >= 1.0 && height >= 1.0) {
+            return None;
+        }
+        let side = |v: f64| v.round().min(f64::from(u32::MAX)) as u32;
+        Some(Self {
+            png: svg,
+            format: PictureFormat::Svg,
+            width: side(width),
+            height: side(height),
+        })
+    }
+
+    /// A picture from the bytes of a HEIC file of `width` by `height`
+    /// pixels, as a HEIF library read them; `None` when they do not start
+    /// as HEIF or it has no pixels (W108).
+    pub fn from_heic(heic: impl Into<Arc<[u8]>>, width: u32, height: u32) -> Option<Self> {
+        let heic = heic.into();
+        if !is_heif(&heic) || width == 0 || height == 0 {
+            return None;
+        }
+        Some(Self {
+            png: heic,
+            format: PictureFormat::Heic,
+            width,
+            height,
+        })
+    }
+
     /// A picture from the bytes of a PNG or JPEG file.
     pub fn from_bytes(bytes: impl Into<Arc<[u8]>>) -> Option<Self> {
         let bytes = bytes.into();
@@ -187,6 +238,66 @@ impl Picture {
     pub fn same_data(&self, other: &Self) -> bool {
         Arc::ptr_eq(&self.png, &other.png)
     }
+}
+
+/// Whether bytes look like an SVG file: an XML document, after a byte
+/// order mark, white space and comments, whose first element is `svg`.
+pub fn is_svg(bytes: &[u8]) -> bool {
+    let head = bytes.get(..bytes.len().min(4096)).unwrap_or_default();
+    let Ok(text) = std::str::from_utf8(head).or_else(|e| {
+        // A head cut inside a character.
+        std::str::from_utf8(head.get(..e.valid_up_to()).unwrap_or_default())
+    }) else {
+        return false;
+    };
+    let mut rest = text.trim_start_matches('\u{feff}');
+    loop {
+        rest = rest.trim_start();
+        if let Some(after) = rest.strip_prefix("<?") {
+            let Some(end) = after.find("?>") else {
+                return false;
+            };
+            rest = after.get(end + 2..).unwrap_or_default();
+        } else if let Some(after) = rest.strip_prefix("<!--") {
+            let Some(end) = after.find("-->") else {
+                return false;
+            };
+            rest = after.get(end + 3..).unwrap_or_default();
+        } else if let Some(after) = rest.strip_prefix("<!DOCTYPE") {
+            let Some(end) = after.find('>') else {
+                return false;
+            };
+            rest = after.get(end + 1..).unwrap_or_default();
+        } else {
+            break;
+        }
+    }
+    rest.strip_prefix("<svg")
+        .is_some_and(|after| after.starts_with(|c: char| c.is_whitespace() || c == '>'))
+        || rest.starts_with("<svg:svg")
+}
+
+/// Whether bytes start as a HEIF file of still pictures, such as HEIC: an
+/// `ftyp` box whose brands name one (W108).
+pub fn is_heif(bytes: &[u8]) -> bool {
+    if bytes.get(4..8) != Some(b"ftyp") {
+        return false;
+    }
+    let size = bytes
+        .get(..4)
+        .and_then(|b| b.try_into().ok())
+        .map_or(0, |b: [u8; 4]| u32::from_be_bytes(b) as usize)
+        .min(bytes.len())
+        .min(256);
+    let brands = bytes.get(8..size).unwrap_or_default();
+    // Brands of HEVC pictures only: "mif1" alone is that of AVIF too,
+    // which Desk does not decode.
+    brands.as_chunks::<4>().0.iter().any(|brand| {
+        matches!(
+            brand,
+            b"heic" | b"heix" | b"heim" | b"heis" | b"hevc" | b"hevx"
+        )
+    })
 }
 
 impl std::fmt::Debug for Picture {
@@ -254,5 +365,26 @@ mod tests {
         assert_eq!(picture.format(), PictureFormat::Jpeg);
         assert_eq!((picture.width(), picture.height()), (17, 9));
         assert!(Picture::from_jpeg(vec![0xFF, 0xD8, 0xFF, 0xDA, 0, 2]).is_none());
+    }
+
+    #[test]
+    fn w108_svg_and_heic_are_known_by_their_first_bytes() {
+        assert!(is_svg(b"<svg xmlns='http://www.w3.org/2000/svg'/>"));
+        assert!(is_svg(
+            b"\xef\xbb\xbf<?xml version='1.0'?>\n<!-- made -->\n<!DOCTYPE svg>\n<svg>"
+        ));
+        assert!(!is_svg(b"<svgx>"));
+        assert!(!is_svg(b"<html><svg>"));
+        let svg = Picture::from_svg(b"<svg width='20' height='10'/>".to_vec(), 20.0, 10.0).unwrap();
+        assert_eq!(svg.format(), PictureFormat::Svg);
+        assert!(svg.format().is_vector());
+        assert!(Picture::from_svg(b"<svg/>".to_vec(), 0.0, 10.0).is_none());
+        let mut heic = 24u32.to_be_bytes().to_vec();
+        heic.extend_from_slice(b"ftypheic\0\0\0\0mif1heic");
+        assert!(is_heif(&heic));
+        assert!(!is_heif(b"\0\0\0\x18ftypisom\0\0\0\0isommp41"));
+        let picture = Picture::from_heic(heic, 64, 48).unwrap();
+        assert_eq!(picture.format().extension(), "heic");
+        assert!(!picture.format().is_vector());
     }
 }

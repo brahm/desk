@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 //! Pictures from other formats as the model keeps them (LST-03, OBJ-01):
-//! PNG, JPEG and PDF as they are, and TIFF, which Pages saves image
-//! bullets in, and GIF, converted to PNG.
+//! PNG, JPEG, PDF, SVG and HEIC as they are, and TIFF, which Pages saves
+//! image bullets in, and GIF, converted to PNG.
 
 use std::io::Cursor;
 
@@ -39,9 +39,9 @@ pub fn scaled_when_read(bytes: &[u8]) -> bool {
     bytes.starts_with(b"II*\0") || bytes.starts_with(b"MM\0*") || bytes.starts_with(b"GIF8")
 }
 
-/// A picture from the bytes of a PNG, JPEG, PDF, TIFF or GIF file, a TIFF
-/// or GIF one scaled down to fit `max_side`, or `None` when they are none
-/// of those or cannot be read.
+/// A picture from the bytes of a PNG, JPEG, PDF, SVG, HEIC, TIFF or GIF
+/// file, a TIFF or GIF one scaled down to fit `max_side`, or `None` when
+/// they are none of those or cannot be read.
 pub fn picture_within(bytes: &[u8], max_side: u32) -> Option<Picture> {
     if let Some(picture) = Picture::from_png(bytes.to_vec()) {
         return Some(picture);
@@ -58,7 +58,105 @@ pub fn picture_within(bytes: &[u8], max_side: u32) -> Option<Picture> {
     if bytes.starts_with(b"GIF8") {
         return from_gif(bytes, max_side.max(1));
     }
+    if desk_model::is_heif(bytes) {
+        return from_heic(bytes);
+    }
+    if desk_model::is_svg(bytes) {
+        return from_svg(bytes);
+    }
     None
+}
+
+/// An SVG file, measured by librsvg, which loads nothing from outside it
+/// (W108).
+fn from_svg(bytes: &[u8]) -> Option<Picture> {
+    let (width, height) = svg_size(bytes)?;
+    Picture::from_svg(bytes.to_vec(), width, height)
+}
+
+/// The size of an SVG file in pixels of 96 to the inch: the one it
+/// declares, or that of its view box.
+fn svg_size(bytes: &[u8]) -> Option<(f64, f64)> {
+    use librsvg_rebind::prelude::*;
+    let handle = librsvg_rebind::Handle::from_data(bytes).ok()?;
+    let (width, height) = handle.intrinsic_size_in_pixels().or_else(|| {
+        let (_, _, view) = handle.intrinsic_dimensions();
+        view.map(|v| (v.width(), v.height()))
+    })?;
+    (width.is_finite() && height.is_finite() && width >= 1.0 && height >= 1.0)
+        .then_some((width, height))
+}
+
+/// A HEIC or HEIF file, measured by libheif, with its turns (W108).
+fn from_heic(bytes: &[u8]) -> Option<Picture> {
+    let context = libheif_rs::HeifContext::read_from_bytes(bytes).ok()?;
+    let handle = context.primary_image_handle().ok()?;
+    let (width, height) = (handle.width(), handle.height());
+    fits(width, height).then_some(())?;
+    Picture::from_heic(bytes.to_vec(), width, height)
+}
+
+/// The largest side of the PNG that stands for an SVG or HEIC picture in
+/// a file, for the programs that read neither (W108).
+pub const FALLBACK_MAX_SIDE: u32 = 2048;
+
+/// A PNG of an SVG or HEIC picture, at most `FALLBACK_MAX_SIDE` on its
+/// larger side, for the programs that read neither; `None` for a picture
+/// of another format, or one that cannot be drawn (W108).
+pub fn png_fallback(picture: &Picture) -> Option<Picture> {
+    match picture.format() {
+        desk_model::PictureFormat::Svg => svg_png(picture),
+        desk_model::PictureFormat::Heic => heic_png(picture.data()),
+        _ => None,
+    }
+}
+
+fn svg_png(picture: &Picture) -> Option<Picture> {
+    use librsvg_rebind::prelude::*;
+    let handle = librsvg_rebind::Handle::from_data(picture.data()).ok()?;
+    let (w, h) = (f64::from(picture.width()), f64::from(picture.height()));
+    let scale = (f64::from(FALLBACK_MAX_SIDE) / w.max(h)).min(1.0);
+    let width = (w * scale).round().max(1.0) as i32;
+    let height = (h * scale).round().max(1.0) as i32;
+    let surface = cairo::ImageSurface::create(cairo::Format::ARgb32, width, height).ok()?;
+    {
+        let cr = cairo::Context::new(&surface).ok()?;
+        handle
+            .render_document(
+                &cr,
+                &librsvg_rebind::Rectangle::new(0.0, 0.0, f64::from(width), f64::from(height)),
+            )
+            .ok()?;
+    }
+    surface.flush();
+    let mut png = Vec::new();
+    surface.write_to_png(&mut png).ok()?;
+    Picture::from_png(png)
+}
+
+fn heic_png(bytes: &[u8]) -> Option<Picture> {
+    use libheif_rs::{ColorSpace, HeifContext, LibHeif, RgbChroma};
+    let context = HeifContext::read_from_bytes(bytes).ok()?;
+    let handle = context.primary_image_handle().ok()?;
+    if !fits(handle.width(), handle.height()) {
+        return None;
+    }
+    let image = LibHeif::new()
+        .decode(&handle, ColorSpace::Rgb(RgbChroma::Rgba), None)
+        .ok()?;
+    let planes = image.planes();
+    let plane = planes.interleaved?;
+    let (width, height) = (plane.width, plane.height);
+    if !fits(width, height) {
+        return None;
+    }
+    let row = width as usize * 4;
+    let mut rgba = Vec::with_capacity(row * height as usize);
+    for y in 0..height as usize {
+        rgba.extend_from_slice(plane.data.get(y * plane.stride..)?.get(..row)?);
+    }
+    let (rgba, width, height) = scaled(&rgba, width, height, FALLBACK_MAX_SIDE);
+    encode(&rgba, width, height)
 }
 
 /// The first page of a PDF file, measured by Poppler.

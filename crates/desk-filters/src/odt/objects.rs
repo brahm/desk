@@ -836,14 +836,18 @@ fn kind(
                 None => custom_shape(shape),
             })
         }
-        odf::DrawKind::Image { href } => {
-            let path = href.strip_prefix("./").unwrap_or(href);
-            let Some(picture) = source
-                .pictures
-                .iter()
-                .find(|(p, _)| p.strip_prefix("./").unwrap_or(p) == path)
-                .and_then(|(_, bytes)| crate::picture::picture_within(bytes, MAX_SIDE))
-            else {
+        odf::DrawKind::Image { href, fallback } => {
+            let read = |href: &str| {
+                let path = href.strip_prefix("./").unwrap_or(href);
+                source
+                    .pictures
+                    .iter()
+                    .find(|(p, _)| p.strip_prefix("./").unwrap_or(p) == path)
+                    .and_then(|(_, bytes)| crate::picture::picture_within(bytes, MAX_SIDE))
+            };
+            // The second picture stands for the first when Desk cannot
+            // read that one (W108).
+            let Some(picture) = read(href).or_else(|| fallback.as_deref().and_then(read)) else {
                 return Ok(None);
             };
             ObjectKind::Image(picture)
@@ -2561,6 +2565,8 @@ impl Exporter<'_> {
             ) => parametric_shape(shape, w, h),
             ObjectKind::Image(picture) => odf::DrawKind::Image {
                 href: self.picture(picture),
+                // A PNG for the programs that read no SVG or HEIC (W108).
+                fallback: crate::picture::png_fallback(picture).map(|png| self.picture(&png)),
             },
             ObjectKind::Media(media) => {
                 let seconds = odf_seconds;

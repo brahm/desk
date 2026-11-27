@@ -1283,3 +1283,70 @@ fn w098_the_background_of_a_page_is_drawn_behind_all_else() {
     assert!(path.contains(&desk_render::PathOp::Line(list.width, list.height)));
     assert!(list.items.len() > 1);
 }
+
+#[test]
+fn w108_svg_and_heic_pictures_are_drawn() {
+    use desk_model::Picture;
+    // Forty pixels by thirty, filled in blue, as lines.
+    let svg = br#"<svg xmlns="http://www.w3.org/2000/svg" width="40" height="30">
+        <rect width="40" height="30" fill="blue"/></svg>"#;
+    let (w, h) = desk_render::svg_size(svg).unwrap();
+    assert_eq!((w, h), (40.0, 30.0));
+    let svg = Picture::from_svg(svg.to_vec(), w, h).unwrap();
+    let heic = std::fs::read(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../corpus/fixtures/images/gradient-64x48.heic"
+    ))
+    .unwrap();
+    assert_eq!(desk_render::heic_size(&heic), Some((64, 48)));
+    let heic = Picture::from_heic(heic, 64, 48).unwrap();
+    let surface = desk_render::picture_surface(&heic).unwrap();
+    assert_eq!((surface.width(), surface.height()), (64, 48));
+    let list = DisplayList {
+        width: 200.0,
+        height: 100.0,
+        items: vec![
+            Item::Image {
+                picture: svg,
+                x: 0.0,
+                y: 0.0,
+                width: 80.0,
+                height: 40.0,
+            },
+            Item::Image {
+                picture: heic,
+                x: 100.0,
+                y: 50.0,
+                width: 80.0,
+                height: 40.0,
+            },
+        ],
+    };
+    let mut surface = cairo::ImageSurface::create(cairo::Format::ARgb32, 200, 100).unwrap();
+    {
+        let cr = cairo::Context::new(&surface).unwrap();
+        cr.set_source_rgb(1.0, 1.0, 1.0);
+        cr.paint().unwrap();
+        Painter::new().unwrap().paint(&cr, &list).unwrap();
+    }
+    surface.flush();
+    let stride = surface.stride() as usize;
+    let data = surface.data().unwrap();
+    let pixel = |x: usize, y: usize| {
+        let p = &data[y * stride + x * 4..][..3];
+        (p[2], p[1], p[0])
+    };
+    // The drawing is stretched to its frame.
+    assert_eq!(pixel(5, 5), (0, 0, 255));
+    assert_eq!(pixel(75, 35), (0, 0, 255));
+    assert_ne!(pixel(140, 70), (255, 255, 255));
+    assert_eq!(pixel(150, 20), (255, 255, 255));
+
+    // In a PDF, the SVG stays lines and the photograph is its pixels.
+    let out = Painter::new()
+        .unwrap()
+        .pdf_bytes(&[list], &Metadata::default())
+        .unwrap();
+    let images = poppler("pdfimages", &["-list"], &out);
+    assert_eq!(images.lines().count(), 3, "{images}");
+}

@@ -323,6 +323,10 @@ impl Painter {
                         paint_pdf(cr, picture, (*x, *y, *width, *height))?;
                         continue;
                     }
+                    if picture.format() == desk_model::PictureFormat::Svg {
+                        paint_svg(cr, picture, (*x, *y, *width, *height))?;
+                        continue;
+                    }
                     let Some(surface) = self.picture(picture) else {
                         continue;
                     };
@@ -1097,8 +1101,9 @@ pub fn reduced_picture(
     mask: Option<desk_model::Frame>,
     size: (f64, f64),
 ) -> Option<desk_model::Picture> {
-    // A PDF stays as it is, which is as sharp and about as small.
-    if picture.format() == desk_model::PictureFormat::Pdf {
+    // A PDF or an SVG stays as it is, which is as sharp and about as
+    // small.
+    if picture.format().is_vector() {
         return None;
     }
     let source = picture_surface(picture)?;
@@ -1188,8 +1193,8 @@ fn surface_bytes(surface: &cairo::ImageSurface) -> usize {
     usize::try_from(surface.stride()).unwrap_or(0) * usize::try_from(surface.height()).unwrap_or(0)
 }
 
-/// The pixels of a picture, to draw: PNG and JPEG decoded, and the first
-/// page of a PDF drawn at two pixels a point.
+/// The pixels of a picture, to draw: PNG, JPEG and HEIC decoded, and the
+/// first page of a PDF or an SVG drawn at two pixels a point.
 pub fn picture_surface(picture: &desk_model::Picture) -> Option<cairo::ImageSurface> {
     use desk_model::PictureFormat;
     match picture.format() {
@@ -1203,7 +1208,7 @@ pub fn picture_surface(picture: &desk_model::Picture) -> Option<cairo::ImageSurf
             .flatten(),
         PictureFormat::Jpeg if !decodable(picture) => None,
         PictureFormat::Jpeg => jpeg_surface(picture.shared_data()),
-        PictureFormat::Pdf => {
+        PictureFormat::Pdf | PictureFormat::Svg => {
             let (w, h) = (f64::from(picture.width()), f64::from(picture.height()));
             let scale = 2.0f64.min(MAX_DECODED_SIDE / w.max(h)).max(1e-3);
             let width = (w * scale).ceil().max(1.0) as i32;
@@ -1211,13 +1216,135 @@ pub fn picture_surface(picture: &desk_model::Picture) -> Option<cairo::ImageSurf
             let surface = cairo::ImageSurface::create(cairo::Format::ARgb32, width, height).ok()?;
             {
                 let cr = Context::new(&surface).ok()?;
-                cr.scale(scale, scale);
-                pdf_page(picture.data())?.render(&cr);
+                if picture.format() == PictureFormat::Svg {
+                    use librsvg_rebind::prelude::*;
+                    svg_handle(picture.data())?
+                        .render_document(
+                            &cr,
+                            &librsvg_rebind::Rectangle::new(0.0, 0.0, w * scale, h * scale),
+                        )
+                        .ok()?;
+                } else {
+                    cr.scale(scale, scale);
+                    pdf_page(picture.data())?.render(&cr);
+                }
             }
             surface.flush();
             Some(surface)
         }
+        PictureFormat::Heic if !decodable(picture) => None,
+        PictureFormat::Heic => heic_surface(picture.data()),
     }
+}
+
+/// An SVG file read by librsvg, which loads nothing from outside it: it
+/// has no place to resolve relative references against (W108).
+fn svg_handle(data: &[u8]) -> Option<librsvg_rebind::Handle> {
+    librsvg_rebind::Handle::from_data(data).ok()
+}
+
+/// The size of an SVG file, in pixels of 96 to the inch: that it
+/// declares, or that of its view box, or none when it declares neither
+/// (W108).
+pub fn svg_size(data: &[u8]) -> Option<(f64, f64)> {
+    use librsvg_rebind::prelude::*;
+    let handle = svg_handle(data)?;
+    let (width, height) = handle.intrinsic_size_in_pixels().or_else(|| {
+        let (_, _, view) = handle.intrinsic_dimensions();
+        view.map(|v| (v.width(), v.height()))
+    })?;
+    (width.is_finite() && height.is_finite() && width >= 1.0 && height >= 1.0)
+        .then_some((width, height))
+}
+
+/// Draws an SVG file into a rectangle, as lines and text, so that it
+/// stays sharp on screen and in a PDF (W108).
+fn paint_svg(
+    cr: &Context,
+    picture: &desk_model::Picture,
+    (x, y, width, height): (f32, f32, f32, f32),
+) -> Result<(), RenderError> {
+    use librsvg_rebind::prelude::*;
+    let Some(handle) = svg_handle(picture.data()) else {
+        return Ok(());
+    };
+    cr.save()?;
+    cr.rectangle(
+        f64::from(x),
+        f64::from(y),
+        f64::from(width),
+        f64::from(height),
+    );
+    cr.clip();
+    // The picture is stretched to the frame, as a PDF or the pixels of a
+    // picture are, whatever its own aspect.
+    let (w, h) = (f64::from(picture.width()), f64::from(picture.height()));
+    cr.translate(f64::from(x), f64::from(y));
+    cr.scale(f64::from(width) / w, f64::from(height) / h);
+    // A drawing that librsvg cannot finish leaves what it drew.
+    let _ = handle.render_document(cr, &librsvg_rebind::Rectangle::new(0.0, 0.0, w, h));
+    cr.restore()?;
+    Ok(())
+}
+
+/// The size of a HEIC file in pixels, with its turns, as libheif reads
+/// it (W108).
+pub fn heic_size(data: &[u8]) -> Option<(u32, u32)> {
+    let context = libheif_rs::HeifContext::read_from_bytes(data).ok()?;
+    let handle = context.primary_image_handle().ok()?;
+    let (width, height) = (handle.width(), handle.height());
+    (width > 0 && height > 0).then_some((width, height))
+}
+
+/// The pixels of a HEIC file, decoded by libheif with its turns and
+/// mirrors, within the limits of the pixels decoded (W108).
+fn heic_surface(data: &[u8]) -> Option<cairo::ImageSurface> {
+    use libheif_rs::{ColorSpace, HeifContext, LibHeif, RgbChroma};
+    let context = HeifContext::read_from_bytes(data).ok()?;
+    let handle = context.primary_image_handle().ok()?;
+    let (width, height) = (handle.width(), handle.height());
+    if width == 0
+        || height == 0
+        || width.max(height) > MAX_SURFACE_SIDE
+        || u64::from(width) * u64::from(height) > MAX_DECODED_PIXELS
+    {
+        return None;
+    }
+    let image = LibHeif::new()
+        .decode(&handle, ColorSpace::Rgb(RgbChroma::Rgba), None)
+        .ok()?;
+    let planes = image.planes();
+    let plane = planes.interleaved?;
+    let (w, h) = (plane.width as usize, plane.height as usize);
+    if w == 0 || h == 0 || w > MAX_SURFACE_SIDE as usize || h > MAX_SURFACE_SIDE as usize {
+        return None;
+    }
+    let mut surface =
+        cairo::ImageSurface::create(cairo::Format::ARgb32, w as i32, h as i32).ok()?;
+    let stride = surface.stride() as usize;
+    {
+        let mut out = surface.data().ok()?;
+        for row in 0..h {
+            let from = plane.data.get(row * plane.stride..)?.get(..w * 4)?;
+            let to = out.get_mut(row * stride..)?.get_mut(..w * 4)?;
+            for (rgba, bgra) in from
+                .as_chunks::<4>()
+                .0
+                .iter()
+                .zip(to.as_chunks_mut::<4>().0.iter_mut())
+            {
+                // Premultiplied BGRA in memory on little-endian machines.
+                let a = u16::from(rgba[3]);
+                let pre = |c: u8| ((u16::from(c) * a + 127) / 255) as u8;
+                bgra[0] = pre(rgba[2]);
+                bgra[1] = pre(rgba[1]);
+                bgra[2] = pre(rgba[0]);
+                bgra[3] = rgba[3];
+            }
+        }
+    }
+    surface.mark_dirty();
+    Some(surface)
 }
 
 /// The first page of a PDF.

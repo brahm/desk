@@ -3188,6 +3188,19 @@ paragraph, and objects on a second page.
   off, in ODF; and showing those of objects inside text boxes, shapes
   and groups, and of a text box that hangs in the line.
 
+### 27 November: SVG and HEIC images (step 4 of W4, #PR)
+
+- SVG images and HEIC photographs can be inserted, dragged onto the page
+  and read from ODT and Pages files, kept as they are. librsvg draws an
+  SVG as lines, sharp at every size and in a PDF, without loading
+  anything from outside the file; libheif decodes a HEIC with its turns.
+- In ODT each is followed by a PNG of it in a second `draw:image`, as
+  LibreOffice writes SVG, so that programs that read neither still show
+  it; Desk reads the PNG when it cannot read the first. No extension.
+- The Flatpak now builds libheif and libde265. AVIF pictures are not
+  decoded, and are no longer mistaken for movies, with HEIC ones.
+- No task moved to another phase.
+
 ## Decisions, with their reasons and consequences
 
 Ids `D-nnn` and `R-nnn` are those of [decisions.md](decisions.md).

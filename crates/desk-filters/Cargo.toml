@@ -9,9 +9,12 @@ repository.workspace = true
 publish.workspace = true
 
 [dependencies]
+cairo-rs.workspace = true
 gif.workspace = true
 glib.workspace = true
 poppler-rs.workspace = true
+librsvg-rebind.workspace = true
+libheif-rs.workspace = true
 desk-chart.workspace = true
 desk-formula.workspace = true
 desk-iwork.workspace = true

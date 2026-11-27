@@ -37,7 +37,7 @@ fi
 export DEBIAN_FRONTEND=noninteractive
 packages=(
     build-essential pkg-config curl ca-certificates git python3-pip
-    libgtk-4-dev libadwaita-1-dev libcairo2-dev libfontconfig-dev libpoppler-glib-dev
+    libgtk-4-dev libadwaita-1-dev libcairo2-dev libfontconfig-dev libpoppler-glib-dev librsvg2-dev libheif-dev libheif-plugin-libde265
     fonts-liberation fonts-dejavu-core fonts-texgyre fonts-urw-base35
     fonts-crosextra-carlito fonts-crosextra-caladea poppler-utils jing unzip
     xvfb xauth xdotool dbus libglib2.0-bin at-spi2-core python3-gi python3-gi-cairo gir1.2-atspi-2.0 gettext
