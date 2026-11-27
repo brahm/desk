@@ -123,7 +123,7 @@ its reason is in [docs/decisions.md](docs/decisions.md).
 Desk Writer came first, because the text engine is the hardest part and
 the other two apps depend on it. It has its text engine, document
 structure, writing tools, objects, tables and charts
-(<!-- parity -->259 of the 333 rows of its parity matrix have tests, 88 of them against what Pages itself laid out, all of them alike<!-- /parity -->):
+(<!-- parity -->259 of the 342 rows of its parity matrix have tests, 88 of them against what Pages itself laid out, all of them alike<!-- /parity -->):
 it opens ODT and Pages '09 documents and saves ODT, edits and formats text
 with styles and a screen reader, checks spelling and grammar, lays out
 sections, headers, footers, notes and tables of contents as Pages does,
