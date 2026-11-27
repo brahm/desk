@@ -3281,6 +3281,20 @@ paragraph, and objects on a second page.
 - W113 is done; generating a shape with AI stays out, as decided.
 - No task moved to another phase.
 
+### 27 November: Reverse and saved fills (step 7 of W4, #270)
+
+- The advanced gradient of 15.4 was already in the Format pane (OBJ-41).
+  What was missing was Reverse, which now turns a gradient of two
+  colours or more around, keeping each blend point between its colours.
+- Saved Fills, at the end of the fill rows, keeps a colour or a gradient
+  in a file of the data folder of Desk, to use again in any document, as
+  the colour picker of Pages keeps fills. A picture is not kept, since
+  it belongs to its document.
+- W121 is done. The colour of the guides (W124) was already a
+  preference; it stays to be checked on the Mac at the end of W4, as
+  planned, not moved.
+- No task moved to another phase.
+
 ## Decisions, with their reasons and consequences
 
 Ids `D-nnn` and `R-nnn` are those of [decisions.md](decisions.md).

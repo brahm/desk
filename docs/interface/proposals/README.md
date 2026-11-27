@@ -76,6 +76,7 @@ the generator, their id starts with `proprio.`.
 | Instant calculation chips | Yes | Yes | Whether a chip widget appears |
 | Colors popover: the palette of the HIG, the colors of the document, the eyedropper, Custom… and None (`crate::color_popover`) | No | Yes | Whether Libadwaita gains a color popover or palette; GTK's own `GtkColorChooser` is deprecated |
 | Shape library popover: categories in a `navigation-sidebar` list, a search entry and a grid of shape pictures, with a context menu on My Shapes (`crate::shape_popover`, W113) | No | Yes | Whether Libadwaita gains a searchable grid picker, such as an emoji or symbol chooser to reuse |
+| Saved Fills popover: a grid of fill swatches with Save Fill and a right-click Delete (`crate::fill_rows`, W121) | No | Yes | Whether Libadwaita gains a swatch grid or color palette widget |
 
 The rest is native: `AdwHeaderBar`, `AdwTabView` and `AdwTabBar`,
 `AdwOverlaySplitView`, `AdwToolbarView`, `AdwSidebar`, `AdwToggleGroup`,

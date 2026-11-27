@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Desk\n"
 "Report-Msgid-Bugs-To: https://github.com/brahm/desk/issues\n"
-"POT-Creation-Date: 2026-11-27 20:52+0000\n"
+"POT-Creation-Date: 2026-11-27 21:49+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -272,7 +272,7 @@ msgid "Insert"
 msgstr ""
 
 #: crates/desk-ui/src/captured_pages.rs:51
-#: crates/desk-ui/src/custom_format.rs:262
+#: crates/desk-ui/src/custom_format.rs:262 crates/desk-ui/src/fill_rows.rs:501
 #: crates/desk-ui/src/page_templates.rs:69
 #: crates/desk-ui/src/page_templates.rs:73
 #: crates/desk-ui/src/tables/window.rs:982 crates/desk-ui/src/undo_names.rs:31
@@ -484,7 +484,7 @@ msgid "None"
 msgstr ""
 
 #: crates/desk-ui/src/chart_pane.rs:50 crates/desk-ui/src/chart_pane.rs:226
-#: crates/desk-ui/src/fill_rows.rs:161
+#: crates/desk-ui/src/fill_rows.rs:174
 msgid "Linear"
 msgstr ""
 
@@ -557,8 +557,8 @@ msgstr ""
 #: crates/desk-ui/src/chart_pane.rs:187 crates/desk-ui/src/chart_pane.rs:210
 #: crates/desk-ui/src/compact.rs:46 crates/desk-ui/src/custom_format.rs:59
 #: crates/desk-ui/src/drop_cap_pane.rs:80 crates/desk-ui/src/effects.rs:269
-#: crates/desk-ui/src/effects.rs:343 crates/desk-ui/src/fill_rows.rs:183
-#: crates/desk-ui/src/fill_rows.rs:187 crates/desk-ui/src/fill_rows.rs:189
+#: crates/desk-ui/src/effects.rs:343 crates/desk-ui/src/fill_rows.rs:238
+#: crates/desk-ui/src/fill_rows.rs:242 crates/desk-ui/src/fill_rows.rs:244
 #: crates/desk-ui/src/fonts.rs:395 crates/desk-ui/src/graphic_pane.rs:130
 #: crates/desk-ui/src/graphic_pane.rs:147
 #: crates/desk-ui/src/graphic_pane.rs:153
@@ -1816,7 +1816,7 @@ msgid "Uneven Ink"
 msgstr ""
 
 #: crates/desk-ui/src/effects.rs:164 crates/desk-ui/src/effects.rs:174
-#: crates/desk-ui/src/fill_rows.rs:508
+#: crates/desk-ui/src/fill_rows.rs:715
 msgid "Color"
 msgstr ""
 
@@ -1891,7 +1891,7 @@ msgstr ""
 msgid "Text Shadow"
 msgstr ""
 
-#: crates/desk-ui/src/effects.rs:340 crates/desk-ui/src/fill_rows.rs:160
+#: crates/desk-ui/src/effects.rs:340 crates/desk-ui/src/fill_rows.rs:173
 #: crates/desk-ui/src/graphic_pane.rs:141
 #: crates/desk-ui/src/objects_pane.rs:207
 msgid "Degrees, counterclockwise"
@@ -1972,123 +1972,156 @@ msgstr ""
 msgid "Pick a Color from the Screen"
 msgstr ""
 
-#: crates/desk-ui/src/fill_rows.rs:32
+#: crates/desk-ui/src/fill_rows.rs:35
 msgid "Scale to Fill"
 msgstr ""
 
-#: crates/desk-ui/src/fill_rows.rs:33
+#: crates/desk-ui/src/fill_rows.rs:36
 msgid "Scale to Fit"
 msgstr ""
 
-#: crates/desk-ui/src/fill_rows.rs:34
+#: crates/desk-ui/src/fill_rows.rs:37
 msgid "Stretch"
 msgstr ""
 
-#: crates/desk-ui/src/fill_rows.rs:35 crates/desk-ui/src/objects_pane.rs:242
+#: crates/desk-ui/src/fill_rows.rs:38 crates/desk-ui/src/objects_pane.rs:242
 msgid "Original Size"
 msgstr ""
 
-#: crates/desk-ui/src/fill_rows.rs:36
+#: crates/desk-ui/src/fill_rows.rs:39
 msgid "Tile"
 msgstr ""
 
-#: crates/desk-ui/src/fill_rows.rs:141
+#: crates/desk-ui/src/fill_rows.rs:154 crates/desk-ui/src/fill_rows.rs:848
 #: crates/desk-ui/src/object_text_pane.rs:165
 msgid "Color Fill"
 msgstr ""
 
-#: crates/desk-ui/src/fill_rows.rs:142
+#: crates/desk-ui/src/fill_rows.rs:155 crates/desk-ui/src/fill_rows.rs:849
 msgid "Gradient Fill"
 msgstr ""
 
-#: crates/desk-ui/src/fill_rows.rs:143
+#: crates/desk-ui/src/fill_rows.rs:156 crates/desk-ui/src/fill_rows.rs:851
 msgid "Image Fill"
 msgstr ""
 
-#: crates/desk-ui/src/fill_rows.rs:144
+#: crates/desk-ui/src/fill_rows.rs:157
 msgid "Tinted Image Fill"
 msgstr ""
 
-#: crates/desk-ui/src/fill_rows.rs:145
+#: crates/desk-ui/src/fill_rows.rs:158 crates/desk-ui/src/fill_rows.rs:850
 msgid "Advanced Gradient Fill"
 msgstr ""
 
-#: crates/desk-ui/src/fill_rows.rs:148 crates/desk-ui/src/table_pane.rs:295
+#: crates/desk-ui/src/fill_rows.rs:161 crates/desk-ui/src/table_pane.rs:295
 #: crates/desk-ui/src/table_pane.rs:312 crates/desk-ui/src/undo_names.rs:72
 msgid "Fill"
 msgstr ""
 
-#: crates/desk-ui/src/fill_rows.rs:150
+#: crates/desk-ui/src/fill_rows.rs:163
 msgid "Choose…"
 msgstr ""
 
-#: crates/desk-ui/src/fill_rows.rs:153 crates/desk-ui/src/formatting.rs:368
+#: crates/desk-ui/src/fill_rows.rs:166 crates/desk-ui/src/formatting.rs:368
 #: crates/desk-ui/src/inspector.rs:66 crates/desk-ui/src/lists_pane.rs:242
 #: crates/desk-ui/src/picture_pane.rs:165
 msgid "Image"
 msgstr ""
 
-#: crates/desk-ui/src/fill_rows.rs:156
+#: crates/desk-ui/src/fill_rows.rs:169
 msgid "Image Size"
 msgstr ""
 
-#: crates/desk-ui/src/fill_rows.rs:157 crates/desk-ui/src/fill_rows.rs:510
+#: crates/desk-ui/src/fill_rows.rs:170 crates/desk-ui/src/fill_rows.rs:717
 msgid "Fill Color"
 msgstr ""
 
-#: crates/desk-ui/src/fill_rows.rs:158
+#: crates/desk-ui/src/fill_rows.rs:171
 msgid "Gradient End Color"
 msgstr ""
 
-#: crates/desk-ui/src/fill_rows.rs:159
+#: crates/desk-ui/src/fill_rows.rs:172
 msgid "Gradient Angle"
 msgstr ""
 
-#: crates/desk-ui/src/fill_rows.rs:161
+#: crates/desk-ui/src/fill_rows.rs:174
 msgid "Gradient Type"
 msgstr ""
 
-#: crates/desk-ui/src/fill_rows.rs:161
+#: crates/desk-ui/src/fill_rows.rs:174
 msgid "Radial"
 msgstr ""
 
-#: crates/desk-ui/src/fill_rows.rs:164 crates/desk-ui/src/gradient_bar.rs:47
+#: crates/desk-ui/src/fill_rows.rs:177 crates/desk-ui/src/gradient_bar.rs:47
 msgid "Gradient Colors"
 msgstr ""
 
-#: crates/desk-ui/src/fill_rows.rs:165
+#: crates/desk-ui/src/fill_rows.rs:178
 msgid "Click to add a color, drag to move it"
 msgstr ""
 
-#: crates/desk-ui/src/fill_rows.rs:177
+#: crates/desk-ui/src/fill_rows.rs:190
 msgid "Add Color"
 msgstr ""
 
-#: crates/desk-ui/src/fill_rows.rs:178
+#: crates/desk-ui/src/fill_rows.rs:191
 msgid "Remove Color"
 msgstr ""
 
-#: crates/desk-ui/src/fill_rows.rs:182
+#: crates/desk-ui/src/fill_rows.rs:193 crates/desk-ui/src/fill_rows.rs:194
+msgid "Reverse Colors"
+msgstr ""
+
+#: crates/desk-ui/src/fill_rows.rs:207
+msgid "Save Fill"
+msgstr ""
+
+#: crates/desk-ui/src/fill_rows.rs:208
+msgid "Keeps this fill here, to use again in any document"
+msgstr ""
+
+#: crates/desk-ui/src/fill_rows.rs:229 crates/desk-ui/src/fill_rows.rs:232
+#: crates/desk-ui/src/fill_rows.rs:234
+msgid "Saved Fills"
+msgstr ""
+
+#: crates/desk-ui/src/fill_rows.rs:237
 msgid "Color Position"
 msgstr ""
 
-#: crates/desk-ui/src/fill_rows.rs:184
+#: crates/desk-ui/src/fill_rows.rs:239
 msgid "Blend Point"
 msgstr ""
 
-#: crates/desk-ui/src/fill_rows.rs:185
+#: crates/desk-ui/src/fill_rows.rs:240
 msgid "Percent of the way to the next color"
 msgstr ""
 
-#: crates/desk-ui/src/fill_rows.rs:186
+#: crates/desk-ui/src/fill_rows.rs:241
 msgid "Horizontal Center"
 msgstr ""
 
-#: crates/desk-ui/src/fill_rows.rs:188
+#: crates/desk-ui/src/fill_rows.rs:243
 msgid "Vertical Center"
 msgstr ""
 
-#: crates/desk-ui/src/fill_rows.rs:396
+#: crates/desk-ui/src/fill_rows.rs:407
+msgid "A picture is not saved here."
+msgstr ""
+
+#: crates/desk-ui/src/fill_rows.rs:410
+msgid "This gradient has more colors or values than a saved fill keeps."
+msgstr ""
+
+#: crates/desk-ui/src/fill_rows.rs:413
+msgid "As many fills are saved as are kept. Delete one to save another."
+msgstr ""
+
+#: crates/desk-ui/src/fill_rows.rs:417
+msgid "The file of saved fills cannot be read or written."
+msgstr ""
+
+#: crates/desk-ui/src/fill_rows.rs:603
 msgid "Choose an Image to Fill With"
 msgstr ""
 
@@ -3278,34 +3311,34 @@ msgstr ""
 msgid "Outside Margin"
 msgstr ""
 
-#: crates/desk-ui/src/lib.rs:413
+#: crates/desk-ui/src/lib.rs:414
 msgid ""
 "The font {requested} is not installed, so {used} is used, which has the same "
 "metrics."
 msgstr ""
 
-#: crates/desk-ui/src/lib.rs:416
+#: crates/desk-ui/src/lib.rs:417
 msgid ""
 "The font {requested} is not installed, so {used} is used, which looks alike; "
 "lines may break elsewhere."
 msgstr ""
 
-#: crates/desk-ui/src/lib.rs:419
+#: crates/desk-ui/src/lib.rs:420
 msgid ""
 "The font {requested} is not installed, so {used} is used; lines may break "
 "elsewhere."
 msgstr ""
 
-#: crates/desk-ui/src/lib.rs:734 crates/desk-ui/src/tables/window.rs:463
+#: crates/desk-ui/src/lib.rs:735 crates/desk-ui/src/tables/window.rs:463
 #: crates/desk-ui/src/window.rs:1967 crates/desk-ui/src/window.rs:2986
 msgid "Untitled"
 msgstr ""
 
-#: crates/desk-ui/src/lib.rs:737
+#: crates/desk-ui/src/lib.rs:738
 msgid "Recover Unsaved Changes?"
 msgstr ""
 
-#: crates/desk-ui/src/lib.rs:740
+#: crates/desk-ui/src/lib.rs:741
 msgid ""
 "{app} closed unexpectedly. The changes to this document were kept: {names}."
 msgid_plural ""
@@ -3313,20 +3346,20 @@ msgid_plural ""
 msgstr[0] ""
 msgstr[1] ""
 
-#: crates/desk-ui/src/lib.rs:748 crates/desk-ui/src/window.rs:2652
+#: crates/desk-ui/src/lib.rs:749 crates/desk-ui/src/window.rs:2652
 #: crates/desk-ui/src/window.rs:2699
 msgid "_Discard"
 msgstr ""
 
-#: crates/desk-ui/src/lib.rs:749
+#: crates/desk-ui/src/lib.rs:750
 msgid "_Recover"
 msgstr ""
 
-#: crates/desk-ui/src/lib.rs:784
+#: crates/desk-ui/src/lib.rs:785
 msgid "Open a Document"
 msgstr ""
 
-#: crates/desk-ui/src/lib.rs:806
+#: crates/desk-ui/src/lib.rs:807
 msgid "All Documents"
 msgstr ""
 
@@ -5206,8 +5239,8 @@ msgstr ""
 msgid "lock security closed"
 msgstr ""
 
-#: crates/desk-ui/src/shape_library.rs:1124
-#: crates/desk-ui/src/shape_library.rs:1364
+#: crates/desk-ui/src/shape_library.rs:1125
+#: crates/desk-ui/src/shape_library.rs:1365
 #: crates/desk-ui/src/window/objects.rs:267
 msgid "My Shape"
 msgstr ""
