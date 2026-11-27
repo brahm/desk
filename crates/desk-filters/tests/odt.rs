@@ -5612,3 +5612,35 @@ fn w111_the_picture_shown_stays_shown_when_one_before_it_cannot_be_read() {
     assert_eq!(gallery.images.len(), 2);
     assert_eq!(gallery.shown_image().unwrap().picture.width(), 2);
 }
+
+#[test]
+fn w113_a_shape_of_several_parts_is_kept_in_odt() {
+    use desk_model::{Anchor, Combine, Frame, Object, ObjectKind, Shape};
+    let mut editor = desk_model::Editor::new(Document::new_word_processing());
+    editor
+        .edit("Subtract", |edit| {
+            let mut ids = Vec::new();
+            for (x, side) in [(0.0, 100.0), (25.0, 50.0)] {
+                let id = edit.new_id();
+                let mut square = Object::new(
+                    id,
+                    ObjectKind::Shape(Shape::Rectangle),
+                    Frame::from_pt(x, x, side, side),
+                );
+                square.anchor = Anchor::Page(0);
+                edit.add_object(square)?;
+                ids.push(id);
+            }
+            edit.combine_shapes(&ids, Combine::Subtract)
+        })
+        .unwrap()
+        .unwrap();
+    let bytes = write_odt(editor.document()).unwrap();
+    keep("w113-compound.odt", &bytes);
+    let read = read_odt(&bytes).unwrap();
+    let object = read.objects().iter().next().unwrap();
+    let was = editor.document().objects().iter().next().unwrap();
+    assert_eq!(object.kind, was.kind);
+    assert!(matches!(&object.kind, ObjectKind::Shape(Shape::Compound(parts)) if parts.len() == 2));
+    assert_eq!(object.frame, was.frame);
+}

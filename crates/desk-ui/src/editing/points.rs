@@ -193,7 +193,7 @@ fn unturned(object: &Object) -> Option<Object> {
     };
     if object.locked
         || shape.is_line()
-        || matches!(shape, Shape::Connection(_))
+        || matches!(shape, Shape::Connection(_) | Shape::Compound(_))
         || (object.rotation == 0 && !object.flip_horizontal && !object.flip_vertical)
     {
         return None;
@@ -402,7 +402,13 @@ impl TextEditor {
         let ObjectKind::Shape(shape) = &object.kind else {
             return false;
         };
-        if info.count != 1 || object.locked || shape.is_line() {
+        // A shape of several parts keeps them: Break Apart makes each
+        // editable (W113).
+        if info.count != 1
+            || object.locked
+            || shape.is_line()
+            || matches!(shape, Shape::Compound(_))
+        {
             return false;
         }
         if !matches!(shape, Shape::Path { .. }) {

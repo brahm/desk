@@ -26,6 +26,9 @@ glib-build-tools = "0.22.8"
 imbl = "7.0.2"
 proptest = "1.12.0"
 unicode-segmentation = "1.13.3"
+# Boolean operations on the outlines of shapes: Unite, Intersect, Subtract
+# and Exclude (W113).
+i_overlay = { version = "9.2.1", default-features = false }
 
 # Spelling with the Hunspell dictionaries of the system, in desk-lang.
 spellbook = "0.4.2"

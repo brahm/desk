@@ -401,7 +401,7 @@ fn mask_shape_text(shape: &Shape) -> Option<String> {
             let numbers: Vec<String> = points.iter().map(|(x, y)| format!("{x} {y}")).collect();
             format!("points {}", numbers.join(" "))
         }
-        Shape::Path { .. } => {
+        Shape::Path { .. } | Shape::Compound(_) => {
             let s = f64::from(POLYGON_SCALE);
             let n = |v: f64| format!("{}", v.round() as i64);
             let path: Vec<String> = shape
@@ -624,6 +624,8 @@ fn parametric_shape(shape: &Shape, w: f64, h: f64) -> odf::DrawKind {
         Shape::Path { closed, .. } => {
             format!("path {}", if closed { "closed" } else { "open" })
         }
+        // docs/odf-extensions.md: desk:shape (W113).
+        Shape::Compound(_) => "path compound".to_owned(),
         _ => String::new(),
     };
     odf::DrawKind::CustomShape {
@@ -688,11 +690,17 @@ pub(crate) fn path_shape(path: &str, view_box: Option<(f64, f64, f64, f64)>) -> 
         };
         (part(x, x0, w), part(y, y0, h))
     };
-    let mut points: Vec<desk_model::PathPoint> = Vec::new();
-    let mut closed = false;
+    // Each part, with whether it is closed.
+    let mut parts: Vec<(Vec<desk_model::PathPoint>, bool)> = vec![(Vec::new(), false)];
     for (command, v) in &flat {
+        let (points, closed) = parts.last_mut()?;
         match command {
-            'M' | 'L' if command == &'L' || points.is_empty() => {
+            'M' if !points.is_empty() => {
+                // Another part starts (W113).
+                let (x, y) = at(v[0], v[1]);
+                parts.push((vec![desk_model::PathPoint::corner(x, y)], false));
+            }
+            'M' | 'L' => {
                 let (x, y) = at(v[0], v[1]);
                 points.push(desk_model::PathPoint::corner(x, y));
             }
@@ -708,25 +716,43 @@ pub(crate) fn path_shape(path: &str, view_box: Option<(f64, f64, f64, f64)>) -> 
                     after: None,
                 });
             }
-            'Z' => {
-                closed = true;
-                break;
-            }
-            // Only the first part of a path that has several.
-            'M' => break,
+            'Z' => *closed = true,
             _ => {}
         }
     }
-    // A closed path that ends where it starts ends on its first point.
-    if closed && points.len() > 1 && points[0].at == points[points.len() - 1].at {
-        let last = points.pop()?;
-        points[0].before = last.before;
+    for (points, closed) in &mut parts {
+        // A closed path that ends where it starts ends on its first point.
+        if *closed
+            && points.len() > 1
+            && points.first().map(|p| p.at) == points.last().map(|p| p.at)
+        {
+            let last = points.pop()?;
+            if let Some(first) = points.first_mut() {
+                first.before = last.before;
+            }
+        }
     }
-    (points.len() >= 2).then(|| Shape::Path {
+    parts.retain(|(points, _)| points.len() >= 2);
+    // Several closed parts are a shape of several parts; otherwise the
+    // first part is a shape drawn with the pen.
+    if parts.len() > 1 && parts.iter().all(|(p, closed)| *closed && p.len() >= 3) {
+        return Some(Shape::Compound(
+            parts
+                .into_iter()
+                .take(MAX_PATH_PARTS)
+                .map(|(p, _)| Arc::from(p))
+                .collect(),
+        ));
+    }
+    let (points, closed) = parts.into_iter().next()?;
+    Some(Shape::Path {
         points: points.into(),
         closed,
     })
 }
+
+/// The most parts of a shape that are read, against hostile files.
+const MAX_PATH_PARTS: usize = 4096;
 
 /// The shape that `desk:shape` gives, or none when it is not one.
 fn desk_shape_of(settings: &str) -> Option<Shape> {
@@ -2638,7 +2664,8 @@ impl Exporter<'_> {
                 | Shape::RegularPolygon { .. }
                 | Shape::Arrow { .. }
                 | Shape::Balloon { .. }
-                | Shape::Path { .. }),
+                | Shape::Path { .. }
+                | Shape::Compound(_)),
             ) => parametric_shape(shape, w, h),
             ObjectKind::Image(picture) => odf::DrawKind::Image {
                 href: self.picture(picture),

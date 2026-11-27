@@ -1203,6 +1203,29 @@ impl TextEditor {
         });
     }
 
+    /// Combines the selected shapes into one, as Format > Shapes and
+    /// Lines of Pages 15.4 does, and selects it (W113).
+    pub fn combine_shapes(&self, how: desk_model::Combine) {
+        let name = match how {
+            desk_model::Combine::Unite => "Unite",
+            desk_model::Combine::Intersect => "Intersect",
+            desk_model::Combine::Subtract => "Subtract",
+            desk_model::Combine::Exclude => "Exclude",
+        };
+        self.arrange_objects(name, |edit, ids| {
+            Ok(edit.combine_shapes(ids, how)?.map(|id| vec![id]))
+        });
+    }
+
+    /// Makes each selected shape of several parts into one shape for each
+    /// part, and selects them (W113).
+    pub fn break_apart_shapes(&self) {
+        self.arrange_objects("Break Apart", |edit, ids| {
+            let made = edit.break_apart_shapes(ids)?;
+            Ok((!made.is_empty()).then_some(made))
+        });
+    }
+
     /// Breaks the selected groups into their objects, and selects them.
     pub fn ungroup_objects(&self) {
         self.arrange_objects("Ungroup", |edit, ids| Ok(Some(edit.ungroup_objects(ids)?)));

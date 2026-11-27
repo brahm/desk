@@ -329,7 +329,11 @@ These sit on the `style:graphic-properties` of the graphic style of a
   - `balloon RADIUS BODY TIP`: the corner radius in points, and the height
     of the body and the place of the tip in ten-thousandths;
   - `path closed` or `path open`: a shape drawn with the pen, whose
-    points are those of the enhanced path.
+    points are those of the enhanced path;
+  - `path compound`: a shape of several closed parts, as combining
+    shapes leaves it (W113), each part a subpath of the enhanced path
+    that starts with `M` and ends with `Z`; a part inside another goes
+    the other way around, as a hole. Desk reads at most 4096 parts.
 - **Fallback:** `draw:enhanced-path` draws the same outline, so other
   programs show the shape, without its handles.
 

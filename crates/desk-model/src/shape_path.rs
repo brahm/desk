@@ -30,6 +30,34 @@ fn part(value: impl Into<f64>) -> f64 {
     value.into() / f64::from(POLYGON_SCALE)
 }
 
+/// The outline of points drawn with the pen, in a frame of `w` by `h`.
+fn path_outline(points: &[crate::PathPoint], closed: bool, w: f64, h: f64) -> Vec<PathSegment> {
+    use PathSegment::{Close, Curve, Line, Move};
+    let at = |(x, y): (i32, i32)| (w * part(x), h * part(y));
+    let mut path = Vec::new();
+    let Some(first) = points.first() else {
+        return path;
+    };
+    let (x, y) = at(first.at);
+    path.push(Move(x, y));
+    let pairs = points.windows(2).map(|p| (p[0], p[1]));
+    let back = (closed && points.len() > 2).then(|| (points[points.len() - 1], *first));
+    for (from, to) in pairs.chain(back) {
+        let (x, y) = at(to.at);
+        if from.after.is_some() || to.before.is_some() {
+            let (ax, ay) = at(from.after.unwrap_or(from.at));
+            let (bx, by) = at(to.before.unwrap_or(to.at));
+            path.push(Curve(ax, ay, bx, by, x, y));
+        } else {
+            path.push(Line(x, y));
+        }
+    }
+    if closed {
+        path.push(Close);
+    }
+    path
+}
+
 /// A closed outline through points.
 fn closed(points: impl IntoIterator<Item = (f64, f64)>) -> Vec<PathSegment> {
     let mut path: Vec<PathSegment> = points
@@ -162,31 +190,11 @@ pub(crate) fn outline(shape: &Shape, w: f64, h: f64) -> Vec<PathSegment> {
                 ])
             }
         }
-        Shape::Path { points, closed } => {
-            let at = |(x, y): (i32, i32)| (w * part(x), h * part(y));
-            let mut path = Vec::new();
-            let Some(first) = points.first() else {
-                return path;
-            };
-            let (x, y) = at(first.at);
-            path.push(Move(x, y));
-            let pairs = points.windows(2).map(|p| (p[0], p[1]));
-            let back = (*closed && points.len() > 2).then(|| (points[points.len() - 1], *first));
-            for (from, to) in pairs.chain(back) {
-                let (x, y) = at(to.at);
-                if from.after.is_some() || to.before.is_some() {
-                    let (ax, ay) = at(from.after.unwrap_or(from.at));
-                    let (bx, by) = at(to.before.unwrap_or(to.at));
-                    path.push(Curve(ax, ay, bx, by, x, y));
-                } else {
-                    path.push(Line(x, y));
-                }
-            }
-            if *closed {
-                path.push(Close);
-            }
-            path
-        }
+        Shape::Path { points, closed } => path_outline(points, *closed, w, h),
+        Shape::Compound(parts) => parts
+            .iter()
+            .flat_map(|points| path_outline(points, true, w, h))
+            .collect(),
         Shape::Connection(connection) => crate::connection::outline(connection, w, h),
         Shape::Balloon { radius, body, tip } => {
             let body_h = h * part(*body).clamp(0.1, 1.0);

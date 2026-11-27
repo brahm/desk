@@ -3251,6 +3251,21 @@ paragraph, and objects on a second page.
   them with up and down buttons, which the keyboard reaches.
 - No task moved to another phase.
 
+### 27 November: combining shapes (step 6 of W4, #PR)
+
+- Unite, Intersect, Subtract and Exclude Shapes, from Format > Shapes
+  and Lines of Pages 15.4, are in Arrange > Shape, with Break Apart. The
+  shapes combine as they sit on the page, rotated and flipped; the
+  result takes the place and the look of the one at the back.
+- A result with holes or several parts is a new kind of shape, kept in
+  ODF as one enhanced path with a subpath for each part, which other
+  programs draw as it is.
+- The boolean operations come from the `i_overlay` crate (MIT), which
+  the Flatpak now builds with the others.
+- The searchable shape library of 15.4 and Save to My Shapes follow in
+  their own pull request, still in step 6.
+- No task moved to another phase.
+
 ## Decisions, with their reasons and consequences
 
 Ids `D-nnn` and `R-nnn` are those of [decisions.md](decisions.md).
