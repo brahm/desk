@@ -182,8 +182,9 @@ impl TextEditor {
         for run in paragraph.runs() {
             let end = offset + run.len();
             if let Some(Some(Field::Merge { sender, .. })) = &run.attrs.field {
-                // The field that starts at the point, before one that
-                // ends there.
+                // A field is one character, so the point is before or
+                // after it: the field that starts there goes before one
+                // that ends there.
                 if spot.offset == offset {
                     return Some(*sender);
                 }

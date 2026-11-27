@@ -171,8 +171,13 @@ pub fn with_cards(f: impl FnOnce(Result<std::rc::Rc<Vec<Card>>, String>) + 'stat
             .await
             .unwrap_or_else(|_| Err("the contacts could not be read".to_owned()))
             .map(std::rc::Rc::new);
-        if let Ok(cards) = &read {
-            CARDS.with_borrow_mut(|c| *c = Some(cards.clone()));
+        // A failed read leaves no older cards to be taken for these.
+        match &read {
+            Ok(cards) => CARDS.with_borrow_mut(|c| *c = Some(cards.clone())),
+            Err(error) => {
+                glib::g_warning!("desk", "cannot read the contacts of the desktop: {error}");
+                CARDS.with_borrow_mut(|c| *c = None);
+            }
         }
         f(read);
     });
