@@ -9,7 +9,7 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
 ## Changes since 0.7.0 (unreleased)
 
 * Added: Reverse Colors turns a gradient fill around, and Saved Fills
-  keeps a color or a gradient to use again in any document (#PR).
+  keeps a color or a gradient to use again in any document (#270).
 
 * Added: The Shape button opens a shape library by category, with a
   search field, and Arrange > Shape > Save to My Shapes keeps a shape of

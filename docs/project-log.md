@@ -3281,7 +3281,7 @@ paragraph, and objects on a second page.
 - W113 is done; generating a shape with AI stays out, as decided.
 - No task moved to another phase.
 
-### 27 November: Reverse and saved fills (step 7 of W4, #PR)
+### 27 November: Reverse and saved fills (step 7 of W4, #270)
 
 - The advanced gradient of 15.4 was already in the Format pane (OBJ-41).
   What was missing was Reverse, which now turns a gradient of two
