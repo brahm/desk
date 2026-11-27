@@ -1768,6 +1768,43 @@ impl TextEditor {
     /// Puts a new shape or text box in the middle of the page in sight,
     /// in front of the others, and selects it (OBJ-08, OBJ-13).
     pub fn insert_shape(&self, shape: NewShape) {
+        self.insert_new_object(shape, None);
+    }
+
+    /// Puts a shape of the shape library or of My Shapes in the middle of
+    /// the page in sight, and selects it (W113).
+    pub fn insert_library_shape(&self, made: crate::shape_library::Made) {
+        match made {
+            crate::shape_library::Made::New(shape) => self.insert_shape(shape),
+            crate::shape_library::Made::Shape(outline, size) => {
+                self.insert_new_object(NewShape::Rectangle, Some((outline, size, true)));
+            }
+            crate::shape_library::Made::Saved(outline, size) => {
+                self.insert_new_object(NewShape::Rectangle, Some((outline, size, false)));
+            }
+        }
+    }
+
+    /// The outline of the selected shape and the size of its frame in
+    /// points, to save it to My Shapes; none for a line or a connection
+    /// line (W113).
+    pub fn shape_to_save(&self) -> Option<(Shape, (f64, f64))> {
+        let info = self.object_info()?;
+        let ObjectKind::Shape(shape) = &info.object.kind else {
+            return None;
+        };
+        if info.count != 1 || shape.is_line() || matches!(shape, Shape::Connection(_)) {
+            return None;
+        }
+        let frame = info.object.frame;
+        Some((shape.clone(), (frame.width.to_pt(), frame.height.to_pt())))
+    }
+
+    /// Puts a new shape or text box on the page: `outline` and its size in
+    /// points, when given, in place of the shape that `shape` names, made
+    /// bigger on a slide when it is a size of the library and not one the
+    /// user saved.
+    fn insert_new_object(&self, shape: NewShape, outline: Option<(Shape, (f64, f64), bool)>) {
         let page = self.view.current_page().unwrap_or(0);
         let (width, height) = {
             let state = self.state.borrow();
@@ -1776,14 +1813,16 @@ impl TextEditor {
                 state.layout.setup.height.to_pt(),
             )
         };
-        let (w, h) = match shape {
-            NewShape::Line => (100.0, 0.0),
-            NewShape::TextBox => (144.0, 72.0),
+        let (w, h) = match (shape, &outline) {
+            (_, Some((_, size, _))) => *size,
+            (NewShape::Line, None) => (100.0, 0.0),
+            (NewShape::TextBox, None) => (144.0, 72.0),
             _ => (100.0, 100.0),
         };
         // A slide is read from afar, with bigger text, so its new objects
         // are bigger too: a text box takes a line of 36 pt text.
-        let (w, h) = if self.is_presentation() {
+        let scaled = outline.as_ref().is_none_or(|(_, _, scaled)| *scaled);
+        let (w, h) = if self.is_presentation() && scaled {
             match shape {
                 NewShape::TextBox => (432.0, 72.0),
                 _ => (w * 2.0, h * 2.0),
@@ -1824,7 +1863,12 @@ impl TextEditor {
                     text.vertical = default.vertical;
                     ObjectKind::TextBox(text)
                 }
-                other => other.shape().unwrap_or(Shape::Rectangle).into(),
+                other => outline
+                    .clone()
+                    .map(|(outline, _, _)| outline)
+                    .or_else(|| other.shape())
+                    .unwrap_or(Shape::Rectangle)
+                    .into(),
             };
             let mut object = Object::new(id, kind, frame);
             object.anchor = Anchor::Page(page as u32);

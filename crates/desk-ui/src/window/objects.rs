@@ -7,17 +7,22 @@
 
 use std::rc::Rc;
 
+use adw::prelude::*;
 use desk_model::{Distribution, Layer, ObjectAlignment};
-use gtk::prelude::*;
 use gtk::{gio, glib};
 
 use super::DocumentWindow;
 use crate::editing::{NewShape, TextEditor};
 use crate::i18n::{tr, trc};
+use crate::shape_library;
 
 /// The actions of these menus, which need a document.
-pub(super) const OBJECT_ACTIONS: [&str; 35] = [
+pub(super) const OBJECT_ACTIONS: [&str; 39] = [
     "insert-equation",
+    "insert-library-shape",
+    "save-to-my-shapes",
+    "rename-my-shape",
+    "delete-my-shape",
     "combine-shapes",
     "break-apart",
     "insert-image-gallery",
@@ -141,7 +146,23 @@ impl DocumentWindow {
         self.actions.add_action(&action);
         self.add_media_browser_action();
         self.add_selectable_actions();
-        let with_string: [(&str, ChoiceAction); 5] = [
+        self.add_my_shapes_actions();
+        let with_string: [(&str, ChoiceAction); 6] = [
+            // A shape of the library of Pages 15.4, or of My Shapes (W113).
+            ("insert-library-shape", |e, value| {
+                let made = match value.strip_prefix("mine:") {
+                    Some(id) => u64::from_str_radix(id, 16).ok().and_then(|id| {
+                        shape_library::read_saved(&shape_library::saved_path())
+                            .into_iter()
+                            .find(|s| s.id == id)?
+                            .made()
+                    }),
+                    None => shape_library::entry(value).and_then(shape_library::Entry::made),
+                };
+                if let Some(made) = made {
+                    e.insert_library_shape(made);
+                }
+            }),
             // Unite, Intersect, Subtract and Exclude of Pages 15.4 (W113).
             ("combine-shapes", |e, value| {
                 e.combine_shapes(match value {
@@ -223,6 +244,119 @@ impl DocumentWindow {
             },
         );
     }
+}
+
+impl DocumentWindow {
+    /// Save to My Shapes of Format > Shapes and Lines of Pages 15.4, and
+    /// Rename and Delete of the shapes of My Shapes (W113).
+    fn add_my_shapes_actions(self: &Rc<Self>) {
+        let action = gio::SimpleAction::new("save-to-my-shapes", None);
+        let weak = Rc::downgrade(self);
+        action.connect_activate(move |_, _| {
+            let Some(this) = weak.upgrade() else { return };
+            let Some((shape, size)) = this.editor().and_then(|e| e.shape_to_save()) else {
+                return;
+            };
+            let target = Rc::downgrade(&this);
+            this.ask_shape_name(
+                &tr("Save to My Shapes"),
+                &tr("My Shape"),
+                &tr("_Save"),
+                move |name| {
+                    let Some(this) = target.upgrade() else { return };
+                    let file = shape_library::saved_path();
+                    if shape_library::add_saved(&file, name, &shape, size).is_some() {
+                        this.shape_library.show_mine();
+                    } else {
+                        this.alert(
+                            &tr("Cannot Save the Shape"),
+                            &tr("My Shapes is full, or its file cannot be written."),
+                        );
+                    }
+                },
+            );
+        });
+        self.actions.add_action(&action);
+        let action = gio::SimpleAction::new("rename-my-shape", Some(glib::VariantTy::STRING));
+        let weak = Rc::downgrade(self);
+        action.connect_activate(move |_, parameter| {
+            let (Some(this), Some(id)) = (weak.upgrade(), saved_id(parameter)) else {
+                return;
+            };
+            let file = shape_library::saved_path();
+            let Some(shape) = shape_library::read_saved(&file)
+                .into_iter()
+                .find(|s| s.id == id)
+            else {
+                return;
+            };
+            let target = Rc::downgrade(&this);
+            this.ask_shape_name(
+                &tr("Rename Shape"),
+                &shape.name,
+                &tr("_Rename"),
+                move |name| {
+                    if let Some(this) = target.upgrade()
+                        && shape_library::rename_saved(&shape_library::saved_path(), id, name)
+                    {
+                        this.shape_library.refresh();
+                    }
+                },
+            );
+        });
+        self.actions.add_action(&action);
+        let action = gio::SimpleAction::new("delete-my-shape", Some(glib::VariantTy::STRING));
+        let weak = Rc::downgrade(self);
+        action.connect_activate(move |_, parameter| {
+            let (Some(this), Some(id)) = (weak.upgrade(), saved_id(parameter)) else {
+                return;
+            };
+            if shape_library::delete_saved(&shape_library::saved_path(), id) {
+                this.shape_library.refresh();
+            }
+        });
+        self.actions.add_action(&action);
+    }
+
+    /// Asks for the name of a shape of My Shapes, in a dialog.
+    fn ask_shape_name(
+        self: &Rc<Self>,
+        title: &str,
+        name: &str,
+        verb: &str,
+        then: impl Fn(&str) + 'static,
+    ) {
+        let dialog = adw::AlertDialog::new(Some(title), None);
+        let entry = gtk::Entry::builder()
+            .text(name)
+            .activates_default(true)
+            .build();
+        crate::formatting::labelled(&entry, &tr("Name"));
+        dialog.set_extra_child(Some(&entry));
+        dialog.add_response("cancel", &tr("_Cancel"));
+        dialog.add_response("done", verb);
+        dialog.set_response_appearance("done", adw::ResponseAppearance::Suggested);
+        dialog.set_default_response(Some("done"));
+        dialog.set_close_response("cancel");
+        let field = entry.clone();
+        dialog.choose(
+            Some(&self.window()),
+            gio::Cancellable::NONE,
+            move |response| {
+                if response == "done" {
+                    then(&field.text());
+                }
+            },
+        );
+        entry.grab_focus();
+        entry.select_region(0, -1);
+    }
+}
+
+/// The id of a shape of My Shapes that an action names.
+fn saved_id(parameter: Option<&glib::Variant>) -> Option<u64> {
+    let value = parameter?.get::<String>()?;
+    u64::from_str_radix(&value, 16).ok()
 }
 
 impl DocumentWindow {
@@ -388,6 +522,10 @@ pub(crate) fn arrange_menu() -> gio::Menu {
         );
     }
     combine.append(Some(&tr("Break Apart")), Some("win.break-apart"));
+    combine.append(
+        Some(&tr("Save to My Shapes…")),
+        Some("win.save-to-my-shapes"),
+    );
     shape.append_section(None, &combine);
     let grouping = gio::Menu::new();
     // A copy a little lower and to the right (OBJ-22).

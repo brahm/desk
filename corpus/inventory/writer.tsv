@@ -113,7 +113,7 @@ W109	3.8 Objects: images, shapes, media	Remove background 🤖 (in 15)	Different
 W110	3.8 Objects: images, shapes, media	Image adjustments	Different	15.4	D-001	In	Done	-	W4	Exposure, Saturation, Enhance and Reset in the Image tab as in 15.4; Adjust Image of the '09 behind it with levels, histogram, Auto Levels and sharpness (OBJ-07, W4 step 4); Auto Crop in W4 step 13
 W111	3.8 Objects: images, shapes, media	Image gallery	Only 15	15.4	D-001	In	Done	-	W4	Insert > Image Gallery, pictures dropped or added in the Gallery tab, arrows over the page, a caption for each or for all, Image Description; desk:gallery in ODT (PXV-23, W4 step 5)
 W112	3.8 Objects: images, shapes, media	AI for images **(subscription)** 🤖🌐💲	Only 15	15.4	D-001	Out: AI, online or paid (D-004)	Out of scope	-	-	AI for images (subscription)
-W113	3.8 Objects: images, shapes, media	Shapes 🤖💲 (in 15)	Different	15.4	D-001	In	Partial	-	W4	Shapes, pen and parametric shapes (OBJ-08 to OBJ-11); Unite, Intersect, Subtract, Exclude and Break Apart (PXV-27, W4 step 6); the searchable library is missing; generating a shape by AI stays out
+W113	3.8 Objects: images, shapes, media	Shapes 🤖💲 (in 15)	Different	15.4	D-001	In	Done	-	W4	Shapes, pen and parametric shapes (OBJ-08 to OBJ-11); Unite, Intersect, Subtract, Exclude and Break Apart (PXV-27); the searchable library by category and My Shapes (W4 step 6); generating a shape by AI stays out
 W114	3.8 Objects: images, shapes, media	Edit points and curves	Equal	Equal in both	-	In	Done	-	done	Edit points (OBJ-10)
 W115	3.8 Objects: images, shapes, media	Lines and connections	Equal	Equal in both	-	In	Done	-	done	Connection line (OBJ-31)
 W116	3.8 Objects: images, shapes, media	3D objects (USDZ)	Only 15	15.4	D-001	In	Missing	-	W4	3D objects (USDZ)

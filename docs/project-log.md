@@ -3266,6 +3266,21 @@ paragraph, and objects on a second page.
   their own pull request, still in step 6.
 - No task moved to another phase.
 
+### 27 November: the shape library (step 6 of W4, #PR)
+
+- The Shape button opens a library as that of Pages 15.4: categories at
+  the side, a grid of shapes, and a search field that finds them in all
+  the categories by name and other words, without minding case or
+  accents.
+- Its 57 shapes are drawn for Desk, in six categories; none comes from
+  Pages (D-011). Basic holds the shapes of Insert > Shape.
+- Arrange > Shape > Save to My Shapes… keeps the selected shape under a
+  name, in a file of the data folder of Desk; a right click on it
+  renames or deletes it. Pages keeps them in iCloud, which Desk does not
+  use.
+- W113 is done; generating a shape with AI stays out, as decided.
+- No task moved to another phase.
+
 ## Decisions, with their reasons and consequences
 
 Ids `D-nnn` and `R-nnn` are those of [decisions.md](decisions.md).
