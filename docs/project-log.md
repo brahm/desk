@@ -3113,9 +3113,13 @@ paragraph, and objects on a second page.
   already a preference since B1.
 - *Decided in the plan:* SVG, HEIC and the recording of sound use
   libraries of the GNOME runtime (librsvg, glycin or libheif,
-  GStreamer), each chosen in its pull request. 3D objects are the least
-  known part, with no Rust reader of USDZ and no 3D viewer in GNOME; the
-  owner is asked what Desk reads before that step.
+  GStreamer), each chosen in its pull request.
+- *Decided by the owner (D-033):* 3D objects, the least known part, with
+  no Rust reader of USDZ and no 3D viewer in GNOME, open from USDZ as in
+  Pages 15.4 and also from glTF and GLB, which the tools of Linux write,
+  and from U3D, PRC, FBX and OBJ, so that the 3D of PDF documents and of
+  Microsoft Office opens too. Each format gets a reader of its own, in
+  its own pull request; the step grows from one to four.
 - *How the Mac is used:* one session at the start and one at the end,
   as in W3.
 - *Fixed on the way:* the rows of W2 that its validation on the Mac
@@ -3526,6 +3530,18 @@ thumbnail saved in the file would carry it; the owner chose to fill
 them only when the person acts.
 *Consequences:* Preview, Merge and Fill With My Card fill the sender
 fields; opening a document never does, as was already built in #256.
+
+### 3D objects (27 November)
+
+**D-033: 3D objects open from USDZ, glTF, GLB, U3D, PRC, FBX and OBJ (27 November).**
+*Why:* Pages 15.4 inserts USDZ, which almost no tool of GNOME writes. The
+plan of W4 offered USDZ with glTF and GLB, the open format of Blender;
+the owner took it and added U3D and PRC, the 3D inside PDF documents,
+and FBX and OBJ, the 3D that Microsoft Office inserts, so that the
+models of those documents open in Desk too.
+*Consequences:* step 11 of W4 has four pull requests, one per family of
+formats, each with a reader of its own in Rust and its own fuzzing;
+the estimate of W4 grows by about a day, corrected when the phase ends.
 
 ## What changed direction, and what it cost
 

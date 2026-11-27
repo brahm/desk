@@ -11,7 +11,8 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
 * Added: The plan of phase W4 of Desk Writer, which brings the objects
   and charts of Pages 15.4: the shape library and combined shapes, the
   image gallery, captions, 3D objects, drawings, recorded sound, SVG
-  and HEIC images, and the donut, radar, bubble and interactive charts
+  and HEIC images, and the donut, radar, bubble and interactive charts.
+  3D objects will open from USDZ, glTF, GLB, U3D, PRC, FBX and OBJ
   (#259).
 * Changed: Writer structure and templates (W3) is done, checked on the
   Mac with Pages 15.4; Writer objects and charts (W4) is the phase in
