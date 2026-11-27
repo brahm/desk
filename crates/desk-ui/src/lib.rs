@@ -74,6 +74,7 @@ mod properties;
 mod recovery;
 mod review_bar;
 mod ruler;
+mod saved_fills;
 mod shape_library;
 mod shape_pane;
 mod shape_popover;

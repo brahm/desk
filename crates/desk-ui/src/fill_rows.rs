@@ -5,6 +5,9 @@
 //! them for an object (OBJ-09, OBJ-41, OBJ-42) and the text color of the
 //! Text inspector offers them for letters (PXV-04): one color, a gradient
 //! of two, a picture with or without a tint, or an advanced gradient.
+//! The colors of a gradient turn around with Reverse, and Saved Fills
+//! keeps a fill to use again in any document, as the color picker of
+//! Pages 15.4 does (W121).
 
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
@@ -123,6 +126,16 @@ pub struct FillRows {
     stop_blend: compact::SpinRow,
     center_x: compact::SpinRow,
     center_y: compact::SpinRow,
+    /// Saved Fills, whose popover shows them and saves the fill there is.
+    saved_row: compact::ActionRow,
+    saved_grid: gtk::FlowBox,
+    save_button: gtk::Button,
+    saved_popover: gtk::Popover,
+    /// Why the fill was not saved.
+    saved_note: gtk::Label,
+    /// The menus of the saved fills, taken off when the grid is made
+    /// again.
+    saved_menus: RefCell<Vec<gtk::Popover>>,
     /// Whether the Fill row is offered at all: a line has no fill.
     shown: Cell<bool>,
     updating: Cell<bool>,
@@ -176,9 +189,51 @@ impl FillRows {
         };
         let gradient_add = icon_button("list-add-symbolic", &tr("Add Color"));
         let gradient_remove = icon_button("list-remove-symbolic", &tr("Remove Color"));
+        // Reverse of the gradients of Pages 15.4 (W121).
+        let reverse = icon_button("object-flip-horizontal-symbolic", &tr("Reverse Colors"));
+        let reverse_two = icon_button("object-flip-horizontal-symbolic", &tr("Reverse Colors"));
         gradient_colors_row.add_suffix(gradient_bar.widget());
         gradient_colors_row.add_suffix(&gradient_add);
         gradient_colors_row.add_suffix(&gradient_remove);
+        gradient_colors_row.add_suffix(&reverse);
+        gradient_end_row.add_suffix(&reverse_two);
+        let saved_grid = gtk::FlowBox::builder()
+            .selection_mode(gtk::SelectionMode::None)
+            .homogeneous(true)
+            .min_children_per_line(6)
+            .max_children_per_line(6)
+            .build();
+        let save_button = gtk::Button::builder()
+            .label(tr("Save Fill"))
+            .tooltip_text(tr("Keeps this fill here, to use again in any document"))
+            .build();
+        let saved_box = gtk::Box::builder()
+            .orientation(gtk::Orientation::Vertical)
+            .spacing(6)
+            .width_request(220)
+            .build();
+        let saved_note = gtk::Label::builder()
+            .wrap(true)
+            .max_width_chars(28)
+            .css_classes(["dim-label", "caption"])
+            .visible(false)
+            .build();
+        saved_box.append(&saved_grid);
+        saved_box.append(&saved_note);
+        saved_box.append(&save_button);
+        let saved_popover = gtk::Popover::builder().child(&saved_box).build();
+        let saved_button = gtk::MenuButton::builder()
+            .icon_name("view-grid-symbolic")
+            .popover(&saved_popover)
+            .valign(gtk::Align::Center)
+            .tooltip_text(tr("Saved Fills"))
+            .css_classes(["flat"])
+            .build();
+        labelled(&saved_button, &tr("Saved Fills"));
+        let saved_row = compact::ActionRow::builder()
+            .title(tr("Saved Fills"))
+            .build();
+        saved_row.add_suffix(&saved_button);
         let stop_position = spin(&tr("Color Position"), 0.0, 100.0, 1.0);
         stop_position.set_subtitle(&tr("Percent"));
         let stop_blend = spin(&tr("Blend Point"), 1.0, 99.0, 1.0);
@@ -207,6 +262,12 @@ impl FillRows {
             stop_blend,
             center_x,
             center_y,
+            saved_row,
+            saved_grid,
+            save_button,
+            saved_popover,
+            saved_note,
+            saved_menus: RefCell::new(Vec::new()),
             shown: Cell::new(true),
             updating: Cell::new(false),
             on_change: RefCell::new(None),
@@ -321,12 +382,148 @@ impl FillRows {
                 this.gradient_bar.remove();
             }
         });
+        for button in [&reverse, &reverse_two] {
+            let weak = Rc::downgrade(&this);
+            button.connect_clicked(move |_| {
+                if let Some(this) = weak.upgrade() {
+                    this.reverse();
+                }
+            });
+        }
+        let weak = Rc::downgrade(&this);
+        this.saved_popover.connect_show(move |_| {
+            if let Some(this) = weak.upgrade() {
+                this.fill_saved();
+            }
+        });
+        let weak = Rc::downgrade(&this);
+        this.save_button.connect_clicked(move |_| {
+            let Some(this) = weak.upgrade() else { return };
+            let Some(fill) = this.value() else { return };
+            let file = crate::saved_fills::saved_path();
+            let note = match crate::saved_fills::add_saved(&file, &fill) {
+                Ok(_) => None,
+                Err(crate::saved_fills::SaveError::Unsupported) => {
+                    Some(tr("A picture is not saved here."))
+                }
+                Err(crate::saved_fills::SaveError::Full) => Some(tr(
+                    "As many fills are saved as are kept. Delete one to save another.",
+                )),
+                Err(crate::saved_fills::SaveError::File(error)) => {
+                    gtk::glib::g_warning!("desk", "cannot save the fill: {error}");
+                    Some(tr("The file of saved fills cannot be read or written."))
+                }
+            };
+            this.fill_saved();
+            if let Some(note) = note {
+                this.saved_note.set_label(&note);
+                this.saved_note.set_visible(true);
+            }
+        });
         this.show_rows();
         this
     }
 
+    /// Turns the colors of the gradient around, the first last (W121).
+    fn reverse(&self) {
+        match self.kind() {
+            Kind::Gradient => {
+                let updating = self.updating.replace(true);
+                let from = self.fill_color.rgba();
+                let to = self.gradient_end.rgba();
+                self.fill_color.set_rgba(&to);
+                self.gradient_end.set_rgba(&from);
+                self.updating.set(updating);
+                self.changed();
+            }
+            Kind::Advanced => {
+                self.gradient_bar
+                    .set_stops(reversed(self.gradient_bar.stops()));
+                self.show_stop();
+                self.changed();
+            }
+            _ => {}
+        }
+    }
+
+    /// Shows the saved fills that the Fill list offers, and whether the
+    /// fill there is can be saved.
+    fn fill_saved(self: &Rc<Self>) {
+        for menu in self.saved_menus.take() {
+            menu.unparent();
+        }
+        self.saved_grid.remove_all();
+        self.saved_note.set_visible(false);
+        let value = self.value();
+        self.save_button.set_sensitive(
+            value
+                .as_ref()
+                .is_some_and(|f| crate::saved_fills::fill_to_text(f).is_some()),
+        );
+        let saved = crate::saved_fills::read_saved(&crate::saved_fills::saved_path());
+        for saved in saved
+            .into_iter()
+            .filter(|s| self.kinds.contains(&Kind::of(Some(&s.fill))))
+        {
+            let picture = gtk::DrawingArea::builder()
+                .content_width(24)
+                .content_height(24)
+                .build();
+            let fill = saved.fill.clone();
+            picture.set_draw_func(move |_, cairo, w, h| draw_fill(cairo, &fill, w, h));
+            let name = fill_name(&saved.fill);
+            let button = gtk::Button::builder()
+                .child(&picture)
+                .tooltip_text(&name)
+                .css_classes(["flat"])
+                .build();
+            labelled(&button, &name);
+            let weak = Rc::downgrade(self);
+            let fill = saved.fill.clone();
+            button.connect_clicked(move |_| {
+                let Some(this) = weak.upgrade() else { return };
+                this.saved_popover.popdown();
+                let color = from_gdk(&this.fill_color.rgba());
+                this.show(Some(&fill), color);
+                this.changed();
+            });
+            // A right click offers to delete it.
+            let delete = gtk::Button::builder()
+                .label(tr("Delete"))
+                .css_classes(["flat"])
+                .build();
+            let menu = gtk::Popover::builder().child(&delete).build();
+            menu.set_parent(&button);
+            let weak = Rc::downgrade(self);
+            let id = saved.id;
+            let shown = menu.clone();
+            delete.connect_clicked(move |_| {
+                shown.popdown();
+                let Some(this) = weak.upgrade() else { return };
+                if crate::saved_fills::delete_saved(&crate::saved_fills::saved_path(), id) {
+                    // Once the menu is done, since the grid takes it away.
+                    let weak = Rc::downgrade(&this);
+                    gtk::glib::idle_add_local_once(move || {
+                        if let Some(this) = weak.upgrade() {
+                            this.fill_saved();
+                        }
+                    });
+                }
+            });
+            let click = gtk::GestureClick::builder().button(3).build();
+            let shown = menu.clone();
+            click.connect_pressed(move |gesture, _, _, _| {
+                gesture.set_state(gtk::EventSequenceState::Claimed);
+                shown.popup();
+            });
+            button.add_controller(click);
+            self.saved_menus.borrow_mut().push(menu);
+            self.saved_grid.append(&button);
+        }
+    }
+
     /// The rows, in order, to put in a group.
-    pub fn rows(&self) -> [&dyn compact::Row; 12] {
+    pub fn rows(&self) -> [&dyn compact::Row; 13] {
         [
             &self.fill,
             &self.fill_color_row,
@@ -340,6 +537,7 @@ impl FillRows {
             &self.gradient_colors_row,
             &self.stop_position,
             &self.stop_blend,
+            &self.saved_row,
         ]
     }
 
@@ -527,6 +725,7 @@ impl FillRows {
             .set_visible(shown && kind == Kind::Gradient);
         self.gradient_angle
             .set_visible(shown && (kind == Kind::Gradient || (kind == Kind::Advanced && !radial)));
+        self.saved_row.set_visible(shown);
     }
 
     /// Shows a fill; `color` is where the colors start when there is none.
@@ -606,6 +805,107 @@ impl FillRows {
     }
 }
 
+impl Drop for FillRows {
+    fn drop(&mut self) {
+        for menu in self.saved_menus.take() {
+            menu.unparent();
+        }
+    }
+}
+
+/// The colors of a gradient the other way around: each where the one
+/// across from it was, blending into the next where the last blended
+/// into it.
+fn reversed(mut stops: Vec<GradientStop>) -> Vec<GradientStop> {
+    stops.sort_by_key(|s| s.at);
+    let count = stops.len();
+    (0..count)
+        .rev()
+        .map(|i| GradientStop {
+            at: 1000 - stops[i].at.min(1000),
+            color: stops[i].color,
+            blend: if i > 0 {
+                1000 - stops[i - 1].blend.min(1000)
+            } else {
+                500
+            },
+        })
+        .collect()
+}
+
+/// What a saved fill is, for its tooltip.
+fn fill_name(fill: &Fill) -> String {
+    match fill {
+        Fill::Color(_) => tr("Color Fill"),
+        Fill::Gradient { .. } => tr("Gradient Fill"),
+        Fill::Advanced(_) => tr("Advanced Gradient Fill"),
+        _ => tr("Image Fill"),
+    }
+}
+
+/// Draws a fill in a square, its colors from left to right, with a thin
+/// outline so that white shows.
+fn draw_fill(cairo: &gtk::cairo::Context, fill: &Fill, width: i32, height: i32) {
+    let (w, h) = (f64::from(width), f64::from(height));
+    let set = |pattern: &gtk::cairo::Gradient, at: f64, c: Rgba| {
+        pattern.add_color_stop_rgba(
+            at,
+            f64::from(c.r) / 255.0,
+            f64::from(c.g) / 255.0,
+            f64::from(c.b) / 255.0,
+            f64::from(c.a) / 255.0,
+        );
+    };
+    cairo.rectangle(0.5, 0.5, w - 1.0, h - 1.0);
+    let painted = match fill {
+        Fill::Color(c) => {
+            cairo.set_source_rgba(
+                f64::from(c.r) / 255.0,
+                f64::from(c.g) / 255.0,
+                f64::from(c.b) / 255.0,
+                f64::from(c.a) / 255.0,
+            );
+            Ok(())
+        }
+        Fill::Gradient { from, to, .. } => {
+            let pattern = gtk::cairo::LinearGradient::new(0.0, 0.0, w, 0.0);
+            set(&pattern, 0.0, *from);
+            set(&pattern, 1.0, *to);
+            cairo.set_source(&pattern)
+        }
+        Fill::Advanced(gradient) => {
+            let stops = gradient.color_stops();
+            if gradient.center.is_some() {
+                let pattern = gtk::cairo::RadialGradient::new(
+                    w / 2.0,
+                    h / 2.0,
+                    0.0,
+                    w / 2.0,
+                    h / 2.0,
+                    w / 1.4,
+                );
+                for (at, c) in stops {
+                    set(&pattern, at, c);
+                }
+                cairo.set_source(&pattern)
+            } else {
+                let pattern = gtk::cairo::LinearGradient::new(0.0, 0.0, w, 0.0);
+                for (at, c) in stops {
+                    set(&pattern, at, c);
+                }
+                cairo.set_source(&pattern)
+            }
+        }
+        _ => Ok(()),
+    };
+    if painted.is_ok() {
+        let _ = cairo.fill_preserve();
+    }
+    cairo.set_source_rgba(0.0, 0.0, 0.0, 0.25);
+    cairo.set_line_width(1.0);
+    let _ = cairo.stroke();
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -628,7 +928,7 @@ mod tests {
         rows.show(Some(&gradient), Rgba::BLACK);
         assert_eq!(rows.kind(), Kind::Gradient);
         assert_eq!(rows.fill.selected(), 1);
-        assert_eq!(rows.value(), Some(gradient));
+        assert_eq!(rows.value(), Some(gradient.clone()));
         assert!(rows.gradient_end_row.is_visible() && !rows.image_row.is_visible());
         let advanced = Fill::Advanced(Gradient {
             stops: vec![
@@ -640,8 +940,30 @@ mod tests {
             center: Some((300, 700)),
         });
         rows.show(Some(&advanced), Rgba::BLACK);
-        assert_eq!(rows.value(), Some(advanced));
+        assert_eq!(rows.value(), Some(advanced.clone()));
         assert!(rows.center_x.is_visible() && !rows.gradient_angle.is_visible());
+        // Reverse turns the colors around.
+        rows.show(Some(&advanced), Rgba::BLACK);
+        rows.reverse();
+        let Some(Fill::Advanced(back)) = rows.value() else {
+            panic!();
+        };
+        let at: Vec<u16> = back.stops.iter().map(|s| s.at).collect();
+        assert_eq!(at, [0, 400, 1000]);
+        assert_eq!(back.stops[0].color, Rgba::WHITE);
+        rows.reverse();
+        assert_eq!(rows.value(), Some(advanced.clone()));
+        rows.show(Some(&gradient), Rgba::BLACK);
+        rows.reverse();
+        assert_eq!(
+            rows.value(),
+            Some(Fill::Gradient {
+                from: Rgba::rgb(0, 0, 200),
+                to: Rgba::rgb(200, 0, 0),
+                angle: 4500,
+            })
+        );
+        rows.show(Some(&advanced), Rgba::BLACK);
         // A fill that the list does not offer shows as plain.
         rows.show(Some(&Fill::Color(Rgba::WHITE)), Rgba::BLACK);
         assert_eq!(rows.kind(), Kind::Plain);
