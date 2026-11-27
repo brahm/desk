@@ -3251,7 +3251,7 @@ paragraph, and objects on a second page.
   them with up and down buttons, which the keyboard reaches.
 - No task moved to another phase.
 
-### 27 November: combining shapes (step 6 of W4, #PR)
+### 27 November: combining shapes (step 6 of W4, #268)
 
 - Unite, Intersect, Subtract and Exclude Shapes, from Format > Shapes
   and Lines of Pages 15.4, are in Arrange > Shape, with Break Apart. The

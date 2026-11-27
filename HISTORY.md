@@ -11,7 +11,7 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
 * Added: Arrange > Shape unites, intersects, subtracts and excludes the
   selected shapes into one, holes and all, and Break Apart makes a shape
   of several parts into one for each; ODT keeps the parts as one path
-  (#PR).
+  (#268).
 
 * Added: Insert > Image Gallery puts several pictures in one frame,
   stepped through with arrows on the page; the Gallery tab adds, orders
