@@ -137,9 +137,9 @@ pub use merge::{MergeSource, MergeValue, merge_document};
 pub use note::{Note, NoteFormat, NoteKind, NoteNumbering, NoteSettings, Notes};
 pub use object::{
     Adjustments, AlphaOutline, AlphaSeed, Anchor, ContourParts, Fill, Frame, FrameStyle, Gradient,
-    GradientStop, GraphicStyle, ImageFill, LineEnd, MAX_SHAPE_SIDES, MAX_TEXT_BOX_COLUMNS, Moved,
-    Object, ObjectKind, ObjectShadow, Objects, POLYGON_SCALE, PathPoint, PictureFrame,
-    PictureSettings, Shape, Stroke, TextBox, VerticalAlignment, Wrap,
+    GradientStop, GraphicStyle, Histogram, ImageFill, LineEnd, MAX_SHAPE_SIDES,
+    MAX_TEXT_BOX_COLUMNS, Moved, Object, ObjectKind, ObjectShadow, Objects, POLYGON_SCALE,
+    PathPoint, PictureFrame, PictureSettings, Shape, Stroke, TextBox, VerticalAlignment, Wrap,
 };
 pub use object_edit::{
     Distribution, Layer, LayoutPagesClip, ObjectAlignment, TextStyling, new_origin, reframed,

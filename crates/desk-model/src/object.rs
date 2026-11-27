@@ -199,8 +199,9 @@ impl AlphaSeed {
 }
 
 /// The changes of the Adjust Image window, each from -100 to 100 with 0
-/// for none.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+/// for none, and the levels, the darkest and lightest values kept
+/// (OBJ-07).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct Adjustments {
     /// Lighter or darker.
     pub brightness: i8,
@@ -214,6 +215,29 @@ pub struct Adjustments {
     pub temperature: i8,
     /// More magenta or more green.
     pub tint: i8,
+    /// Sharper edges, or softer below zero (W110).
+    pub sharpness: i8,
+    /// The value, from 0 to 255, that becomes black: the left handle of
+    /// the levels (W110).
+    pub black: u8,
+    /// The value that becomes white: the right handle of the levels.
+    pub white: u8,
+}
+
+impl Default for Adjustments {
+    fn default() -> Self {
+        Self {
+            brightness: 0,
+            contrast: 0,
+            saturation: 0,
+            exposure: 0,
+            temperature: 0,
+            tint: 0,
+            sharpness: 0,
+            black: 0,
+            white: 255,
+        }
+    }
 }
 
 impl Adjustments {
@@ -222,10 +246,26 @@ impl Adjustments {
         *self == Self::default()
     }
 
+    /// Whether the colors of each pixel change, apart from the sharpness,
+    /// which takes its neighbors.
+    pub fn changes_colors(&self) -> bool {
+        Self {
+            sharpness: 0,
+            ..*self
+        } != Self::default()
+    }
+
     /// The color of a pixel, adjusted, in straight (not premultiplied)
-    /// red, green and blue from 0 to 1.
+    /// red, green and blue from 0 to 1. The sharpness is not applied: it
+    /// takes the pixels around.
     pub fn apply(&self, [r, g, b]: [f32; 3]) -> [f32; 3] {
         let unit = |v: i8| f32::from(v) / 100.0;
+        // The levels first, as the histogram of the window shows the
+        // picture as it is.
+        let low = f32::from(self.black) / 255.0;
+        let high = f32::from(self.white.max(self.black.saturating_add(1))) / 255.0;
+        let level = |v: f32| ((v - low) / (high - low)).clamp(0.0, 1.0);
+        let (r, g, b) = (level(r), level(g), level(b));
         let exposure = 2f32.powf(unit(self.exposure) * 2.0);
         let (warm, tint) = (unit(self.temperature) * 0.15, unit(self.tint) * 0.15);
         let mut rgb = [
@@ -241,6 +281,134 @@ impl Adjustments {
         let gray = 0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2];
         let saturation = 1.0 + unit(self.saturation);
         rgb.map(|v| (gray + (v - gray) * saturation).clamp(0.0, 1.0))
+    }
+
+    /// Enhance (W110): the exposure and the saturation that bring a
+    /// picture of this histogram to a middle lightness and a natural
+    /// color, the others kept, as the button of the Image tab of Pages
+    /// 15.4 sets them.
+    pub fn enhanced(&self, histogram: &Histogram) -> Self {
+        let mut out = *self;
+        let Some(mean) = histogram.mean_luma() else {
+            return out;
+        };
+        // Half of the way to the middle, so that a dark scene stays dark
+        // but shows; none for one close to it.
+        let target = 0.46;
+        out.exposure = if (mean - target).abs() < 0.04 {
+            0
+        } else {
+            let stops = (target / mean.max(0.02)).log2() * 0.5;
+            (stops / 2.0 * 100.0).round().clamp(-60.0, 60.0) as i8
+        };
+        let colorful = histogram.mean_chroma().unwrap_or(0.0);
+        out.saturation = if colorful < 0.02 {
+            // Gray stays gray.
+            0
+        } else {
+            // Only more: a colorful picture is left as it is.
+            ((0.18 - colorful) / 0.18 * 40.0).round().clamp(0.0, 30.0) as i8
+        };
+        out
+    }
+
+    /// Auto Levels of Adjust Image (W110): the darkest and lightest
+    /// values of the picture, leaving out the few outermost, become black
+    /// and white.
+    pub fn auto_levels(&self, histogram: &Histogram) -> Self {
+        let mut out = *self;
+        if let (Some(black), Some(white)) = (histogram.luma_at(0.005), histogram.luma_at(0.995))
+            && white > black
+        {
+            out.black = black;
+            out.white = white;
+        }
+        out
+    }
+}
+
+/// How many pixels of a picture have each value, from 0 to 255, of their
+/// lightness and of each color, with how far their colors are from gray,
+/// for the levels and for Enhance (W110).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Histogram {
+    /// By lightness.
+    pub luma: [u32; 256],
+    /// By red, green and blue.
+    pub rgb: [[u32; 256]; 3],
+    /// The sum of the chroma of the pixels, from 0 to 255 each.
+    pub chroma: u64,
+}
+
+impl Default for Histogram {
+    fn default() -> Self {
+        Self {
+            luma: [0; 256],
+            rgb: [[0; 256]; 3],
+            chroma: 0,
+        }
+    }
+}
+
+impl Histogram {
+    /// Counts a pixel of straight red, green and blue from 0 to 255.
+    pub fn add(&mut self, [r, g, b]: [u8; 3]) {
+        let luma = (0.2126 * f32::from(r) + 0.7152 * f32::from(g) + 0.0722 * f32::from(b))
+            .round()
+            .clamp(0.0, 255.0) as usize;
+        if let Some(n) = self.luma.get_mut(luma) {
+            *n += 1;
+        }
+        for (counts, v) in self.rgb.iter_mut().zip([r, g, b]) {
+            if let Some(n) = counts.get_mut(usize::from(v)) {
+                *n += 1;
+            }
+        }
+        self.chroma += u64::from(r.max(g).max(b) - r.min(g).min(b));
+    }
+
+    /// How many pixels were counted.
+    pub fn count(&self) -> u64 {
+        self.luma.iter().map(|&n| u64::from(n)).sum()
+    }
+
+    /// The mean lightness, from 0 to 1.
+    pub fn mean_luma(&self) -> Option<f32> {
+        let count = self.count();
+        (count > 0).then(|| {
+            let sum: u64 = self
+                .luma
+                .iter()
+                .enumerate()
+                .map(|(v, &n)| v as u64 * u64::from(n))
+                .sum();
+            sum as f32 / count as f32 / 255.0
+        })
+    }
+
+    /// The mean chroma, from 0 to 1.
+    pub fn mean_chroma(&self) -> Option<f32> {
+        let count = self.count();
+        (count > 0).then(|| self.chroma as f32 / count as f32 / 255.0)
+    }
+
+    /// The lightness below which `share` of the pixels are.
+    pub fn luma_at(&self, share: f32) -> Option<u8> {
+        let count = self.count();
+        if count == 0 {
+            return None;
+        }
+        let wanted = (count as f64 * f64::from(share.clamp(0.0, 1.0)))
+            .ceil()
+            .max(1.0) as u64;
+        let mut seen = 0u64;
+        for (v, &n) in self.luma.iter().enumerate() {
+            seen += u64::from(n);
+            if seen >= wanted {
+                return u8::try_from(v).ok();
+            }
+        }
+        Some(255)
     }
 }
 
@@ -1118,6 +1286,78 @@ impl Objects {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn histogram_of(pixels: &[[u8; 3]]) -> Histogram {
+        let mut histogram = Histogram::default();
+        for &p in pixels {
+            histogram.add(p);
+        }
+        histogram
+    }
+
+    #[test]
+    fn w110_the_levels_stretch_the_values_between_them() {
+        let a = Adjustments {
+            black: 51,
+            white: 204,
+            ..Adjustments::default()
+        };
+        assert!(!a.is_none());
+        assert!(a.changes_colors());
+        let [r, g, b] = a.apply([0.2, 0.5, 0.8]);
+        assert!(r.abs() < 0.01 && (g - 0.5).abs() < 0.01 && (b - 1.0).abs() < 0.01);
+        // Handles that cross keep a step between them.
+        let crossed = Adjustments {
+            black: 200,
+            white: 100,
+            ..Adjustments::default()
+        };
+        assert!(crossed.apply([0.9, 0.5, 0.0]).iter().all(|v| v.is_finite()));
+        // The sharpness alone changes no pixel by itself.
+        let sharp = Adjustments {
+            sharpness: 50,
+            ..Adjustments::default()
+        };
+        assert!(!sharp.is_none() && !sharp.changes_colors());
+    }
+
+    #[test]
+    fn w110_enhance_brightens_a_dark_picture_and_colors_a_dull_one() {
+        let dark = histogram_of(&[[30, 25, 20], [50, 40, 35], [20, 20, 25]]);
+        let enhanced = Adjustments::default().enhanced(&dark);
+        assert!(enhanced.exposure > 20, "{enhanced:?}");
+        let bright = histogram_of(&[[240, 235, 230], [250, 245, 240]]);
+        assert!(Adjustments::default().enhanced(&bright).exposure < 0);
+        // A picture of middle lightness and color keeps them.
+        let fine = histogram_of(&[[150, 100, 60], [80, 110, 160], [130, 120, 90]]);
+        let kept = Adjustments::default().enhanced(&fine);
+        assert!(
+            kept.exposure.abs() <= 10 && kept.saturation.abs() <= 15,
+            "{kept:?}"
+        );
+        // Gray stays gray; the other adjustments are kept.
+        let gray = histogram_of(&[[60, 60, 60], [90, 90, 90]]);
+        let start = Adjustments {
+            tint: 12,
+            ..Adjustments::default()
+        };
+        let enhanced = start.enhanced(&gray);
+        assert_eq!((enhanced.saturation, enhanced.tint), (0, 12));
+        // Nothing counted, nothing changed.
+        assert_eq!(start.enhanced(&Histogram::default()), start);
+    }
+
+    #[test]
+    fn w110_auto_levels_take_the_darkest_and_lightest_values() {
+        let mut pixels = vec![[100, 100, 100]; 400];
+        pixels.extend([[40, 40, 40]; 100]);
+        pixels.extend([[180, 180, 180]; 100]);
+        let a = Adjustments::default().auto_levels(&histogram_of(&pixels));
+        assert_eq!((a.black, a.white), (40, 180));
+        // A picture of one value keeps the levels.
+        let flat = Adjustments::default().auto_levels(&histogram_of(&[[90, 90, 90]]));
+        assert_eq!((flat.black, flat.white), (0, 255));
+    }
     use crate::{Document, Editor, ModelError, ParaAttrs, Run};
 
     fn shape(id: NodeId) -> Object {

@@ -2,11 +2,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 //! The image tools of Pages, for a selected picture: its mask (OBJ-04),
-//! Instant Alpha (OBJ-06), Adjust Image (OBJ-07) and Reduce File Size
+//! Instant Alpha (OBJ-06), the adjustments of Pages 15.4 with Enhance
+//! and Adjust Image behind them (OBJ-07, W110) and Reduce File Size
 //! (OBJ-05).
 
 use crate::compact;
-use std::cell::Cell;
+use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
 use adw::prelude::*;
@@ -56,7 +57,16 @@ pub struct PictureGroup {
     /// Puts back the colors that Instant Alpha took out.
     restore: gtk::Button,
     editor: EditorOf,
-    adjust: [compact::SpinRow; 6],
+    /// Exposure and Saturation, as the Image tab of Pages 15.4 shows
+    /// them (W110).
+    exposure: compact::SpinRow,
+    saturation: compact::SpinRow,
+    /// Sets them from the picture.
+    enhance: gtk::Button,
+    /// Opens the full Adjust Image.
+    more: gtk::Button,
+    /// The selected picture and its adjustments.
+    current: RefCell<Option<(desk_model::Picture, Adjustments)>>,
     reset: gtk::Button,
     reduce: gtk::Button,
     /// How far the selected picture is placed on its page from its frame
@@ -70,28 +80,6 @@ fn spin(title: &str, min: f64, max: f64) -> compact::SpinRow {
     let row = compact::SpinRow::with_range(min, max, 1.0);
     row.set_title(title);
     row
-}
-
-/// The changes that the rows of Adjust Image ask for.
-fn adjustments(rows: &[compact::SpinRow; 6]) -> Adjustments {
-    let [
-        brightness,
-        contrast,
-        saturation,
-        exposure,
-        temperature,
-        tint,
-    ] = rows
-        .each_ref()
-        .map(|r| r.value().round().clamp(-100.0, 100.0) as i8);
-    Adjustments {
-        brightness,
-        contrast,
-        saturation,
-        exposure,
-        temperature,
-        tint,
-    }
 }
 
 impl PictureGroup {
@@ -149,15 +137,16 @@ impl PictureGroup {
         // width of the Inspector in every language.
         let restore_row = compact::ActionRow::new();
         restore_row.add_suffix(&restore);
-        let adjust = [
-            tr("Brightness"),
-            tr("Contrast"),
-            tr("Saturation"),
-            tr("Exposure"),
-            tr("Temperature"),
-            tr("Tint"),
-        ]
-        .map(|title| spin(&title, -100.0, 100.0));
+        let enhance = gtk::Button::builder()
+            .label(tr("Enhance"))
+            .valign(gtk::Align::Center)
+            .tooltip_text(tr("Sets the exposure and the saturation from the picture"))
+            .build();
+        let more = gtk::Button::builder()
+            .label(tr("Adjust Image…"))
+            .valign(gtk::Align::Center)
+            .tooltip_text(tr("The levels, the sharpness and all the adjustments"))
+            .build();
         let reset = gtk::Button::builder()
             .label(tr("Reset Image"))
             .valign(gtk::Align::Center)
@@ -181,9 +170,14 @@ impl PictureGroup {
         group.add(&top);
         group.add(&alpha_row);
         group.add(&restore_row);
-        for row in &adjust {
-            group.add(row);
-        }
+        let exposure = crate::adjust_dialog::slider_row(&group, &tr("Exposure"), -100.0, 100.0);
+        let saturation = crate::adjust_dialog::slider_row(&group, &tr("Saturation"), -100.0, 100.0);
+        let enhance_row = compact::ActionRow::new();
+        enhance_row.add_suffix(&enhance);
+        group.add(&enhance_row);
+        let more_row = compact::ActionRow::new();
+        more_row.add_suffix(&more);
+        group.add(&more_row);
         group.add(&reduce_row);
         group.add(&reset_row);
         let this = Rc::new(Self {
@@ -196,7 +190,11 @@ impl PictureGroup {
             alpha,
             restore,
             editor: editor.clone(),
-            adjust,
+            exposure,
+            saturation,
+            enhance,
+            more,
+            current: RefCell::new(None),
             reset,
             reduce,
             shift: Cell::new((0.0, 0.0)),
@@ -315,7 +313,7 @@ impl PictureGroup {
                 });
             }
         });
-        for row in &this.adjust {
+        for row in [&this.exposure, &this.saturation] {
             let weak = Rc::downgrade(&this);
             let editor = editor.clone();
             row.connect_value_notify(move |_| {
@@ -323,12 +321,46 @@ impl PictureGroup {
                 if this.updating.get() {
                     return;
                 }
-                let adjust = adjustments(&this.adjust);
+                let unit = |row: &compact::SpinRow| row.value().round().clamp(-100.0, 100.0) as i8;
+                let (exposure, saturation) = (unit(&this.exposure), unit(&this.saturation));
+                if let Some(editor) = editor() {
+                    editor.set_object("Adjust Image", |object| {
+                        object.picture.adjust.exposure = exposure;
+                        object.picture.adjust.saturation = saturation;
+                    });
+                }
+            });
+        }
+        let weak = Rc::downgrade(&this);
+        let enhance_editor = editor.clone();
+        this.enhance.connect_clicked(move |_| {
+            let Some(this) = weak.upgrade() else { return };
+            let Some((picture, _)) = this.current.borrow().clone() else {
+                return;
+            };
+            let Some(histogram) = desk_render::histogram(&picture) else {
+                return;
+            };
+            if let Some(editor) = enhance_editor() {
+                editor.set_object("Enhance", |object| {
+                    object.picture.adjust = object.picture.adjust.enhanced(&histogram);
+                });
+            }
+        });
+        let weak = Rc::downgrade(&this);
+        let more_editor = editor.clone();
+        this.more.connect_clicked(move |button| {
+            let Some(this) = weak.upgrade() else { return };
+            let Some((picture, adjust)) = this.current.borrow().clone() else {
+                return;
+            };
+            let editor = more_editor.clone();
+            crate::adjust_dialog::open(button, &picture, adjust, move |adjust| {
                 if let Some(editor) = editor() {
                     editor.set_object("Adjust Image", |object| object.picture.adjust = adjust);
                 }
             });
-        }
+        });
         let reset_editor = editor.clone();
         this.reset.connect_clicked(move |_| {
             if let Some(editor) = reset_editor() {
@@ -382,6 +414,7 @@ impl PictureGroup {
     pub fn show(&self, info: Option<&ObjectInfo>) {
         let Some(info) = info.filter(|i| matches!(i.object.kind, ObjectKind::Image(_))) else {
             self.group.set_visible(false);
+            self.current.replace(None);
             if self.alpha.is_active() {
                 self.updating.set(true);
                 self.alpha.set_active(false);
@@ -432,15 +465,10 @@ impl PictureGroup {
         self.restore
             .set_sensitive(!settings.alpha.is_empty() || settings.alpha_kept.is_some());
         let a = settings.adjust;
-        for (row, value) in self.adjust.iter().zip([
-            a.brightness,
-            a.contrast,
-            a.saturation,
-            a.exposure,
-            a.temperature,
-            a.tint,
-        ]) {
-            set(row, f64::from(value));
+        set(&self.exposure, f64::from(a.exposure));
+        set(&self.saturation, f64::from(a.saturation));
+        if let ObjectKind::Image(picture) = &info.object.kind {
+            self.current.replace(Some((picture.clone(), a)));
         }
         self.show_rows();
         self.updating.set(false);

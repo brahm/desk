@@ -15,6 +15,7 @@ pub use adw;
 pub use gtk;
 
 mod access;
+mod adjust_dialog;
 mod area;
 mod auto_numbers;
 mod bullet_pictures;

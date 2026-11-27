@@ -1350,3 +1350,57 @@ fn w108_svg_and_heic_pictures_are_drawn() {
     let images = poppler("pdfimages", &["-list"], &out);
     assert_eq!(images.lines().count(), 3, "{images}");
 }
+
+#[test]
+fn w110_sharpness_and_the_histogram_of_a_picture() {
+    use desk_model::{Adjustments, Picture};
+    // Black on the left half, white on the right.
+    let source = cairo::ImageSurface::create(cairo::Format::ARgb32, 8, 4).unwrap();
+    {
+        let cr = cairo::Context::new(&source).unwrap();
+        cr.set_source_rgb(0.0, 0.0, 0.0);
+        cr.paint().unwrap();
+        cr.set_source_rgb(0.6, 0.6, 0.6);
+        cr.rectangle(4.0, 0.0, 4.0, 4.0);
+        cr.fill().unwrap();
+    }
+    let mut png = Vec::new();
+    source.write_to_png(&mut png).unwrap();
+    let picture = Picture::from_png(png).unwrap();
+    let histogram = desk_render::histogram(&picture).unwrap();
+    assert_eq!(histogram.count(), 32);
+    assert_eq!(histogram.luma[0], 16);
+    assert_eq!(histogram.luma[153], 16);
+    let gray = |surface: &mut cairo::ImageSurface, x: usize| {
+        let stride = surface.stride() as usize;
+        surface.data().unwrap()[stride + x * 4]
+    };
+    let mut plain =
+        desk_render::adjusted_surface(&source, &[], None, Adjustments::default()).unwrap();
+    let mut sharp = desk_render::adjusted_surface(
+        &source,
+        &[],
+        None,
+        Adjustments {
+            sharpness: 100,
+            ..Adjustments::default()
+        },
+    )
+    .unwrap();
+    let mut soft = desk_render::adjusted_surface(
+        &source,
+        &[],
+        None,
+        Adjustments {
+            sharpness: -100,
+            ..Adjustments::default()
+        },
+    )
+    .unwrap();
+    // The light side of the edge gets lighter when sharper, and darker
+    // when softer; far from the edge nothing changes.
+    let edge = gray(&mut plain, 4);
+    assert!(gray(&mut sharp, 4) > edge);
+    assert!(gray(&mut soft, 4) < edge);
+    assert_eq!(gray(&mut sharp, 7), gray(&mut plain, 7));
+}

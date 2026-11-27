@@ -2142,6 +2142,9 @@ fn with_objects() -> Document {
                     exposure: -5,
                     temperature: 40,
                     tint: -50,
+                    sharpness: 25,
+                    black: 12,
+                    white: 240,
                 },
             };
             edit.add_object(image)?;

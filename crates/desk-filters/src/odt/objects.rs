@@ -373,10 +373,16 @@ fn odf_picture_settings(
         if a.contrast != 0 {
             g.contrast = Some(f64::from(a.contrast));
         }
-        g.image_adjust = Some(format!(
+        let mut value = format!(
             "{} {} {} {} {} {}",
             a.brightness, a.contrast, a.saturation, a.exposure, a.temperature, a.tint
-        ));
+        );
+        // The sharpness and the levels only when set, so that older
+        // versions of Desk read the six of before (W110).
+        if (a.sharpness, a.black, a.white) != (0, 0, 255) {
+            value.push_str(&format!(" {} {} {}", a.sharpness, a.black, a.white));
+        }
+        g.image_adjust = Some(value);
     }
 }
 
@@ -524,20 +530,35 @@ fn model_picture_settings(
         settings.alpha_kept = alpha_kept(value);
     }
     let unit = |v: f64| v.round().clamp(-100.0, 100.0) as i8;
-    let numbers: Option<Vec<i8>> = g.image_adjust.as_deref().and_then(|v| {
+    let numbers: Option<Vec<f64>> = g.image_adjust.as_deref().and_then(|v| {
         v.split_whitespace()
-            .map(|n| n.parse::<f64>().ok().filter(|n| n.is_finite()).map(unit))
+            .map(|n| n.parse::<f64>().ok().filter(|n| n.is_finite()))
             .collect()
     });
-    match numbers {
-        Some(n) if n.len() == 6 => {
+    match numbers.as_deref() {
+        Some(
+            &[
+                brightness,
+                contrast,
+                saturation,
+                exposure,
+                temperature,
+                tint,
+                ref rest @ ..,
+            ],
+        ) if rest.is_empty() || rest.len() == 3 => {
+            let level =
+                |v: Option<&f64>, none: u8| v.map_or(none, |v| v.round().clamp(0.0, 255.0) as u8);
             settings.adjust = desk_model::Adjustments {
-                brightness: n[0],
-                contrast: n[1],
-                saturation: n[2],
-                exposure: n[3],
-                temperature: n[4],
-                tint: n[5],
+                brightness: unit(brightness),
+                contrast: unit(contrast),
+                saturation: unit(saturation),
+                exposure: unit(exposure),
+                temperature: unit(temperature),
+                tint: unit(tint),
+                sharpness: rest.first().map_or(0, |v| unit(*v)),
+                black: level(rest.get(1), 0),
+                white: level(rest.get(2), 255),
             };
         }
         _ => {

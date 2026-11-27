@@ -33,8 +33,8 @@ mod display;
 pub use cairo;
 
 pub use backend::{
-    Painter, RenderError, adjusted_surface, heic_size, pdf_size, picture_surface, reduced_picture,
-    svg_size,
+    Painter, RenderError, adjusted_surface, heic_size, histogram, pdf_size, picture_surface,
+    reduced_picture, svg_size,
 };
 pub use brush::outline as brush_outline;
 pub use contour::{object_contour, object_contours, trace_contour};
