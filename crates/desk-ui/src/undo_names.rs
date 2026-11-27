@@ -87,6 +87,12 @@ const NAMES: &[&str] = &[
     n_("Remove Image"),
     n_("Image Description"),
     n_("Caption for Each Image"),
+    // Combining shapes, as in Pages 15.4 (W113).
+    n_("Unite"),
+    n_("Intersect"),
+    n_("Subtract"),
+    n_("Exclude"),
+    n_("Break Apart"),
     n_("Insert Link"),
     n_("Insert Note"),
     n_("Insert Shape"),

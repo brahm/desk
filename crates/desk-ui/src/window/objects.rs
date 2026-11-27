@@ -16,8 +16,10 @@ use crate::editing::{NewShape, TextEditor};
 use crate::i18n::{tr, trc};
 
 /// The actions of these menus, which need a document.
-pub(super) const OBJECT_ACTIONS: [&str; 33] = [
+pub(super) const OBJECT_ACTIONS: [&str; 35] = [
     "insert-equation",
+    "combine-shapes",
+    "break-apart",
     "insert-image-gallery",
     "edit-equation",
     "mask-with-shape",
@@ -79,13 +81,15 @@ type ChoiceAction = fn(&TextEditor, &str);
 
 impl DocumentWindow {
     pub(super) fn add_object_actions(self: &Rc<Self>) {
-        let simple: [(&str, EditorAction); 26] = [
+        let simple: [(&str, EditorAction); 27] = [
             // The editor of equations, for a new one or the selected one
             // (W104).
             ("insert-equation", TextEditor::insert_equation_dialog),
             ("edit-equation", TextEditor::edit_equation_dialog),
             // Insert > Image Gallery of Pages 15.4 (W111).
             ("insert-image-gallery", TextEditor::insert_gallery),
+            // Format > Shapes and Lines > Break Apart of Pages 15.4 (W113).
+            ("break-apart", TextEditor::break_apart_shapes),
             ("unmask", TextEditor::unmask_picture),
             ("duplicate-objects", TextEditor::duplicate_objects),
             ("move-to-master", TextEditor::move_objects_to_master),
@@ -137,7 +141,16 @@ impl DocumentWindow {
         self.actions.add_action(&action);
         self.add_media_browser_action();
         self.add_selectable_actions();
-        let with_string: [(&str, ChoiceAction); 4] = [
+        let with_string: [(&str, ChoiceAction); 5] = [
+            // Unite, Intersect, Subtract and Exclude of Pages 15.4 (W113).
+            ("combine-shapes", |e, value| {
+                e.combine_shapes(match value {
+                    "intersect" => desk_model::Combine::Intersect,
+                    "subtract" => desk_model::Combine::Subtract,
+                    "exclude" => desk_model::Combine::Exclude,
+                    _ => desk_model::Combine::Unite,
+                })
+            }),
             ("insert-shape", |e, value| {
                 e.insert_shape(named_shape(value))
             }),
@@ -360,6 +373,22 @@ pub(crate) fn arrange_menu() -> gio::Menu {
     }
     shape.append_submenu(Some(&tr("Mask with S_hape")), &masks);
     shape.append(Some(&tr("Un_mask")), Some("win.unmask"));
+    // Format > Shapes and Lines of Pages 15.4 (W113).
+    let combine = gio::Menu::new();
+    for (label, value) in [
+        // Without mnemonics: every letter of them is taken in the menu.
+        (tr("Unite Shapes"), "unite"),
+        (tr("Intersect Shapes"), "intersect"),
+        (tr("Subtract Shapes"), "subtract"),
+        (tr("Exclude Shapes"), "exclude"),
+    ] {
+        combine.append(
+            Some(&label),
+            Some(&format!("win.combine-shapes('{value}')")),
+        );
+    }
+    combine.append(Some(&tr("Break Apart")), Some("win.break-apart"));
+    shape.append_section(None, &combine);
     let grouping = gio::Menu::new();
     // A copy a little lower and to the right (OBJ-22).
     grouping.append(

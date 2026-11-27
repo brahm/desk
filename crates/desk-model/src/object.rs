@@ -669,6 +669,10 @@ pub enum Shape {
     /// A connection line, which joins two objects and follows them
     /// (OBJ-31).
     Connection(crate::Connection),
+    /// A shape of several closed parts, as combining shapes leaves it,
+    /// filled by the nonzero rule: a hole goes the other way around than
+    /// the part it is in (W113, PXV-27).
+    Compound(Arc<[Arc<[PathPoint]>]>),
 }
 
 /// A point of a shape drawn with the pen, in parts of [`POLYGON_SCALE`]

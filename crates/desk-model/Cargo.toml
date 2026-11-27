@@ -11,6 +11,7 @@ publish.workspace = true
 [dependencies]
 desk-chart.workspace = true
 desk-table.workspace = true
+i_overlay.workspace = true
 imbl.workspace = true
 unicode-segmentation.workspace = true
 

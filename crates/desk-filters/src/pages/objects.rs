@@ -34,11 +34,13 @@ fn shape(path: &ShapePath, natural: (f64, f64)) -> (Shape, bool) {
     let (w, h) = natural;
     let shape = match path {
         ShapePath::Bezier(path) => {
-            let Some(Shape::Path { points, closed }) =
-                crate::odt::objects::path_shape(path, Some((0.0, 0.0, w, h)))
-            else {
-                return (Shape::Rectangle, false);
-            };
+            let (points, closed) =
+                match crate::odt::objects::path_shape(path, Some((0.0, 0.0, w, h))) {
+                    Some(Shape::Path { points, closed }) => (points, closed),
+                    // A shape of several parts, as a ring (W113).
+                    Some(compound @ Shape::Compound(_)) => return (compound, false),
+                    _ => return (Shape::Rectangle, false),
+                };
             let mut points = points.to_vec();
             let mut closed = closed;
             // Pages ends a closed curve where it starts, without closing it.
