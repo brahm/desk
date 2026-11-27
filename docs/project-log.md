@@ -3084,6 +3084,51 @@ paragraph, and objects on a second page.
   Edit Page Templates mode (B-078), links to a page of a page layout
   document (B-079) and Populate With (B-080).
 
+### 27 November: W3 closed, W4 next
+
+- Phase W3 ended with its 9 rows and B-044 done: sections, page
+  templates, headers and footers, page backgrounds, the table of
+  contents per section, bookmarks, links, equations and mail merge,
+  and the artistic lines, checked on the Mac against Pages 15.4 on 27
+  November.
+- It took two days, 26 and 27 November, against the three estimated.
+- *Moved on:* the Edit Page Templates mode (B-078), links to a page of
+  a page layout document (B-079) and Populate With of mail merge
+  (B-080), all to W5.
+- *Next:* the owner asked to start the next phase, W4, Writer objects
+  and charts of 15.
+
+### 27 November: phase W4 starts, with its plan
+
+- The first pull request of W4 is its plan,
+  [docs/phases/W4.md](phases/W4.md): 20 rows of objects and charts and
+  one backlog item, the text of each part of a chart (B-013) from B1,
+  with the parity rows that test each one, what is missing, the ODF
+  each needs and the order of 13 steps.
+- *What reading the rows showed:* four rows are done and need only the
+  check of the new target; eleven exist as Pages '09 had them and need
+  what Pages 15.4 adds; five are missing (the image gallery, 3D objects,
+  drawings, captions and titles, and the corners, bevel and hole of
+  charts), none with a parity row. The colour of the guides (W124) is
+  already a preference since B1.
+- *Decided in the plan:* SVG, HEIC and the recording of sound use
+  libraries of the GNOME runtime (librsvg, glycin or libheif,
+  GStreamer), each chosen in its pull request.
+- *Decided by the owner (D-033):* 3D objects, the least known part, with
+  no Rust reader of USDZ and no 3D viewer in GNOME, open from USDZ as in
+  Pages 15.4 and also from glTF and GLB, which the tools of Linux write,
+  and from U3D, PRC, FBX and OBJ, so that the 3D of PDF documents and of
+  Microsoft Office opens too. Each format gets a reader of its own, in
+  its own pull request; the step grows from one to four.
+- *How the Mac is used:* one session at the start and one at the end,
+  as in W3.
+- *Fixed on the way:* the rows of W2 that its validation on the Mac
+  checked on 26 November (W148, W151 to W155) still asked for a check
+  in the inventory, so the dashboard showed W2 with 2 of 9 rows done.
+  Their check is now recorded, as `corpus/mac-review.tsv` has it; W148
+  and W149 stay partial, since comments and changes in print wait for
+  W5 (B-077).
+
 ## Decisions, with their reasons and consequences
 
 Ids `D-nnn` and `R-nnn` are those of [decisions.md](decisions.md).
@@ -3486,6 +3531,18 @@ them only when the person acts.
 *Consequences:* Preview, Merge and Fill With My Card fill the sender
 fields; opening a document never does, as was already built in #256.
 
+### 3D objects (27 November)
+
+**D-033: 3D objects open from USDZ, glTF, GLB, U3D, PRC, FBX and OBJ (27 November).**
+*Why:* Pages 15.4 inserts USDZ, which almost no tool of GNOME writes. The
+plan of W4 offered USDZ with glTF and GLB, the open format of Blender;
+the owner took it and added U3D and PRC, the 3D inside PDF documents,
+and FBX and OBJ, the 3D that Microsoft Office inserts, so that the
+models of those documents open in Desk too.
+*Consequences:* step 11 of W4 has four pull requests, one per family of
+formats, each with a reader of its own in Rust and its own fuzzing;
+the estimate of W4 grows by about a day, corrected when the phase ends.
+
 ## What changed direction, and what it cost
 
 | Date | Change | What was redone or set aside |
@@ -3524,7 +3581,9 @@ from 17 to 22 November and brought Writer to the behaviour of Pages
 review, as the next phase. On 24 November, after pull request 200, he
 paused W2 for RV, a review of all the code (D-027); RV ended the same
 day after six batches, and W2 resumed. W2 ended on 26 November, and
-the owner started W3, Writer structure and templates, the same day. The three
+the owner started W3, Writer structure and templates, the same day.
+W3 ended on 27 November, and W4, Writer objects and charts of 15,
+started the same day. The three
 apps can advance side by side: six phases of Writer, five of Tables, five
 of Slides, and a last phase across the apps before version 1.0.
 
