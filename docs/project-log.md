@@ -3106,7 +3106,7 @@ paragraph, and objects on a second page.
   with the parity rows that test each one, what is missing, the ODF
   each needs and the order of 13 steps.
 - *What reading the rows showed:* four rows are done and need only the
-  check of the new target; ten exist as Pages '09 had them and need
+  check of the new target; eleven exist as Pages '09 had them and need
   what Pages 15.4 adds; five are missing (the image gallery, 3D objects,
   drawings, captions and titles, and the corners, bevel and hole of
   charts), none with a parity row. The colour of the guides (W124) is
