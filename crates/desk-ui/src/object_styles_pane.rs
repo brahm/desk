@@ -123,7 +123,9 @@ fn draw_preview(
             match stroke.style {
                 desk_model::BorderStyle::Dashed => cr.set_dash(&[width * 3.0, width * 2.0], 0.0),
                 desk_model::BorderStyle::Dotted => cr.set_dash(&[width, width * 1.5], 0.0),
-                desk_model::BorderStyle::Solid => cr.set_dash(&[], 0.0),
+                desk_model::BorderStyle::Solid | desk_model::BorderStyle::Artistic(_) => {
+                    cr.set_dash(&[], 0.0)
+                }
             }
             cr.move_to(x, y + h);
             cr.line_to(x + w, y);
@@ -199,7 +201,9 @@ fn draw_preview(
         match stroke.style {
             desk_model::BorderStyle::Dashed => cr.set_dash(&[width * 3.0, width * 2.0], 0.0),
             desk_model::BorderStyle::Dotted => cr.set_dash(&[width, width * 1.5], 0.0),
-            desk_model::BorderStyle::Solid => cr.set_dash(&[], 0.0),
+            desk_model::BorderStyle::Solid | desk_model::BorderStyle::Artistic(_) => {
+                cr.set_dash(&[], 0.0)
+            }
         }
         rect(0.0, 0.0);
         let _ = cr.stroke();

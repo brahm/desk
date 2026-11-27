@@ -31,8 +31,12 @@ const LINE_ENDS: [LineEnd; 6] = [
     LineEnd::Bar,
 ];
 
-/// The styles of a line, after "None" in its list.
-const STROKES: [BorderStyle; 3] = [BorderStyle::Solid, BorderStyle::Dashed, BorderStyle::Dotted];
+/// The styles of a line, after "None" in its list: the plain ones and
+/// the artistic ones (B-044).
+const STROKES: [BorderStyle; 8] = BorderStyle::ALL;
+
+/// Where Picture Frame is in the list of the line, after its styles.
+const PICTURE_FRAME: u32 = STROKES.len() as u32 + 1;
 
 /// The name of a picture frame of the library (OBJ-36).
 fn frame_style_name(style: FrameStyle) -> String {
@@ -108,16 +112,11 @@ impl GraphicGroup {
             ],
             &tr("None"),
         );
-        let stroke = combo(
-            &tr("Stroke"),
-            &[
-                tr("None"),
-                tr("Solid"),
-                tr("Dashed"),
-                tr("Dotted"),
-                tr("Picture Frame"),
-            ],
-        );
+        let strokes: Vec<String> = std::iter::once(tr("None"))
+            .chain(STROKES.map(crate::effects::style_name))
+            .chain(std::iter::once(tr("Picture Frame")))
+            .collect();
+        let stroke = combo(&tr("Stroke"), &strokes);
         let frames: Vec<String> = FrameStyle::ALL
             .iter()
             .map(|f| frame_style_name(*f))
@@ -330,7 +329,7 @@ impl GraphicGroup {
 
     /// The picture frame that the rows ask for.
     fn frame_value(&self) -> Option<PictureFrame> {
-        (self.stroke.selected() == 4).then(|| PictureFrame {
+        (self.stroke.selected() == PICTURE_FRAME).then(|| PictureFrame {
             style: FrameStyle::ALL
                 .get(self.frame_style.selected() as usize)
                 .copied()
@@ -352,7 +351,7 @@ impl GraphicGroup {
 
     /// Shows the rows that the choices of the others call for.
     fn show_rows(&self) {
-        let framed = self.stroke.selected() == 4;
+        let framed = self.stroke.selected() == PICTURE_FRAME;
         let stroked = self.stroke.selected() > 0 && !framed;
         self.stroke_color_row.set_visible(stroked);
         self.stroke_width.set_visible(stroked);
@@ -413,7 +412,7 @@ impl GraphicGroup {
         select(&self.frame_style, index as u32);
         set(&self.frame_scale, f64::from(frame.scale));
         match style.stroke {
-            _ if style.frame.is_some() && !line => select(&self.stroke, 4),
+            _ if style.frame.is_some() && !line => select(&self.stroke, PICTURE_FRAME),
             Some(stroke) => {
                 let index = STROKES.iter().position(|s| *s == stroke.style).unwrap_or(0);
                 select(&self.stroke, index as u32 + 1);

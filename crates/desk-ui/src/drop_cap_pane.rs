@@ -11,10 +11,10 @@
 use std::cell::Cell;
 use std::rc::Rc;
 
-use desk_model::{DropCap, DropCapShape, Length, ParaAttrs, ParaFormat};
+use desk_model::{BorderStyle, DropCap, DropCapShape, Length, ParaAttrs, ParaFormat};
 
 use crate::compact;
-use crate::effects::{ColorRow, STYLES, style_name};
+use crate::effects::{ColorRow, style_name};
 use crate::formatting::EditorOf;
 use crate::i18n::tr;
 use crate::tab_stops::string_list;
@@ -72,7 +72,7 @@ impl DropCapGroup {
         border_width.set_subtitle(&tr("Points"));
         let border_style = compact::ComboRow::builder()
             .title(tr("Border Style"))
-            .model(&string_list(STYLES.map(style_name)))
+            .model(&string_list(BorderStyle::ALL.map(style_name)))
             .build();
         let scale = spin(&tr("Letter Size"), 10.0, 100.0);
         scale.set_subtitle(&tr("Percent of the shape"));
@@ -180,8 +180,9 @@ impl DropCapGroup {
                         None => 0.0,
                     }),
                     border_color: border.unwrap_or(DropCapShape::default().border_color),
-                    border_style: STYLES
-                        [(self.border_style.selected() as usize).min(STYLES.len() - 1)],
+                    // The plain lines and the artistic ones (B-044).
+                    border_style: BorderStyle::ALL
+                        [(self.border_style.selected() as usize).min(BorderStyle::ALL.len() - 1)],
                     scale: self.scale.value().round().clamp(10.0, 100.0) as u8,
                     radius: self.radius.value().round().clamp(0.0, 100.0) as u8,
                 }
@@ -244,7 +245,7 @@ impl DropCapGroup {
             &self.border_width,
             border.map_or(2.0, |b| b.border_width.to_pt()),
         );
-        let style = STYLES
+        let style = BorderStyle::ALL
             .iter()
             .position(|s| *s == start.border_style)
             .unwrap_or_default() as u32;

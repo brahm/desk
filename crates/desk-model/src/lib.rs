@@ -116,7 +116,7 @@ pub use equation::Equation;
 pub use error::ModelError;
 pub use find::{Found, Query};
 pub use format::{
-    Alignment, Baseline, BorderSides, BorderStyle, Capitalization, CharAttrs, CharFormat,
+    Alignment, Baseline, BorderSides, BorderStyle, Brush, Capitalization, CharAttrs, CharFormat,
     DEFAULT_TAB_INTERVAL, DropCap, DropCapShape, FontFeature, FontFeatures, FontWeight, Language,
     Ligatures, LineColor, LineSpacing, LineStyle, ParaAttrs, ParaBorder, ParaFormat, Shadow,
     TabAlignment, TabLeader, TabStop, TabStops,

@@ -4896,3 +4896,155 @@ fn w104_an_equation_on_the_master_of_a_section_is_kept() {
     });
     assert!(kept);
 }
+
+/// The text of a part of an ODF package.
+fn part_of(bytes: &[u8], name: &str) -> String {
+    use std::io::Read;
+    let mut zip = zip::ZipArchive::new(std::io::Cursor::new(bytes)).unwrap();
+    let mut text = String::new();
+    zip.by_name(name)
+        .unwrap()
+        .read_to_string(&mut text)
+        .unwrap();
+    text
+}
+
+#[test]
+fn b_044_artistic_lines_of_objects_and_drop_caps_are_kept() {
+    use desk_model::{
+        Anchor, Brush, DropCap, DropCapShape, Frame, Object, ObjectKind, Shape, Stroke,
+    };
+    let mut editor = desk_model::Editor::new(Document::new_word_processing());
+    let start = editor.document().start();
+    editor
+        .edit("Lines", |edit| {
+            edit.insert_text(start, "Text")?;
+            for (i, brush) in Brush::ALL.into_iter().enumerate() {
+                let mut shape = Object::new(
+                    edit.new_id(),
+                    ObjectKind::Shape(Shape::Rectangle),
+                    Frame::from_pt(20.0 + 60.0 * i as f64, 100.0, 50.0, 40.0),
+                );
+                shape.anchor = Anchor::Page(1);
+                shape.style.stroke = Some(Stroke {
+                    style: BorderStyle::Artistic(brush),
+                    ..Stroke::new(Rgba::rgb(0, 0, 120), Length::from_points(4))
+                });
+                edit.add_object(shape)?;
+            }
+            Ok(())
+        })
+        .unwrap();
+    let mut document = editor.document().clone();
+    let cap = DropCap {
+        lines: 2,
+        background: Some(DropCapShape {
+            border_width: Length::from_points(2),
+            border_style: BorderStyle::Artistic(Brush::ChiselPen),
+            ..DropCapShape::default()
+        }),
+        ..DropCap::default()
+    };
+    let body = document.styles().default_paragraph();
+    let attrs = ParaAttrs {
+        drop_cap: Some(Some(cap)),
+        ..ParaAttrs::default()
+    };
+    let paragraph =
+        Paragraph::from_runs(document.new_id(), body, attrs, vec![Run::new("Initial")]).unwrap();
+    document
+        .apply(Op::InsertParagraph {
+            index: 1,
+            paragraph,
+        })
+        .unwrap();
+    let bytes = write_odt(&document).unwrap();
+    keep("filters-artistic-lines.odt", &bytes);
+    let content = part_of(&bytes, "content.xml");
+    // Other programs draw the lines solid.
+    for name in [
+        "chalk",
+        "thick-brush",
+        "chisel-pen",
+        "dry-brush",
+        "uneven-ink",
+    ] {
+        assert!(
+            content.contains(&format!("desk:stroke-style=\"{name}\"")),
+            "{name} in {content}"
+        );
+    }
+    assert!(!content.contains("draw:stroke=\"dash\""));
+    assert!(content.contains("desk:drop-cap-border-style=\"chisel-pen\""));
+    let read = read_odt(&bytes).unwrap();
+    let styles: Vec<BorderStyle> = read
+        .objects()
+        .iter()
+        .filter_map(|o| o.style.stroke.map(|s| s.style))
+        .collect();
+    assert_eq!(styles, Brush::ALL.map(BorderStyle::Artistic));
+    let read_cap = read
+        .body()
+        .get(1)
+        .unwrap()
+        .attrs()
+        .drop_cap
+        .flatten()
+        .and_then(|c| c.background)
+        .map(|b| b.border_style);
+    assert_eq!(read_cap, Some(BorderStyle::Artistic(Brush::ChiselPen)));
+    // A program that made the line of chalk dashed, keeping the name of
+    // Desk, made it dashed.
+    let dashed = content.replacen(
+        "draw:stroke=\"solid\"",
+        "draw:stroke=\"dash\"",
+        content.matches("draw:stroke=\"solid\"").count(),
+    );
+    let read = read_odt(&with_part(&bytes, "content.xml", &dashed)).unwrap();
+    assert!(
+        read.objects()
+            .iter()
+            .filter_map(|o| o.style.stroke)
+            .all(|s| s.style == BorderStyle::Dashed)
+    );
+    // An unknown name of a later Desk is a solid line.
+    let unknown = content.replace(
+        "desk:stroke-style=\"chalk\"",
+        "desk:stroke-style=\"crayon\"",
+    );
+    let read = read_odt(&with_part(&bytes, "content.xml", &unknown)).unwrap();
+    assert_eq!(
+        read.objects()
+            .iter()
+            .filter_map(|o| o.style.stroke)
+            .next()
+            .map(|s| s.style),
+        Some(BorderStyle::Solid)
+    );
+}
+
+/// An ODF package with one of its parts replaced.
+fn with_part(bytes: &[u8], name: &str, text: &str) -> Vec<u8> {
+    use std::io::{Read, Write};
+    let mut zip = zip::ZipArchive::new(std::io::Cursor::new(bytes)).unwrap();
+    let mut out = Vec::new();
+    {
+        let mut writer = zip::ZipWriter::new(std::io::Cursor::new(&mut out));
+        let stored = zip::write::SimpleFileOptions::default()
+            .compression_method(zip::CompressionMethod::Stored);
+        for i in 0..zip.len() {
+            let mut file = zip.by_index(i).unwrap();
+            let part = file.name().unwrap().to_string();
+            let mut data = Vec::new();
+            file.read_to_end(&mut data).unwrap();
+            writer.start_file(part.as_str(), stored).unwrap();
+            if part == name {
+                writer.write_all(text.as_bytes()).unwrap();
+            } else {
+                writer.write_all(&data).unwrap();
+            }
+        }
+        writer.finish().unwrap();
+    }
+    out
+}

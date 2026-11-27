@@ -662,6 +662,34 @@ impl BorderSides {
     }
 }
 
+/// A line drawn as a pen or a brush draws it, the artistic lines of
+/// Pages 15.4 (B-044), in a drawing of Desk's own.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum Brush {
+    /// Chalk: a grainy line, broken in small pieces.
+    Chalk,
+    /// A thick brush: a line that swells and thins, tapered at its ends.
+    ThickBrush,
+    /// A chisel pen: a nib held at 45 degrees, thick across it and thin
+    /// along it.
+    ChiselPen,
+    /// A dry brush: bristles that leave streaks with gaps.
+    DryBrush,
+    /// Uneven ink: a line that wobbles a little and pools here and there.
+    UnevenInk,
+}
+
+impl Brush {
+    /// Every brush, in the order of their menus.
+    pub const ALL: [Self; 5] = [
+        Self::Chalk,
+        Self::ThickBrush,
+        Self::ChiselPen,
+        Self::DryBrush,
+        Self::UnevenInk,
+    ];
+}
+
 /// How the line of a border is drawn (FMT-21).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub enum BorderStyle {
@@ -672,17 +700,60 @@ pub enum BorderStyle {
     Dashed,
     /// Dots as long as the width, with gaps as long.
     Dotted,
+    /// The line of a pen or a brush (B-044).
+    Artistic(Brush),
 }
 
 impl BorderStyle {
+    /// Every style of line, the plain ones first, in the order of their
+    /// menus.
+    pub const ALL: [Self; 8] = [
+        Self::Solid,
+        Self::Dashed,
+        Self::Dotted,
+        Self::Artistic(Brush::Chalk),
+        Self::Artistic(Brush::ThickBrush),
+        Self::Artistic(Brush::ChiselPen),
+        Self::Artistic(Brush::DryBrush),
+        Self::Artistic(Brush::UnevenInk),
+    ];
+
     /// The lengths of the dashes and gaps of a line `width` wide, empty
-    /// for a solid line.
+    /// for a solid line and for the line of a brush.
     pub fn dashes(self, width: f64) -> Vec<f64> {
         match self {
-            Self::Solid => Vec::new(),
+            Self::Solid | Self::Artistic(_) => Vec::new(),
             Self::Dashed => vec![2.0 * width, 2.0 * width],
             Self::Dotted => vec![width, width],
         }
+    }
+
+    /// The brush that draws the line, if it is an artistic one.
+    pub fn brush(self) -> Option<Brush> {
+        match self {
+            Self::Artistic(brush) => Some(brush),
+            _ => None,
+        }
+    }
+
+    /// The name of the style in the files of Desk.
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::Solid => "solid",
+            Self::Dashed => "dashed",
+            Self::Dotted => "dotted",
+            Self::Artistic(Brush::Chalk) => "chalk",
+            Self::Artistic(Brush::ThickBrush) => "thick-brush",
+            Self::Artistic(Brush::ChiselPen) => "chisel-pen",
+            Self::Artistic(Brush::DryBrush) => "dry-brush",
+            Self::Artistic(Brush::UnevenInk) => "uneven-ink",
+        }
+    }
+
+    /// The style of a name that [`BorderStyle::name`] gives.
+    pub fn from_name(name: &str) -> Option<Self> {
+        let name = name.trim();
+        Self::ALL.into_iter().find(|s| s.name() == name)
     }
 }
 
@@ -1025,6 +1096,26 @@ mod tests {
                 .without(Length::from_points(1))
                 .can_take(Length::from_points(1000))
         );
+    }
+
+    #[test]
+    fn b_044_line_styles_have_names_of_their_own() {
+        let names: std::collections::HashSet<&str> =
+            BorderStyle::ALL.iter().map(|s| s.name()).collect();
+        assert_eq!(names.len(), BorderStyle::ALL.len());
+        for style in BorderStyle::ALL {
+            assert_eq!(BorderStyle::from_name(style.name()), Some(style));
+            // A brush draws with no dashes.
+            if style.brush().is_some() {
+                assert!(style.dashes(2.0).is_empty());
+            }
+        }
+        assert_eq!(
+            BorderStyle::from_name(" chalk "),
+            Some(BorderStyle::Artistic(Brush::Chalk))
+        );
+        assert_eq!(BorderStyle::from_name("crayon"), None);
+        assert_eq!(BorderStyle::Dashed.brush(), None);
     }
 
     #[test]
