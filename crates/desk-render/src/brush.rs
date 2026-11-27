@@ -231,14 +231,19 @@ fn sample(line: &Polyline, width: f32) -> Vec<Sample> {
                 (dx, dy) = (1.0, 0.0);
             }
             // At a corner the direction lies between the two sides; the
-            // edges reach out as a miter does, up to twice as far.
-            let (sx, sy) = (x - x0, y - y0);
-            let side = sx.hypot(sy);
-            let reach = if side > 1e-6 {
-                let cos = (sx * dx + sy * dy) / side;
-                1.0 / cos.max(0.5)
-            } else {
-                1.0
+            // edges reach out as a miter does, by the half of the turn
+            // between the side before and the side after, up to twice as
+            // far.
+            let unit = |(ux, uy): (f32, f32)| {
+                let n = ux.hypot(uy);
+                (n > 1e-6).then(|| (ux / n, uy / n))
+            };
+            let reach = match (unit((x - x0, y - y0)), unit((x1 - x, y1 - y))) {
+                (Some(a), Some(b)) => {
+                    let cos = (a.0 + b.0).hypot(a.1 + b.1) / 2.0;
+                    1.0 / cos.max(0.5)
+                }
+                _ => 1.0,
             };
             Sample {
                 x,
