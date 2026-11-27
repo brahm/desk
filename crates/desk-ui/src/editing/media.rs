@@ -98,6 +98,10 @@ impl TextEditor {
             {
                 return true;
             }
+            // Pictures dropped on an image gallery go into it (W111).
+            if this.drop_on_gallery(&files.files(), x, y) {
+                return true;
+            }
             let at = this.view.page_at(x, y);
             let mut used = false;
             for (i, file) in files.files().iter().enumerate() {

@@ -16,8 +16,9 @@ use crate::editing::{NewShape, TextEditor};
 use crate::i18n::{tr, trc};
 
 /// The actions of these menus, which need a document.
-pub(super) const OBJECT_ACTIONS: [&str; 32] = [
+pub(super) const OBJECT_ACTIONS: [&str; 33] = [
     "insert-equation",
+    "insert-image-gallery",
     "edit-equation",
     "mask-with-shape",
     "unmask",
@@ -78,11 +79,13 @@ type ChoiceAction = fn(&TextEditor, &str);
 
 impl DocumentWindow {
     pub(super) fn add_object_actions(self: &Rc<Self>) {
-        let simple: [(&str, EditorAction); 25] = [
+        let simple: [(&str, EditorAction); 26] = [
             // The editor of equations, for a new one or the selected one
             // (W104).
             ("insert-equation", TextEditor::insert_equation_dialog),
             ("edit-equation", TextEditor::edit_equation_dialog),
+            // Insert > Image Gallery of Pages 15.4 (W111).
+            ("insert-image-gallery", TextEditor::insert_gallery),
             ("unmask", TextEditor::unmask_picture),
             ("duplicate-objects", TextEditor::duplicate_objects),
             ("move-to-master", TextEditor::move_objects_to_master),

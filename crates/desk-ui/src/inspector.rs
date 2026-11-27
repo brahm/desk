@@ -34,6 +34,8 @@ pub enum Context {
     Chart,
     /// An equation (W104).
     Equation,
+    /// An image gallery (W111).
+    Gallery,
     /// Nothing selected in Desk Slides: the slide itself (KINT-13).
     Slide,
 }
@@ -51,6 +53,7 @@ impl Context {
             Some(ObjectKind::Table(_)) => Self::Table,
             Some(ObjectKind::Chart(_)) => Self::Chart,
             Some(ObjectKind::Equation(_)) => Self::Equation,
+            Some(ObjectKind::Gallery(_)) => Self::Gallery,
             // A group, or a kind of object that came later.
             Some(_) => Self::Group,
         }
@@ -70,6 +73,7 @@ impl Context {
             Self::Table => tr("Table"),
             Self::Chart => tr("Chart"),
             Self::Equation => tr("Equation"),
+            Self::Gallery => tr("Image Gallery"),
             Self::Slide => tr("Slide"),
         }
     }

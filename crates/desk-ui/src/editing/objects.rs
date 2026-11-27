@@ -193,6 +193,10 @@ pub(super) fn mark(page: usize, placed: &PlacedObject) -> ObjectMark {
             .collect(),
         locked: placed.object.locked,
         master: placed.object.anchor.is_master(),
+        arrows: super::gallery::gallery_arrows(placed)
+            .into_iter()
+            .map(|(x, y)| (f64::from(x), f64::from(y)))
+            .collect(),
     }
 }
 
@@ -783,6 +787,7 @@ fn connection_marks(
                 handles: Vec::new(),
                 locked: false,
                 master: false,
+                arrows: Vec::new(),
             });
         }
     }
@@ -2046,6 +2051,10 @@ impl TextEditor {
         let reach = (REACH / scale) as f32;
         let shift = modifiers.contains(gdk::ModifierType::SHIFT_MASK);
         let control = modifiers.contains(gdk::ModifierType::CONTROL_MASK);
+        // The arrows of a selected gallery come before its handles (W111).
+        if presses == 1 && !shift && !control && self.press_gallery_arrow(page, px, py) {
+            return true;
+        }
         let (mut grabbed, hit_id) = {
             let state = self.state.borrow();
             let mut grabbed = None;

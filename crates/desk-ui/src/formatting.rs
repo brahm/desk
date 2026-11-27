@@ -303,7 +303,16 @@ impl Inspector {
         document.add(&facing_pages);
         // The tabs of Format for each kind of selection, and those of
         // Document (INT-13, the Inspector of interface B).
-        let [metrics, shape, picture, media, graphic, wrap, text_box] = objects.groups();
+        let [
+            metrics,
+            shape,
+            picture,
+            media,
+            gallery,
+            graphic,
+            wrap,
+            text_box,
+        ] = objects.groups();
         let [font, alignment] = object_text.groups();
         let [character, text_shadow, borders] = effects.groups();
         let [page, layout, section] = layouts.groups();
@@ -380,6 +389,15 @@ impl Inspector {
                 ],
             );
         }
+        // The Gallery tab of Pages 15.4 (W111).
+        contexts.insert(
+            Context::Gallery,
+            vec![
+                Tab::new("style", n_("Style"), &[styles, graphic]),
+                Tab::new("gallery", n_("Gallery"), &[gallery]),
+                arrange(),
+            ],
+        );
         contexts.insert(Context::Group, vec![style(), arrange()]);
         let [
             table_styles,

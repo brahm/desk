@@ -888,6 +888,41 @@ fn kind(
             };
             ObjectKind::Image(picture)
         }
+        odf::DrawKind::Gallery {
+            shown,
+            each_caption,
+            images,
+            ..
+        } => {
+            // docs/odf-extensions.md: desk:gallery (W111).
+            let mut built = Vec::with_capacity(images.len());
+            for image in images {
+                let path = image.href.strip_prefix("./").unwrap_or(&image.href);
+                let Some(picture) = source
+                    .pictures
+                    .iter()
+                    .find(|(p, _)| p.strip_prefix("./").unwrap_or(p) == path)
+                    .and_then(|(_, bytes)| crate::picture::picture_within(bytes, MAX_SIDE))
+                else {
+                    continue;
+                };
+                let mut caption = Vec::with_capacity(image.caption.len());
+                for p in &image.caption {
+                    caption.push(paragraph(document, p)?);
+                }
+                built.push(desk_model::GalleryImage {
+                    picture,
+                    description: image.description.clone(),
+                    caption: Arc::from(caption),
+                });
+            }
+            let gallery = desk_model::Gallery {
+                shown: (*shown).min(built.len().saturating_sub(1)),
+                images: Arc::from(built),
+                each_caption: *each_caption,
+            };
+            ObjectKind::Gallery(Arc::new(gallery))
+        }
         odf::DrawKind::Media {
             href,
             params,
@@ -2604,6 +2639,50 @@ impl Exporter<'_> {
                 // A PNG for the programs that read no SVG or HEIC (W108).
                 fallback: crate::picture::png_fallback(picture).map(|png| self.picture(&png)),
             },
+            ObjectKind::Gallery(gallery) => {
+                let mut track = super::Track::new(self.document);
+                let shown = gallery.shown_index();
+                // The caption of the picture shown is that of the object
+                // when each has its own.
+                let shown_caption = object
+                    .captions
+                    .as_deref()
+                    .filter(|_| gallery.each_caption)
+                    .map(|c| c.caption.paragraphs.clone());
+                let images = gallery
+                    .images
+                    .iter()
+                    .enumerate()
+                    .map(|(i, image)| {
+                        let caption = match &shown_caption {
+                            Some(caption) if i == shown => caption,
+                            _ => &image.caption,
+                        };
+                        odf::GalleryImage {
+                            href: self.picture(&image.picture),
+                            description: image.description.clone(),
+                            caption: if gallery.each_caption {
+                                caption
+                                    .iter()
+                                    .map(|p| self.paragraph(p, &mut track))
+                                    .collect()
+                            } else {
+                                Vec::new()
+                            },
+                        }
+                    })
+                    .collect();
+                odf::DrawKind::Gallery {
+                    // What other programs show, in a format they read.
+                    poster: gallery.shown_image().map(|image| {
+                        let png = crate::picture::png_fallback(&image.picture);
+                        self.picture(png.as_ref().unwrap_or(&image.picture))
+                    }),
+                    shown,
+                    each_caption: gallery.each_caption,
+                    images,
+                }
+            }
             ObjectKind::Media(media) => {
                 let seconds = odf_seconds;
                 let mut params = vec![(

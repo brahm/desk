@@ -3237,6 +3237,20 @@ paragraph, and objects on a second page.
   and the checks of W107 and W109.
 - No task moved to another phase.
 
+### 27 November: the image gallery (step 5 of W4, #PR)
+
+- Insert > Image Gallery puts an empty gallery on the page. Pictures
+  dropped on it, or added with the + of the new Gallery tab, go after
+  the one shown; two round arrows over the selected gallery step through
+  them. The tab orders and removes the pictures, gives each its own
+  caption or one for all, and sets the Image Description of each.
+- In ODT the frame keeps a `draw:image` of the picture shown, so other
+  programs show it, and a new `desk:gallery` element with all the
+  pictures, their descriptions and captions: five new names, 93 in all.
+- Pages reorders the pictures by dragging them in the list; Desk moves
+  them with up and down buttons, which the keyboard reaches.
+- No task moved to another phase.
+
 ## Decisions, with their reasons and consequences
 
 Ids `D-nnn` and `R-nnn` are those of [decisions.md](decisions.md).

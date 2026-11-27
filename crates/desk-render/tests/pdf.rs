@@ -1414,3 +1414,73 @@ fn w110_sharpness_and_the_histogram_of_a_picture() {
     assert!(gray(&mut soft, 4) < edge);
     assert_eq!(gray(&mut sharp, 7), gray(&mut plain, 7));
 }
+
+#[test]
+fn w111_a_gallery_shows_the_picture_shown_fitted_in_its_frame() {
+    use desk_model::{
+        Document, Editor, Frame, Gallery, GalleryImage, Object, ObjectKind, Picture, Wrap,
+    };
+    let solid = |(r, g, b): (f64, f64, f64), w: i32, h: i32| {
+        let surface = cairo::ImageSurface::create(cairo::Format::ARgb32, w, h).unwrap();
+        {
+            let cr = cairo::Context::new(&surface).unwrap();
+            cr.set_source_rgb(r, g, b);
+            cr.paint().unwrap();
+        }
+        let mut png = Vec::new();
+        surface.write_to_png(&mut png).unwrap();
+        Picture::from_png(png).unwrap()
+    };
+    // Two pictures, twice as wide as tall; the second is shown.
+    let gallery = Gallery {
+        images: Arc::from([
+            GalleryImage::new(solid((1.0, 0.0, 0.0), 40, 20)),
+            GalleryImage::new(solid((0.0, 1.0, 0.0), 40, 20)),
+        ]),
+        shown: 1,
+        each_caption: false,
+    };
+    let mut editor = Editor::new(Document::new_word_processing());
+    editor
+        .edit("Galleries", |edit| {
+            edit.set_page_setup(PageSetup {
+                width: Length::from_points(200),
+                height: Length::from_points(100),
+                ..PageSetup::default()
+            })?;
+            for (gallery, x) in [(gallery, 0.0), (Gallery::default(), 100.0)] {
+                let mut object = Object::new(
+                    edit.new_id(),
+                    ObjectKind::Gallery(Arc::new(gallery)),
+                    Frame::from_pt(x, 0.0, 80.0, 80.0),
+                );
+                object.wrap = Wrap::Through;
+                edit.add_object(object)?;
+            }
+            Ok(())
+        })
+        .unwrap();
+    let layout = desk_layout::paginate(editor.document(), &mut TextSystem::new());
+    let list = &DisplayList::pages(&layout)[0];
+    let mut surface = cairo::ImageSurface::create(cairo::Format::ARgb32, 200, 100).unwrap();
+    {
+        let cr = cairo::Context::new(&surface).unwrap();
+        cr.set_source_rgb(1.0, 1.0, 1.0);
+        cr.paint().unwrap();
+        Painter::new().unwrap().paint(&cr, list).unwrap();
+    }
+    surface.flush();
+    let stride = surface.stride() as usize;
+    let data = surface.data().unwrap();
+    let pixel = |x: usize, y: usize| {
+        let p = &data[y * stride + x * 4..][..4];
+        (p[2], p[1], p[0])
+    };
+    // The picture shown, whole and centered: 80 wide, 40 tall.
+    assert_eq!(pixel(40, 40), (0, 255, 0));
+    assert_eq!(pixel(4, 24), (0, 255, 0));
+    assert_eq!(pixel(40, 10), (255, 255, 255));
+    assert_eq!(pixel(40, 70), (255, 255, 255));
+    // A gallery with no pictures yet is a light gray frame.
+    assert_eq!(pixel(140, 40), (0xe8, 0xe8, 0xe8));
+}

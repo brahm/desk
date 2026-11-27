@@ -588,6 +588,8 @@ pub enum ObjectKind {
     Chart(Arc<desk_chart::Chart>),
     /// An equation, drawn in its frame (W104).
     Equation(Arc<crate::Equation>),
+    /// An image gallery: pictures shown one at a time (W111).
+    Gallery(Arc<crate::Gallery>),
 }
 
 impl From<Shape> for ObjectKind {
