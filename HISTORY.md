@@ -8,6 +8,8 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
 
 ## Changes since 0.7.0 (unreleased)
 
+* Added: Insert > Drawing draws freehand with a pen, a pencil, a crayon
+  and a fill, and the Drawing tab animates the drawing (#271).
 * Added: Reverse Colors turns a gradient fill around, and Saved Fills
   keeps a color or a gradient to use again in any document (#270).
 

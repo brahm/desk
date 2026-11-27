@@ -60,7 +60,8 @@ impl ObjectStyleKind {
             | ObjectKind::Table(_)
             | ObjectKind::Chart(_)
             | ObjectKind::Equation(_)
-            | ObjectKind::Gallery(_) => None,
+            | ObjectKind::Gallery(_)
+            | ObjectKind::Drawing(_) => None,
         }
     }
 

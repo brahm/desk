@@ -383,6 +383,7 @@ pub(super) fn insert_menu(objects: bool) -> gio::Menu {
             Some(&tr("Image _Gallery")),
             Some("win.insert-image-gallery"),
         );
+        items.append(Some(&tr("Dra_wing")), Some("win.insert-drawing"));
         menu.append_section(None, &items);
     }
     let breaks = gio::Menu::new();
@@ -463,6 +464,8 @@ pub(super) fn insert_menu(objects: bool) -> gio::Menu {
         Some("win.insert-image-gallery"),
     );
     other.append(Some(&tr("_Equation…")), Some("win.insert-equation"));
+    // Insert > Drawing of Pages 15.4 (W117).
+    other.append(Some(&tr("Dra_wing")), Some("win.insert-drawing"));
     menu.append_section(None, &other);
     menu
 }
@@ -481,6 +484,7 @@ pub(super) fn shape_menu() -> gio::Menu {
     menu.append_section(None, &shapes);
     let drawn = gio::Menu::new();
     drawn.append(Some(&tr("Pe_n")), Some("win.draw-with-pen"));
+    drawn.append(Some(&tr("Dra_wing")), Some("win.insert-drawing"));
     drawn.append(Some(&tr("Connection L_ine")), Some("win.insert-connection"));
     menu.append_section(None, &drawn);
     menu

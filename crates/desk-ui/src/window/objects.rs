@@ -17,8 +17,12 @@ use crate::i18n::{tr, trc};
 use crate::shape_library;
 
 /// The actions of these menus, which need a document.
-pub(super) const OBJECT_ACTIONS: [&str; 39] = [
+pub(super) const OBJECT_ACTIONS: [&str; 43] = [
     "insert-equation",
+    "insert-drawing",
+    "edit-drawing",
+    "finish-drawing",
+    "play-drawing",
     "insert-library-shape",
     "save-to-my-shapes",
     "rename-my-shape",
@@ -86,7 +90,21 @@ type ChoiceAction = fn(&TextEditor, &str);
 
 impl DocumentWindow {
     pub(super) fn add_object_actions(self: &Rc<Self>) {
-        let simple: [(&str, EditorAction); 27] = [
+        let simple: [(&str, EditorAction); 31] = [
+            // Insert > Drawing of Pages 15.4, and Edit Drawing, Done and
+            // Play of the Drawing tab (W117).
+            ("insert-drawing", TextEditor::start_drawing),
+            ("edit-drawing", |e| {
+                e.edit_drawing();
+            }),
+            ("finish-drawing", TextEditor::finish_drawing),
+            ("play-drawing", |e| {
+                if e.drawing_playing() {
+                    e.stop_drawing_animation();
+                } else {
+                    e.play_drawing();
+                }
+            }),
             // The editor of equations, for a new one or the selected one
             // (W104).
             ("insert-equation", TextEditor::insert_equation_dialog),

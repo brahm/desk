@@ -28,6 +28,7 @@ fn painted(brush: Option<Brush>) -> cairo::ImageSurface {
                 color: Rgba::BLACK,
                 dashes: Vec::new(),
                 brush,
+                round: false,
             }),
         }],
     };
@@ -144,6 +145,7 @@ fn b_044_the_nib_of_a_chisel_pen_stays_as_on_the_page_when_flipped() {
             color: Rgba::BLACK,
             dashes: Vec::new(),
             brush: Some(Brush::ChiselPen),
+            round: false,
         }),
     };
     let plain = ink_of(vec![line()]);

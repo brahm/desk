@@ -1540,6 +1540,21 @@ fn import_one(
         }
         frame = Frame::from_pt(x0, y0, x1 - x0, y1 - y0);
     }
+    let mut drawing_rotation = 0;
+    // A drawing of Pages 15.4, which other programs see as a group of
+    // paths (docs/odf-extensions.md: desk:drawing, W117).
+    if let (Some(tools), ObjectKind::Group(children)) = (&object.drawing, &kind)
+        && let Some((drawn, turn, drawing)) = drawing_of_group(
+            children,
+            tools,
+            object.animation_duration.as_deref(),
+            object.animation_repeat,
+        )
+    {
+        frame = drawn;
+        drawing_rotation = turn;
+        kind = ObjectKind::Drawing(Arc::new(drawing));
+    }
     let mut built = Object::new(document.new_id(), kind, frame);
     built.anchor = model_anchor;
     // On a master page, the pages of the section it shows on (EST-19);
@@ -1552,7 +1567,11 @@ fn import_one(
     if let Some(pages) = master_pages {
         built.anchor = Anchor::Master(None, pages);
     }
-    built.rotation = rotation;
+    built.rotation = if matches!(built.kind, ObjectKind::Drawing(_)) {
+        drawing_rotation
+    } else {
+        rotation
+    };
     built.style = model_look(source, &g);
     built.object_style = object_style_of(source, document, object.style.as_deref()).filter(|id| {
         document.object_styles().get(*id).map(|s| s.kind)
@@ -2553,6 +2572,29 @@ impl Exporter<'_> {
         page: Option<u32>,
         dx: f64,
     ) -> odf::DrawObject {
+        // A drawing is written as a group of paths, which other programs
+        // show, and the tool of each path (W117).
+        if let ObjectKind::Drawing(drawing) = &object.kind {
+            let group = group_of_drawing(object, drawing);
+            let mut out = self.object(&group, anchor, page, dx);
+            // The tools of the paths written: a line with no points has
+            // none.
+            out.drawing = Some(
+                drawing
+                    .strokes
+                    .iter()
+                    .filter(|s| !s.points.is_empty())
+                    .map(|s| s.tool.name())
+                    .collect::<Vec<_>>()
+                    .join(" "),
+            );
+            if let Some(animation) = drawing.animation {
+                out.animation_duration =
+                    Some(format!("{}", f64::from(animation.duration) / 1000.0));
+                out.animation_repeat = animation.repeat;
+            }
+            return out;
+        }
         let frame = object.frame;
         let (x, y) = (frame.x.to_pt() - dx, frame.y.to_pt());
         let (w, h) = (frame.width.to_pt(), frame.height.to_pt());
@@ -3080,6 +3122,199 @@ fn turned_with_group(child: &Object, group: &Object) -> Object {
     out.frame = Frame::from_pt(cx - w / 2.0, cy - h / 2.0, w, h);
     out.rotation = (child.rotation + group.rotation).rem_euclid(36_000);
     out
+}
+
+/// A drawing as a group of paths on the page, as other programs show it
+/// (W117): an open path for each line, along its points, in its colour and
+/// width, and a closed one for each fill, filled with its colour, flipped
+/// into their points; the group turns them as the drawing is. The paths have
+/// identifiers of their own, which name no object of the document.
+fn group_of_drawing(object: &Object, drawing: &desk_model::Drawing) -> Object {
+    let f = object.frame;
+    let (w, h) = (f.width.to_pt(), f.height.to_pt());
+    let (fx, fy) = (f.x.to_pt(), f.y.to_pt());
+    let scale = f64::from(POLYGON_SCALE);
+    let members: Vec<Object> = drawing
+        .strokes
+        .iter()
+        .enumerate()
+        .filter_map(|(i, stroke)| {
+            let points: Vec<(f64, f64)> = stroke
+                .points_in(w, h)
+                .into_iter()
+                .map(|(x, y)| {
+                    (
+                        if object.flip_horizontal { w - x } else { x },
+                        if object.flip_vertical { h - y } else { y },
+                    )
+                })
+                .collect();
+            let (mut x0, mut y0, mut x1, mut y1) = (f64::MAX, f64::MAX, f64::MIN, f64::MIN);
+            for &(x, y) in &points {
+                (x0, y0, x1, y1) = (x0.min(x), y0.min(y), x1.max(x), y1.max(y));
+            }
+            if points.is_empty() {
+                return None;
+            }
+            let (pw, ph) = ((x1 - x0).max(0.01), (y1 - y0).max(0.01));
+            let part =
+                |v: f64, origin: f64, size: f64| ((v - origin) / size * scale).round() as i32;
+            let mut path: Vec<desk_model::PathPoint> = points
+                .iter()
+                .map(|&(x, y)| desk_model::PathPoint::corner(part(x, x0, pw), part(y, y0, ph)))
+                .collect();
+            // A dot is a path of two points in one place.
+            if path.len() == 1 {
+                path.push(path[0]);
+            }
+            let fill = stroke.tool == desk_model::DrawingTool::Fill;
+            let id = NodeId::new(u64::MAX - i as u64)?;
+            let mut member = Object::new(
+                id,
+                ObjectKind::Shape(Shape::Path {
+                    points: path.into(),
+                    closed: fill,
+                }),
+                Frame::from_pt(fx + x0, fy + y0, pw, ph),
+            );
+            member.anchor = object.anchor;
+            member.rotation = 0;
+            if fill {
+                member.style.fill = Some(Fill::Color(stroke.color));
+                member.style.stroke = None;
+            } else {
+                member.style.fill = None;
+                member.style.stroke = Some(Stroke::new(stroke.color, stroke.width));
+            }
+            // The group turns its paths as it is written.
+            Some(member)
+        })
+        .collect();
+    let mut group = object.clone();
+    group.kind = ObjectKind::Group(members.into());
+    group.flip_horizontal = false;
+    group.flip_vertical = false;
+    group
+}
+
+/// The drawing that a group of paths written by Desk is (W117), from the
+/// tools of its paths, with its frame on the page: none when the paths
+/// are not those of a drawing, as when another program changed them.
+fn drawing_of_group(
+    children: &[Object],
+    tools: &str,
+    duration: Option<&str>,
+    repeat: bool,
+) -> Option<(Frame, i32, desk_model::Drawing)> {
+    let tools: Vec<desk_model::DrawingTool> = tools
+        .split_whitespace()
+        .map(desk_model::DrawingTool::from_name)
+        .collect::<Option<_>>()?;
+    if tools.len() != children.len() || tools.len() > desk_model::MAX_DRAWING_STROKES {
+        return None;
+    }
+    let mut strokes: Vec<desk_model::NewStroke> = Vec::with_capacity(tools.len());
+    for (child, tool) in children.iter().zip(tools) {
+        let ObjectKind::Shape(Shape::Path { points, .. }) = &child.kind else {
+            return None;
+        };
+        if points.len() > desk_model::MAX_STROKE_POINTS {
+            return None;
+        }
+        let f = child.frame;
+        let (w, h) = (f.width.to_pt(), f.height.to_pt());
+        let (cx, cy) = (f.x.to_pt() + w / 2.0, f.y.to_pt() + h / 2.0);
+        let (sin, cos) = (f64::from(child.rotation) / 100.0).to_radians().sin_cos();
+        let scale = f64::from(POLYGON_SCALE);
+        // Each point on the page, turned as the path is.
+        let on_page = points
+            .iter()
+            .map(|p| {
+                let (mut dx, mut dy) = (
+                    f64::from(p.at.0) / scale * w - w / 2.0,
+                    f64::from(p.at.1) / scale * h - h / 2.0,
+                );
+                if child.flip_horizontal {
+                    dx = -dx;
+                }
+                if child.flip_vertical {
+                    dy = -dy;
+                }
+                (cx + dx * cos + dy * sin, cy - dx * sin + dy * cos)
+            })
+            .collect();
+        let (color, width) = match tool {
+            desk_model::DrawingTool::Fill => match child.style.fill {
+                Some(Fill::Color(color)) => (color, Length::ZERO),
+                _ => return None,
+            },
+            _ => {
+                let stroke = child.style.stroke?;
+                (stroke.color, stroke.width)
+            }
+        };
+        strokes.push(desk_model::NewStroke {
+            tool,
+            color,
+            width,
+            points: on_page,
+        });
+    }
+    // Paths turned alike are a drawing turned so much: its points are
+    // turned back around the middle of the paths, and its frame turned
+    // with them.
+    let rotation = children.first().map_or(0, |c| c.rotation);
+    let turned = rotation != 0 && children.iter().all(|c| c.rotation == rotation);
+    let (mut x0, mut y0, mut x1, mut y1) = (f64::MAX, f64::MAX, f64::MIN, f64::MIN);
+    for child in children {
+        let f = child.frame;
+        (x0, y0) = (x0.min(f.x.to_pt()), y0.min(f.y.to_pt()));
+        x1 = x1.max(f.x.to_pt() + f.width.to_pt());
+        y1 = y1.max(f.y.to_pt() + f.height.to_pt());
+    }
+    let middle = ((x0 + x1) / 2.0, (y0 + y1) / 2.0);
+    let (sin, cos) = (f64::from(rotation) / 100.0).to_radians().sin_cos();
+    if turned {
+        for stroke in &mut strokes {
+            for p in &mut stroke.points {
+                let (dx, dy) = (p.0 - middle.0, p.1 - middle.1);
+                *p = (
+                    middle.0 + dx * cos - dy * sin,
+                    middle.1 + dx * sin + dy * cos,
+                );
+            }
+        }
+    }
+    let ((x, y, w, h), strokes) = desk_model::drawing_frame(&strokes)?;
+    let (x, y) = if turned {
+        // The middle of the frame, turned onto the page.
+        let (dx, dy) = (x + w / 2.0 - middle.0, y + h / 2.0 - middle.1);
+        let (cx, cy) = (
+            middle.0 + dx * cos + dy * sin,
+            middle.1 - dx * sin + dy * cos,
+        );
+        (cx - w / 2.0, cy - h / 2.0)
+    } else {
+        (x, y)
+    };
+    let animation = duration
+        .and_then(|d| d.trim().parse::<f64>().ok())
+        .filter(|d| d.is_finite() && *d > 0.0)
+        .map(|seconds| desk_model::DrawingAnimation {
+            duration: ((seconds * 1000.0).round().min(f64::from(u32::MAX)) as u32).clamp(
+                *desk_model::ANIMATION_DURATION.start(),
+                *desk_model::ANIMATION_DURATION.end(),
+            ),
+            repeat,
+        });
+    Some((
+        Frame::from_pt(x, y, w, h),
+        if turned { rotation } else { 0 },
+        desk_model::Drawing {
+            strokes: strokes.into(),
+            animation,
+        },
+    ))
 }
 
 /// The spans that hold the places of objects in paragraphs and in the

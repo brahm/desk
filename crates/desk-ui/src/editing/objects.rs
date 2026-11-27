@@ -2233,6 +2233,15 @@ impl TextEditor {
                 self.edit_equation_dialog();
                 return true;
             }
+            // A double click on a drawing draws on it again (W117).
+            if self.object_by_id(id).drawing().is_some() {
+                if self.selected_objects() != [id] {
+                    self.select_objects(vec![id]);
+                }
+                // A locked one is only selected.
+                self.edit_drawing();
+                return true;
+            }
             // A double click on a text box or a shape edits its text
             // (OBJ-08, OBJ-13).
             if self.object_by_id(id).holds_text() {

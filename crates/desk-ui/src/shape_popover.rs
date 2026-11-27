@@ -4,8 +4,8 @@
 //! The popover of the Shape button, as the shape library of Pages 15.4
 //! (W113): the categories at the side, the shapes of the one chosen, a
 //! search field that finds shapes of them all, and My Shapes, whose
-//! shapes can be renamed and deleted. The pen and the connection line are
-//! at the bottom.
+//! shapes can be renamed and deleted. The pen, a drawing (W117) and the
+//! connection line are at the bottom.
 
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
@@ -101,6 +101,7 @@ impl ShapePopover {
             .build();
         for (label, action) in [
             (tr("Pe_n"), "win.draw-with-pen"),
+            (tr("Dra_wing"), "win.insert-drawing"),
             (tr("Connection L_ine"), "win.insert-connection"),
         ] {
             let button = gtk::Button::builder()

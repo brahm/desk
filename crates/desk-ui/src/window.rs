@@ -139,6 +139,8 @@ pub struct DocumentWindow {
     bubble_popover: gtk::Popover,
     /// The bar of comments and changes of Desk Writer (REV-02).
     review_bar: crate::review_bar::ReviewBar,
+    /// The bar of the tools of a drawing, while one is drawn (W117).
+    drawing_bar: Rc<crate::drawing_bar::DrawingBar>,
     /// The bubble of the tracked change selected (REV-04).
     change_bubble: crate::change_bubble::ChangeBubbleView,
     bubble_at: Cell<Option<(Option<desk_model::NodeId>, crate::text_nav::SpanRect)>>,
@@ -670,6 +672,8 @@ impl DocumentWindow {
         if !is_slides {
             toolbar_view.add_top_bar(review_bar.widget());
         }
+        let drawing_bar = crate::drawing_bar::DrawingBar::new(editor_of());
+        toolbar_view.add_top_bar(drawing_bar.widget());
         toolbar_view.add_top_bar(&screen_banner);
         toolbar_view.add_top_bar(&warnings_banner);
         let find = FindWindow::new(editor_of(), search.clone());
@@ -765,6 +769,7 @@ impl DocumentWindow {
             bubble,
             bubble_popover,
             review_bar,
+            drawing_bar,
             change_bubble,
             bubble_at: Cell::new(None),
             outline,
@@ -3897,6 +3902,8 @@ impl DocumentWindow {
         if self.slides.is_none() {
             self.review_bar.show(self.editor().as_ref());
         }
+        // And the bar of drawing, while a drawing is drawn (W117).
+        self.drawing_bar.show(self.editor().as_ref());
         // The bubble of a change stays while its change is selected.
         if let Some(id) = self.change_bubble.shown() {
             match self.current_change_bubble() {

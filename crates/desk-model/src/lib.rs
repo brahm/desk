@@ -52,6 +52,10 @@ mod autocorrect;
 mod captions;
 pub use captions::{CAPTION_STYLE, Caption, Captions};
 pub use combine::{Combine, MAX_SHAPE_PARTS};
+pub use drawing::{
+    ANIMATION_DURATION, Drawing, DrawingAnimation, DrawingStroke, DrawingTool, FramedStrokes,
+    MAX_DRAWING_STROKES, MAX_STROKE_POINTS, NewStroke, drawing_frame,
+};
 pub use gallery::{Gallery, GalleryImage};
 mod case_change;
 mod change;
@@ -63,6 +67,7 @@ mod convert_quotes;
 mod custom_format;
 mod document;
 mod document_language;
+mod drawing;
 mod drop_cap_style;
 mod equation;
 mod error;

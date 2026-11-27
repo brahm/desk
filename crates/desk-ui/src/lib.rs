@@ -31,6 +31,8 @@ mod contents_page;
 mod custom_format;
 mod desktop_contacts;
 mod document_controls;
+mod drawing_bar;
+mod drawing_pane;
 mod drop_cap_pane;
 mod drop_cap_styles;
 mod editing;

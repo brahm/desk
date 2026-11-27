@@ -458,6 +458,9 @@ pub struct PathStroke {
     /// The pen or brush that draws the line, for an artistic one, whose
     /// dashes are empty (B-044).
     pub brush: Option<desk_model::Brush>,
+    /// Whether its ends and corners are round, as the line of a pen of a
+    /// drawing is (W117); they are square otherwise.
+    pub round: bool,
 }
 
 /// What one page, slide or sheet draws, in points from its top left
@@ -609,6 +612,7 @@ impl DisplayList {
                             .map(|d| d as f32)
                             .collect(),
                         brush: cap.shape.border_style.brush(),
+                        round: false,
                     }),
                 });
             }
@@ -843,6 +847,7 @@ fn object_body_item(placed: &PlacedObject) -> Item {
                     .map(|d| d as f32)
                     .collect(),
                 brush: stroke.style.brush(),
+                round: false,
             }
         });
     let mut flips = true;
@@ -1040,6 +1045,23 @@ fn object_body_item(placed: &PlacedObject) -> Item {
                 });
             }
         }
+        ObjectKind::Drawing(drawing) => {
+            if fill.is_some() {
+                list.items.push(Item::Path {
+                    path: shape_path(&Shape::Rectangle, x, y, w, h),
+                    fill,
+                    stroke: None,
+                });
+            }
+            list.items.extend(drawing_items(drawing, (x, y, w, h)));
+            if stroke.is_some() {
+                list.items.push(Item::Path {
+                    path: shape_path(&Shape::Rectangle, x, y, w, h),
+                    fill: None,
+                    stroke,
+                });
+            }
+        }
         ObjectKind::Gallery(gallery) => {
             list.items
                 .extend(gallery_items(gallery, fill, (x, y, w, h)));
@@ -1172,6 +1194,7 @@ fn frame_items(frame: PictureFrame, rect: (f32, f32, f32, f32)) -> Vec<Item> {
             color,
             dashes: Vec::new(),
             brush: None,
+            round: false,
         }),
     };
     // Lit from the top left, across the band.
@@ -1316,6 +1339,7 @@ fn line_items(
         let plain = PathStroke {
             dashes: Vec::new(),
             brush: None,
+            round: false,
             ..stroke.clone()
         };
         match kind {
@@ -1408,6 +1432,108 @@ fn line_items(
     out
 }
 
+/// The path of a line drawn freehand through points, smoothed: a curve
+/// through the middles of its pieces, with each point as its handle.
+fn smooth_path(points: &[(f32, f32)]) -> Vec<PathOp> {
+    let mut path = Vec::with_capacity(points.len() + 2);
+    let Some(&(x0, y0)) = points.first() else {
+        return path;
+    };
+    path.push(PathOp::Move(x0, y0));
+    if points.len() < 3 {
+        path.extend(points[1..].iter().map(|&(x, y)| PathOp::Line(x, y)));
+        if points.len() == 1 {
+            // A dot: a line as long as nothing, drawn with its round ends.
+            path.push(PathOp::Line(x0 + 0.01, y0));
+        }
+        return path;
+    }
+    let mut from = (x0, y0);
+    for pair in points[1..].windows(2) {
+        let (p, next) = (pair[0], pair[1]);
+        let to = ((p.0 + next.0) / 2.0, (p.1 + next.1) / 2.0);
+        // The quadratic curve from `from` to `to` round `p`, as a cubic.
+        path.push(PathOp::Curve(
+            from.0 + 2.0 / 3.0 * (p.0 - from.0),
+            from.1 + 2.0 / 3.0 * (p.1 - from.1),
+            to.0 + 2.0 / 3.0 * (p.0 - to.0),
+            to.1 + 2.0 / 3.0 * (p.1 - to.1),
+            to.0,
+            to.1,
+        ));
+        from = to;
+    }
+    let &(xn, yn) = points.last().unwrap_or(&(x0, y0));
+    path.push(PathOp::Line(xn, yn));
+    path
+}
+
+/// A colour with its opacity taken down to a share of it.
+fn faded(color: Rgba, share: f32) -> Rgba {
+    Rgba {
+        a: (f32::from(color.a) * share).round() as u8,
+        ..color
+    }
+}
+
+/// A drawing (W117): its lines and fills from the first to the last, in
+/// its frame. A pen draws a smooth line with round ends; a pencil a
+/// thinner, lighter line with the grain of chalk over it; a crayon a
+/// light, waxy line with the grain of chalk at its full width, as the
+/// brushes of the artistic lines draw it (B-044); a fill fills the area
+/// of its points, along the curve its line takes.
+pub fn drawing_items(
+    drawing: &desk_model::Drawing,
+    (x, y, w, h): (f32, f32, f32, f32),
+) -> Vec<Item> {
+    use desk_model::{Brush, DrawingTool};
+    let mut items = Vec::new();
+    for stroke in drawing.strokes.iter() {
+        let points: Vec<(f32, f32)> = stroke
+            .points_in(f64::from(w), f64::from(h))
+            .into_iter()
+            .map(|(px, py)| (x + px as f32, y + py as f32))
+            .collect();
+        if points.is_empty() {
+            continue;
+        }
+        let width = stroke.width.to_pt() as f32;
+        let path = smooth_path(&points);
+        let line = |width: f32, color: Rgba, brush: Option<Brush>| Item::Path {
+            path: path.clone(),
+            fill: None,
+            stroke: Some(PathStroke {
+                width,
+                color,
+                dashes: Vec::new(),
+                brush,
+                round: brush.is_none(),
+            }),
+        };
+        match stroke.tool {
+            DrawingTool::Pen => items.push(line(width, stroke.color, None)),
+            DrawingTool::Pencil => {
+                items.push(line(width * 0.6, faded(stroke.color, 0.55), None));
+                items.push(line(width, faded(stroke.color, 0.8), Some(Brush::Chalk)));
+            }
+            DrawingTool::Crayon => {
+                items.push(line(width * 0.85, faded(stroke.color, 0.35), None));
+                items.push(line(width, stroke.color, Some(Brush::Chalk)));
+            }
+            DrawingTool::Fill => {
+                let mut path = path;
+                path.push(PathOp::Close);
+                items.push(Item::Path {
+                    path,
+                    fill: Some(Paint::Color(stroke.color)),
+                    stroke: None,
+                });
+            }
+        }
+    }
+    items
+}
+
 /// An image gallery (W111): the picture shown, fitted whole into the
 /// frame and centered, over the fill of the object; a light gray frame
 /// while it has no pictures yet.
@@ -1497,6 +1623,7 @@ fn media_icon(sound: bool, x: f32, y: f32, w: f32, h: f32) -> Vec<Item> {
                     color: gray,
                     dashes: Vec::new(),
                     brush: None,
+                    round: false,
                 }),
             },
         ];
@@ -1851,6 +1978,7 @@ fn chart_items(laid: &desk_layout::ChartLayout, x: f32, y: f32) -> Vec<Item> {
                         color: table_color(*c),
                         dashes: d.clone(),
                         brush: None,
+                        round: false,
                     }),
                 };
                 if *shadow {

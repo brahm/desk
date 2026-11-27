@@ -309,6 +309,7 @@ impl Inspector {
             picture,
             media,
             gallery,
+            drawing,
             graphic,
             wrap,
             text_box,
@@ -395,6 +396,16 @@ impl Inspector {
             vec![
                 Tab::new("style", n_("Style"), &[styles, graphic]),
                 Tab::new("gallery", n_("Gallery"), &[gallery]),
+                arrange(),
+            ],
+        );
+        // The Drawing tab of Pages 15.4: drawing on it again, and its
+        // animation (W117).
+        contexts.insert(
+            Context::Drawing,
+            vec![
+                Tab::new("style", n_("Style"), &[styles, graphic]),
+                Tab::new("drawing", n_("Drawing"), &[drawing]),
                 arrange(),
             ],
         );

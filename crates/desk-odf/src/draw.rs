@@ -414,6 +414,16 @@ pub struct DrawObject {
     /// `desk:template-object`: the `xml:id` of the object of the page
     /// template that this object of a page copies (W095).
     pub template_object: Option<String>,
+    /// `desk:drawing` of a `draw:g` that is a drawing of Pages 15.4: the
+    /// tool of each of its paths, in order, separated by spaces (W117,
+    /// odf-extensions.md).
+    pub drawing: Option<String>,
+    /// `desk:animation-duration` of a drawing: how long it is animated
+    /// over, in seconds (W117).
+    pub animation_duration: Option<String>,
+    /// `desk:animation-repeat` of a drawing: whether its animation starts
+    /// again when it ends (W117).
+    pub animation_repeat: bool,
     /// `desk:captions` of a frame that Desk writes around an object with
     /// a title or a caption: the parts of its text in order, `title=N`,
     /// `object` and `caption=N`, each with its number of paragraphs (W122,
@@ -453,6 +463,9 @@ impl DrawObject {
             placeholder: None,
             placeholder_tag: None,
             template_object: None,
+            drawing: None,
+            animation_duration: None,
+            animation_repeat: false,
             captions: None,
         }
     }
@@ -1180,6 +1193,13 @@ fn draw_object_at(
             .filter(|t| !t.is_empty())
             .map(|t| t.chars().take(MAX_NAME).collect()),
         template_object: e.attr(DESK, "template-object").map(str::to_owned),
+        // A drawing of Pages 15.4 (W117).
+        drawing: e
+            .attr(DESK, "drawing")
+            .filter(|_| e.name.is(DRAW, "g"))
+            .map(str::to_owned),
+        animation_duration: e.attr(DESK, "animation-duration").map(str::to_owned),
+        animation_repeat: e.attr(DESK, "animation-repeat") == Some("true"),
         captions: e.attr(DESK, "captions").map(str::to_owned),
     })
 }
@@ -1346,6 +1366,17 @@ fn write_shape(w: &mut Writer, object: &DrawObject, paragraph: &dyn Fn(&mut Writ
     w.attr_opt("desk:placeholder-tag", object.placeholder_tag.as_deref());
     w.attr_opt("desk:template-object", object.template_object.as_deref());
     w.attr_opt("desk:captions", object.captions.as_deref());
+    // docs/odf-extensions.md: desk:drawing (W117).
+    if let (DrawKind::Group(_), Some(tools)) = (&object.kind, &object.drawing) {
+        w.attr("desk:drawing", tools);
+        w.attr_opt(
+            "desk:animation-duration",
+            object.animation_duration.as_deref(),
+        );
+        if object.animation_repeat {
+            w.attr("desk:animation-repeat", "true");
+        }
+    }
     if !matches!(
         object.kind,
         DrawKind::Line { .. } | DrawKind::Connector { .. } | DrawKind::Group(_)
