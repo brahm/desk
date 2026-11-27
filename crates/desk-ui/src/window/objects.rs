@@ -254,7 +254,11 @@ impl DocumentWindow {
         let weak = Rc::downgrade(self);
         action.connect_activate(move |_, _| {
             let Some(this) = weak.upgrade() else { return };
-            let Some((shape, size)) = this.editor().and_then(|e| e.shape_to_save()) else {
+            let Some((shape, size, flip)) = this.editor().and_then(|e| e.shape_to_save()) else {
+                this.alert(
+                    &tr("Cannot Save the Shape"),
+                    &tr("Select one shape to save it to My Shapes. Lines are not saved."),
+                );
                 return;
             };
             let target = Rc::downgrade(&this);
@@ -265,14 +269,23 @@ impl DocumentWindow {
                 move |name| {
                     let Some(this) = target.upgrade() else { return };
                     let file = shape_library::saved_path();
-                    if shape_library::add_saved(&file, name, &shape, size).is_some() {
-                        this.shape_library.show_mine();
-                    } else {
-                        this.alert(
-                            &tr("Cannot Save the Shape"),
-                            &tr("My Shapes is full, or its file cannot be written."),
-                        );
-                    }
+                    let why = match shape_library::add_saved(&file, name, &shape, size, flip) {
+                        Ok(_) => {
+                            this.shape_library.show_mine();
+                            return;
+                        }
+                        Err(shape_library::SaveError::Unsupported) => {
+                            tr("This shape cannot be saved to My Shapes.")
+                        }
+                        Err(shape_library::SaveError::Full) => {
+                            tr("My Shapes is full. Delete a shape of it to save another.")
+                        }
+                        Err(shape_library::SaveError::File(error)) => {
+                            glib::g_warning!("desk", "cannot save to My Shapes: {error}");
+                            tr("The file of My Shapes cannot be read or written.")
+                        }
+                    };
+                    this.alert(&tr("Cannot Save the Shape"), &why);
                 },
             );
         });

@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Desk\n"
 "Report-Msgid-Bugs-To: https://github.com/brahm/desk/issues\n"
-"POT-Creation-Date: 2026-11-27 20:42+0000\n"
+"POT-Creation-Date: 2026-11-27 20:52+0000\n"
 "PO-Revision-Date: 2026-11-02 00:54+0000\n"
 "Last-Translator: Desk contributors\n"
 "Language-Team: Brazilian Portuguese\n"
@@ -185,7 +185,7 @@ msgstr "Documento inteiro"
 #: crates/desk-ui/src/window.rs:2651 crates/desk-ui/src/window.rs:2698
 #: crates/desk-ui/src/window.rs:4044
 #: crates/desk-ui/src/window/format_actions.rs:377
-#: crates/desk-ui/src/window/objects.rs:336
+#: crates/desk-ui/src/window/objects.rs:349
 msgid "_Cancel"
 msgstr "_Cancelar"
 
@@ -441,8 +441,8 @@ msgid "2-Axis"
 msgstr "2 eixos"
 
 #: crates/desk-ui/src/chart_pane.rs:41
-#: crates/desk-ui/src/editing/objects.rs:1707
-#: crates/desk-ui/src/editing/objects.rs:1735 crates/desk-ui/src/effects.rs:46
+#: crates/desk-ui/src/editing/objects.rs:1711
+#: crates/desk-ui/src/editing/objects.rs:1739 crates/desk-ui/src/effects.rs:46
 msgid "Default"
 msgstr "Padrão"
 
@@ -1033,7 +1033,7 @@ msgstr "Número"
 #: crates/desk-ui/src/custom_format.rs:20
 #: crates/desk-ui/src/custom_format.rs:46
 #: crates/desk-ui/src/custom_format.rs:95
-#: crates/desk-ui/src/editing/objects.rs:1857 crates/desk-ui/src/fonts.rs:367
+#: crates/desk-ui/src/editing/objects.rs:1866 crates/desk-ui/src/fonts.rs:367
 #: crates/desk-ui/src/formatting.rs:377 crates/desk-ui/src/formatting.rs:419
 #: crates/desk-ui/src/function_browser.rs:23 crates/desk-ui/src/inspector.rs:65
 #: crates/desk-ui/src/outline_view.rs:361
@@ -1155,7 +1155,7 @@ msgstr "Criar formato personalizado"
 #: crates/desk-ui/src/tables/inspector.rs:244
 #: crates/desk-ui/src/tables/window.rs:800
 #: crates/desk-ui/src/window/format_actions.rs:371
-#: crates/desk-ui/src/window/objects.rs:334
+#: crates/desk-ui/src/window/objects.rs:347
 #: crates/desk-ui/src/window/rename.rs:40
 msgid "Name"
 msgstr "Nome"
@@ -1213,7 +1213,7 @@ msgid "The cells that use “{name}” will take the Automatic format."
 msgstr "As células que usam “{name}” passarão a ter o formato Automático."
 
 #: crates/desk-ui/src/custom_format.rs:305
-#: crates/desk-ui/src/shape_popover.rs:295
+#: crates/desk-ui/src/shape_popover.rs:302
 #: crates/desk-ui/src/tables/header.rs:265
 #: crates/desk-ui/src/tables/header.rs:288 crates/desk-ui/src/thumbnails.rs:396
 #: crates/desk-ui/src/thumbnails.rs:493 crates/desk-ui/src/window.rs:2453
@@ -1626,7 +1626,7 @@ msgstr "Caixa de texto"
 msgid "Shape"
 msgstr "Forma"
 
-#: crates/desk-ui/src/editing/objects.rs:1692
+#: crates/desk-ui/src/editing/objects.rs:1696
 #: crates/desk-ui/src/formatting.rs:338 crates/desk-ui/src/formatting.rs:345
 #: crates/desk-ui/src/formatting.rs:367 crates/desk-ui/src/formatting.rs:386
 #: crates/desk-ui/src/formatting.rs:396
@@ -2589,23 +2589,23 @@ msgid "_Instant Alpha"
 msgstr "_Alfa instantâneo"
 
 #: crates/desk-ui/src/format_pane.rs:393
-#: crates/desk-ui/src/window/objects.rs:509
+#: crates/desk-ui/src/window/objects.rs:522
 msgid "Un_mask"
 msgstr "Re_mover máscara"
 
 #: crates/desk-ui/src/format_pane.rs:397
-#: crates/desk-ui/src/window/objects.rs:533
+#: crates/desk-ui/src/window/objects.rs:546
 msgctxt "Arrange"
 msgid "Dupl_icate"
 msgstr "Dupl_icar"
 
 #: crates/desk-ui/src/format_pane.rs:400
-#: crates/desk-ui/src/window/objects.rs:538
+#: crates/desk-ui/src/window/objects.rs:551
 msgid "_Lock"
 msgstr "T_ravar"
 
 #: crates/desk-ui/src/format_pane.rs:401
-#: crates/desk-ui/src/window/objects.rs:539
+#: crates/desk-ui/src/window/objects.rs:552
 msgid "U_nlock"
 msgstr "Destra_var"
 
@@ -4796,7 +4796,7 @@ msgid "My Shapes"
 msgstr "Minhas Formas"
 
 #: crates/desk-ui/src/shape_library.rs:198
-#: crates/desk-ui/src/window/objects.rs:425
+#: crates/desk-ui/src/window/objects.rs:438
 msgid "_Rectangle"
 msgstr "_Retângulo"
 
@@ -4805,7 +4805,7 @@ msgid "square box"
 msgstr "quadrado caixa"
 
 #: crates/desk-ui/src/shape_library.rs:204
-#: crates/desk-ui/src/window/objects.rs:426
+#: crates/desk-ui/src/window/objects.rs:439
 msgid "Rounded Re_ctangle"
 msgstr "Retângulo a_rredondado"
 
@@ -4814,7 +4814,7 @@ msgid "square box button"
 msgstr "quadrado caixa botão"
 
 #: crates/desk-ui/src/shape_library.rs:210
-#: crates/desk-ui/src/window/objects.rs:427
+#: crates/desk-ui/src/window/objects.rs:440
 msgid "_Oval"
 msgstr "_Oval"
 
@@ -4823,7 +4823,7 @@ msgid "circle ellipse round"
 msgstr "círculo elipse redondo"
 
 #: crates/desk-ui/src/shape_library.rs:216
-#: crates/desk-ui/src/window/objects.rs:428
+#: crates/desk-ui/src/window/objects.rs:441
 msgid "Tr_iangle"
 msgstr "_Triângulo"
 
@@ -4832,7 +4832,7 @@ msgid "pyramid"
 msgstr "pirâmide"
 
 #: crates/desk-ui/src/shape_library.rs:222
-#: crates/desk-ui/src/window/objects.rs:429
+#: crates/desk-ui/src/window/objects.rs:442
 msgid "Ri_ght Triangle"
 msgstr "Triângulo r_etângulo"
 
@@ -4841,7 +4841,7 @@ msgid "triangle"
 msgstr "triângulo"
 
 #: crates/desk-ui/src/shape_library.rs:228
-#: crates/desk-ui/src/window/objects.rs:430
+#: crates/desk-ui/src/window/objects.rs:443
 msgid "_Diamond"
 msgstr "Losan_go"
 
@@ -4850,7 +4850,7 @@ msgid "rhombus lozenge"
 msgstr "losango"
 
 #: crates/desk-ui/src/shape_library.rs:232
-#: crates/desk-ui/src/window/objects.rs:431
+#: crates/desk-ui/src/window/objects.rs:444
 msgid "_Arrow"
 msgstr "_Seta"
 
@@ -4859,7 +4859,7 @@ msgid "right"
 msgstr "direita"
 
 #: crates/desk-ui/src/shape_library.rs:235
-#: crates/desk-ui/src/window/objects.rs:432
+#: crates/desk-ui/src/window/objects.rs:445
 msgid "Dou_ble Arrow"
 msgstr "Seta _dupla"
 
@@ -4868,7 +4868,7 @@ msgid "left right"
 msgstr "esquerda direita"
 
 #: crates/desk-ui/src/shape_library.rs:239
-#: crates/desk-ui/src/window/objects.rs:433
+#: crates/desk-ui/src/window/objects.rs:446
 msgid "_Star"
 msgstr "Estrel_a"
 
@@ -4877,7 +4877,7 @@ msgid "favorite"
 msgstr "favorito"
 
 #: crates/desk-ui/src/shape_library.rs:240
-#: crates/desk-ui/src/window/objects.rs:434
+#: crates/desk-ui/src/window/objects.rs:447
 msgid "_Polygon"
 msgstr "_Polígono"
 
@@ -4886,7 +4886,7 @@ msgid "pentagon"
 msgstr "pentágono"
 
 #: crates/desk-ui/src/shape_library.rs:243
-#: crates/desk-ui/src/window/objects.rs:435
+#: crates/desk-ui/src/window/objects.rs:448
 msgid "_Quote Bubble"
 msgstr "_Balão de fala"
 
@@ -4895,7 +4895,7 @@ msgid "speech talk comic balloon"
 msgstr "fala conversa quadrinhos balão"
 
 #: crates/desk-ui/src/shape_library.rs:249
-#: crates/desk-ui/src/window/objects.rs:436
+#: crates/desk-ui/src/window/objects.rs:449
 msgid "Call_out"
 msgstr "Balão reta_ngular"
 
@@ -5244,9 +5244,9 @@ msgstr "Cadeado"
 msgid "lock security closed"
 msgstr "trancar segurança fechado"
 
-#: crates/desk-ui/src/shape_library.rs:1006
-#: crates/desk-ui/src/shape_library.rs:1212
-#: crates/desk-ui/src/window/objects.rs:263
+#: crates/desk-ui/src/shape_library.rs:1124
+#: crates/desk-ui/src/shape_library.rs:1364
+#: crates/desk-ui/src/window/objects.rs:267
 msgid "My Shape"
 msgstr "Minha Forma"
 
@@ -5310,15 +5310,15 @@ msgstr "_Caneta"
 msgid "Connection L_ine"
 msgstr "Linha de c_onexão"
 
-#: crates/desk-ui/src/shape_popover.rs:258
-msgid "Save a shape here with Arrange > Save to My Shapes"
-msgstr "Salve uma forma aqui com Organizar > Salvar em Minhas Formas"
+#: crates/desk-ui/src/shape_popover.rs:265
+msgid "Save a shape here with Arrange > Shape > Save to My Shapes"
+msgstr "Salve uma forma aqui com Organizar > Forma > Salvar em Minhas Formas"
 
-#: crates/desk-ui/src/shape_popover.rs:260
+#: crates/desk-ui/src/shape_popover.rs:267
 msgid "No Shapes Found"
 msgstr "Nenhuma Forma Encontrada"
 
-#: crates/desk-ui/src/shape_popover.rs:291
+#: crates/desk-ui/src/shape_popover.rs:298
 msgid "_Rename…"
 msgstr "_Renomear…"
 
@@ -5895,7 +5895,7 @@ msgstr "Renomear estilo"
 #: crates/desk-ui/src/styles_drawer.rs:688
 #: crates/desk-ui/src/tables/window.rs:803
 #: crates/desk-ui/src/window/format_actions.rs:378
-#: crates/desk-ui/src/window/objects.rs:297
+#: crates/desk-ui/src/window/objects.rs:310
 #: crates/desk-ui/src/window/rename.rs:42
 msgid "_Rename"
 msgstr "_Renomear"
@@ -7211,7 +7211,7 @@ msgstr "Subtrair"
 msgid "Exclude"
 msgstr "Excluir"
 
-#: crates/desk-ui/src/undo_names.rs:95 crates/desk-ui/src/window/objects.rs:524
+#: crates/desk-ui/src/undo_names.rs:95 crates/desk-ui/src/window/objects.rs:537
 msgid "Break Apart"
 msgstr "Separar"
 
@@ -7594,7 +7594,7 @@ msgstr ""
 "serão perdidas permanentemente."
 
 #: crates/desk-ui/src/window.rs:2653 crates/desk-ui/src/window/header.rs:228
-#: crates/desk-ui/src/window/objects.rs:264
+#: crates/desk-ui/src/window/objects.rs:268
 msgid "_Save"
 msgstr "_Salvar"
 
@@ -8107,147 +8107,160 @@ msgstr "Escolher uma imagem, filme ou som"
 msgid "The file is not an image, movie or sound that Desk can read."
 msgstr "O arquivo não é uma imagem, filme ou som que o Desk consiga ler."
 
-#: crates/desk-ui/src/window/objects.rs:262
-msgid "Save to My Shapes"
-msgstr "Salvar em Minhas Formas"
-
-#: crates/desk-ui/src/window/objects.rs:272
+#: crates/desk-ui/src/window/objects.rs:259
+#: crates/desk-ui/src/window/objects.rs:288
 msgid "Cannot Save the Shape"
 msgstr "Não É Possível Salvar a Forma"
 
-#: crates/desk-ui/src/window/objects.rs:273
-msgid "My Shapes is full, or its file cannot be written."
-msgstr "Minhas Formas está cheio, ou o seu arquivo não pode ser gravado."
+#: crates/desk-ui/src/window/objects.rs:260
+msgid "Select one shape to save it to My Shapes. Lines are not saved."
+msgstr "Selecione uma forma para salvá-la em Minhas Formas. Linhas não são salvas."
 
-#: crates/desk-ui/src/window/objects.rs:295
+#: crates/desk-ui/src/window/objects.rs:266
+msgid "Save to My Shapes"
+msgstr "Salvar em Minhas Formas"
+
+#: crates/desk-ui/src/window/objects.rs:278
+msgid "This shape cannot be saved to My Shapes."
+msgstr "Esta forma não pode ser salva em Minhas Formas."
+
+#: crates/desk-ui/src/window/objects.rs:281
+msgid "My Shapes is full. Delete a shape of it to save another."
+msgstr "Minhas Formas está cheio. Exclua uma forma dele para salvar outra."
+
+#: crates/desk-ui/src/window/objects.rs:285
+msgid "The file of My Shapes cannot be read or written."
+msgstr "O arquivo de Minhas Formas não pode ser lido ou gravado."
+
+#: crates/desk-ui/src/window/objects.rs:308
 msgid "Rename Shape"
 msgstr "Renomear Forma"
 
-#: crates/desk-ui/src/window/objects.rs:463
+#: crates/desk-ui/src/window/objects.rs:476
 msgid "Bring to _Front"
 msgstr "Trazer para a _frente"
 
-#: crates/desk-ui/src/window/objects.rs:464
+#: crates/desk-ui/src/window/objects.rs:477
 msgid "Bring _Forward"
 msgstr "Trazer uma _camada para a frente"
 
-#: crates/desk-ui/src/window/objects.rs:465
+#: crates/desk-ui/src/window/objects.rs:478
 msgid "Send _Backward"
 msgstr "Enviar uma ca_mada para trás"
 
-#: crates/desk-ui/src/window/objects.rs:466
+#: crates/desk-ui/src/window/objects.rs:479
 msgid "Send to Bac_k"
 msgstr "Enviar para _trás"
 
-#: crates/desk-ui/src/window/objects.rs:469
+#: crates/desk-ui/src/window/objects.rs:482
 msgid "_Left"
 msgstr "_Esquerda"
 
-#: crates/desk-ui/src/window/objects.rs:470
+#: crates/desk-ui/src/window/objects.rs:483
 msgid "_Center"
 msgstr "_Centro"
 
-#: crates/desk-ui/src/window/objects.rs:471
+#: crates/desk-ui/src/window/objects.rs:484
 msgid "_Right"
 msgstr "_Direita"
 
-#: crates/desk-ui/src/window/objects.rs:472
+#: crates/desk-ui/src/window/objects.rs:485
 msgid "_Top"
 msgstr "_Topo"
 
-#: crates/desk-ui/src/window/objects.rs:473
+#: crates/desk-ui/src/window/objects.rs:486
 msgid "_Middle"
 msgstr "_Meio"
 
-#: crates/desk-ui/src/window/objects.rs:474
+#: crates/desk-ui/src/window/objects.rs:487
 msgid "_Bottom"
 msgstr "_Base"
 
-#: crates/desk-ui/src/window/objects.rs:480
+#: crates/desk-ui/src/window/objects.rs:493
 msgid "_Horizontally"
 msgstr "_Horizontalmente"
 
-#: crates/desk-ui/src/window/objects.rs:484
+#: crates/desk-ui/src/window/objects.rs:497
 msgid "_Vertically"
 msgstr "_Verticalmente"
 
-#: crates/desk-ui/src/window/objects.rs:488
+#: crates/desk-ui/src/window/objects.rs:501
 msgid "_Align Objects"
 msgstr "_Alinhar objetos"
 
-#: crates/desk-ui/src/window/objects.rs:489
+#: crates/desk-ui/src/window/objects.rs:502
 msgid "_Distribute Objects"
 msgstr "_Distribuir objetos"
 
-#: crates/desk-ui/src/window/objects.rs:490
+#: crates/desk-ui/src/window/objects.rs:503
 msgid "Flip _Horizontally"
 msgstr "Espelhar _horizontalmente"
 
-#: crates/desk-ui/src/window/objects.rs:491
+#: crates/desk-ui/src/window/objects.rs:504
 msgid "Flip _Vertically"
 msgstr "Espelhar _verticalmente"
 
-#: crates/desk-ui/src/window/objects.rs:493
+#: crates/desk-ui/src/window/objects.rs:506
 msgid "Make _Editable"
 msgstr "Tornar _editável"
 
-#: crates/desk-ui/src/window/objects.rs:494
+#: crates/desk-ui/src/window/objects.rs:507
 msgid "Smoo_th Path"
 msgstr "Suavi_zar caminho"
 
-#: crates/desk-ui/src/window/objects.rs:495
+#: crates/desk-ui/src/window/objects.rs:508
 msgid "Sha_rpen Path"
 msgstr "Agu_çar caminho"
 
-#: crates/desk-ui/src/window/objects.rs:497
+#: crates/desk-ui/src/window/objects.rs:510
 msgid "_Reset Text and Object Handles"
 msgstr "_Redefinir texto e alças do objeto"
 
-#: crates/desk-ui/src/window/objects.rs:508
+#: crates/desk-ui/src/window/objects.rs:521
 msgid "Mask with S_hape"
 msgstr "Máscara com _forma"
 
-#: crates/desk-ui/src/window/objects.rs:514
+#: crates/desk-ui/src/window/objects.rs:527
 msgid "Unite Shapes"
 msgstr "Unir formas"
 
-#: crates/desk-ui/src/window/objects.rs:515
+#: crates/desk-ui/src/window/objects.rs:528
 msgid "Intersect Shapes"
 msgstr "Interseção de formas"
 
-#: crates/desk-ui/src/window/objects.rs:516
+#: crates/desk-ui/src/window/objects.rs:529
 msgid "Subtract Shapes"
 msgstr "Subtrair formas"
 
-#: crates/desk-ui/src/window/objects.rs:517
+#: crates/desk-ui/src/window/objects.rs:530
 msgid "Exclude Shapes"
 msgstr "Excluir formas"
 
-#: crates/desk-ui/src/window/objects.rs:526
+#: crates/desk-ui/src/window/objects.rs:539
 msgid "Save to My Shapes…"
 msgstr "Salvar em Minhas Formas…"
 
-#: crates/desk-ui/src/window/objects.rs:536
+#: crates/desk-ui/src/window/objects.rs:549
 msgid "_Group"
 msgstr "A_grupar"
 
-#: crates/desk-ui/src/window/objects.rs:537
+#: crates/desk-ui/src/window/objects.rs:550
 msgid "_Ungroup"
 msgstr "Desagr_upar"
 
-#: crates/desk-ui/src/window/objects.rs:543
+#: crates/desk-ui/src/window/objects.rs:556
 msgid "Move to Section _Master"
 msgstr "Mover para o mestre da _seção"
 
-#: crates/desk-ui/src/window/objects.rs:546
+#: crates/desk-ui/src/window/objects.rs:559
 msgid "Move to _Page"
 msgstr "Mover para a _página"
 
-#: crates/desk-ui/src/window/objects.rs:548
+#: crates/desk-ui/src/window/objects.rs:561
 msgid "Make Background Objects _Selectable"
 msgstr "Tornar objetos de fundo se_lecionáveis"
 
-#: crates/desk-ui/src/window/objects.rs:552
+#: crates/desk-ui/src/window/objects.rs:565
 msgid "Make Master _Objects Selectable"
 msgstr "Tornar objetos mestres selecio_náveis"
 

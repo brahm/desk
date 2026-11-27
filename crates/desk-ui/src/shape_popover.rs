@@ -184,11 +184,18 @@ impl ShapePopover {
         self.category.set(Category::Mine);
     }
 
-    /// Shows the shapes again, as after one of My Shapes changed.
-    pub(crate) fn refresh(&self) {
-        if self.popover.is_visible() {
-            self.fill();
-        }
+    /// Shows the shapes again, as after one of My Shapes changed: once the
+    /// menu that asked for the change is done, since the grid takes it
+    /// away.
+    pub(crate) fn refresh(self: &Rc<Self>) {
+        let weak = Rc::downgrade(self);
+        glib::idle_add_local_once(move || {
+            if let Some(this) = weak.upgrade()
+                && this.popover.is_visible()
+            {
+                this.fill();
+            }
+        });
     }
 
     fn select(&self, category: Category) {
@@ -255,7 +262,7 @@ impl ShapePopover {
         if tiles.is_empty() {
             self.empty
                 .set_label(&if self.search.text().trim().is_empty() {
-                    tr("Save a shape here with Arrange > Save to My Shapes")
+                    tr("Save a shape here with Arrange > Shape > Save to My Shapes")
                 } else {
                     tr("No Shapes Found")
                 });

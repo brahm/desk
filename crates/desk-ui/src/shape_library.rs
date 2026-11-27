@@ -799,22 +799,84 @@ fn parts_of_path(data: &str) -> Option<Vec<Part>> {
     (!parts.is_empty()).then_some(parts)
 }
 
+/// Where a cubic Bézier curve turns back along an axis, from its ends
+/// and control points along it: the values of `t` between 0 and 1 where
+/// its derivative is nothing.
+fn turns(p0: f64, p1: f64, p2: f64, p3: f64) -> Vec<f64> {
+    let a = -p0 + 3.0 * p1 - 3.0 * p2 + p3;
+    let b = 2.0 * (p0 - 2.0 * p1 + p2);
+    let c = p1 - p0;
+    let roots = if a.abs() < 1e-12 {
+        if b.abs() < 1e-12 {
+            Vec::new()
+        } else {
+            vec![-c / b]
+        }
+    } else {
+        let d = b * b - 4.0 * a * c;
+        if d < 0.0 {
+            Vec::new()
+        } else {
+            let d = d.sqrt();
+            vec![(-b + d) / (2.0 * a), (-b - d) / (2.0 * a)]
+        }
+    };
+    roots.into_iter().filter(|t| *t > 0.0 && *t < 1.0).collect()
+}
+
+/// The point of a cubic Bézier curve at `t`.
+fn bezier(p0: f64, p1: f64, p2: f64, p3: f64, t: f64) -> f64 {
+    let u = 1.0 - t;
+    u * u * u * p0 + 3.0 * u * u * t * p1 + 3.0 * u * t * t * p2 + t * t * t * p3
+}
+
+/// The box of what the parts draw, as left, top, right and bottom: their
+/// points and the furthest their curves go, not their handles, which may
+/// reach beyond.
+fn drawn_box(parts: &[Part]) -> (f64, f64, f64, f64) {
+    let (mut x0, mut y0, mut x1, mut y1) = (f64::MAX, f64::MAX, f64::MIN, f64::MIN);
+    let mut take = |(x, y): (f64, f64)| {
+        (x0, y0, x1, y1) = (x0.min(x), y0.min(y), x1.max(x), y1.max(y));
+    };
+    for part in parts {
+        let n = part.points.len();
+        let pairs = (0..n.saturating_sub(1)).map(|i| (i, i + 1));
+        let back = (part.closed && n > 1).then_some((n - 1, 0));
+        for point in &part.points {
+            take(point.at);
+        }
+        for (i, j) in pairs.chain(back) {
+            let (from, to) = (part.points[i], part.points[j]);
+            if from.after.is_none() && to.before.is_none() {
+                continue;
+            }
+            let a = from.after.unwrap_or(from.at);
+            let b = to.before.unwrap_or(to.at);
+            let xs = (from.at.0, a.0, b.0, to.at.0);
+            let ys = (from.at.1, a.1, b.1, to.at.1);
+            for t in turns(xs.0, xs.1, xs.2, xs.3)
+                .into_iter()
+                .chain(turns(ys.0, ys.1, ys.2, ys.3))
+            {
+                take((
+                    bezier(xs.0, xs.1, xs.2, xs.3, t),
+                    bezier(ys.0, ys.1, ys.2, ys.3, t),
+                ));
+            }
+        }
+    }
+    (x0, y0, x1, y1)
+}
+
 /// The shape that a path draws, as a pen shape of one part or a shape of
-/// several parts, with the size of its box in the units of the path.
+/// several parts, with the size of the box of what it draws in the units
+/// of the path.
 pub(crate) fn shape_of_path(data: &str) -> Option<(Shape, (f64, f64))> {
     let parts = parts_of_path(data)?;
     if parts.iter().any(|p| p.points.len() < 2) {
         return None;
     }
-    let (mut x0, mut y0, mut x1, mut y1) = (f64::MAX, f64::MAX, f64::MIN, f64::MIN);
-    for (x, y) in parts
-        .iter()
-        .flat_map(|p| &p.points)
-        .flat_map(|p| [Some(p.at), p.before, p.after])
-        .flatten()
-    {
-        (x0, y0, x1, y1) = (x0.min(x), y0.min(y), x1.max(x), y1.max(y));
-    }
+    let (x0, y0, x1, y1) = drawn_box(&parts);
     let (w, h) = (x1 - x0, y1 - y0);
     if w < 1e-3 || h < 1e-3 {
         return None;
@@ -847,25 +909,28 @@ pub(crate) fn shape_of_path(data: &str) -> Option<(Shape, (f64, f64))> {
     Some((shape, (w, h)))
 }
 
-/// The path of a shape in a frame of `w` by `h` points, or none for a
-/// line or a connection line.
-pub(crate) fn path_of_shape(shape: &Shape, w: f64, h: f64) -> Option<String> {
+/// The path of a shape in a frame of `w` by `h` points, flipped across
+/// as `flip.0` and up and down as `flip.1` say; none for a line or a
+/// connection line, or an outline that cannot be read back.
+pub(crate) fn path_of_shape(shape: &Shape, w: f64, h: f64, flip: (bool, bool)) -> Option<String> {
     if shape.is_line() || matches!(shape, Shape::Connection(_)) {
         return None;
     }
+    let x = |x: f64| number(if flip.0 { w - x } else { x });
+    let y = |y: f64| number(if flip.1 { h - y } else { y });
     let mut path = Vec::new();
     for segment in shape.outline(w, h) {
         match segment {
-            PathSegment::Move(x, y) => path.push(format!("M {} {}", number(x), number(y))),
-            PathSegment::Line(x, y) => path.push(format!("L {} {}", number(x), number(y))),
-            PathSegment::Curve(ax, ay, bx, by, x, y) => path.push(format!(
+            PathSegment::Move(px, py) => path.push(format!("M {} {}", x(px), y(py))),
+            PathSegment::Line(px, py) => path.push(format!("L {} {}", x(px), y(py))),
+            PathSegment::Curve(ax, ay, bx, by, px, py) => path.push(format!(
                 "C {} {} {} {} {} {}",
-                number(ax),
-                number(ay),
-                number(bx),
-                number(by),
-                number(x),
-                number(y)
+                x(ax),
+                y(ay),
+                x(bx),
+                y(by),
+                x(px),
+                y(py)
             )),
             PathSegment::Close => path.push("Z".to_owned()),
         }
@@ -904,6 +969,11 @@ impl Saved {
     pub(crate) fn matches(&self, query: &str) -> bool {
         matches(&self.name, query)
     }
+
+    /// Its line in the file.
+    fn line(&self) -> String {
+        format!("{:x}\t{}\t{}", self.id, clean_name(&self.name), self.path)
+    }
 }
 
 /// The first line of the file of My Shapes.
@@ -920,54 +990,78 @@ pub(crate) fn saved_path() -> PathBuf {
         .join("my-shapes.txt")
 }
 
+/// A line of the file of My Shapes: a shape this version reads, or one it
+/// does not, kept as it is so that changing the others never loses it.
+enum Line {
+    Shape(Saved),
+    Other(String),
+}
+
+/// The lines of a file of My Shapes: none when there is no file; an
+/// error when it cannot be read whole, so that it is not written over.
+fn read_lines(file: &Path) -> std::io::Result<Vec<Line>> {
+    let size = match std::fs::metadata(file) {
+        Ok(metadata) => metadata.len(),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
+        Err(error) => return Err(error),
+    };
+    if size > MAX_FILE {
+        return Err(std::io::Error::other("the file of My Shapes is too large"));
+    }
+    let text = std::fs::read_to_string(file)?;
+    let mut lines = Vec::new();
+    let mut shapes = 0usize;
+    let mut ids = std::collections::HashSet::new();
+    for line in text.lines().filter(|l| !l.is_empty() && *l != HEADER) {
+        let mut fields = line.splitn(3, '\t');
+        let read = match (fields.next(), fields.next(), fields.next()) {
+            (Some(id), Some(name), Some(path)) if shapes < MAX_SAVED => u64::from_str_radix(id, 16)
+                .ok()
+                .filter(|id| !ids.contains(id) && shape_of_path(path).is_some())
+                .map(|id| Saved {
+                    id,
+                    name: clean_name(name),
+                    path: path.to_owned(),
+                }),
+            _ => None,
+        };
+        match read {
+            Some(saved) => {
+                shapes += 1;
+                ids.insert(saved.id);
+                lines.push(Line::Shape(saved));
+            }
+            None => lines.push(Line::Other(line.to_owned())),
+        }
+    }
+    Ok(lines)
+}
+
 /// The shapes of My Shapes in a file, in the order they were saved;
 /// lines that are not shapes are left out.
 pub(crate) fn read_saved(file: &Path) -> Vec<Saved> {
-    let too_large = std::fs::metadata(file).map_or(true, |m| m.len() > MAX_FILE);
-    if too_large {
-        return Vec::new();
-    }
-    let Ok(text) = std::fs::read_to_string(file) else {
-        return Vec::new();
-    };
-    let mut saved: Vec<Saved> = Vec::new();
-    for line in text.lines().filter(|l| !l.starts_with('#')) {
-        let mut fields = line.splitn(3, '\t');
-        let (Some(id), Some(name), Some(path)) = (fields.next(), fields.next(), fields.next())
-        else {
-            continue;
-        };
-        let Ok(id) = u64::from_str_radix(id, 16) else {
-            continue;
-        };
-        if saved.iter().any(|s| s.id == id) || shape_of_path(path).is_none() {
-            continue;
-        }
-        saved.push(Saved {
-            id,
-            name: clean_name(name),
-            path: path.to_owned(),
-        });
-        if saved.len() >= MAX_SAVED {
-            break;
-        }
-    }
-    saved
+    read_lines(file)
+        .unwrap_or_default()
+        .into_iter()
+        .filter_map(|line| match line {
+            Line::Shape(saved) => Some(saved),
+            Line::Other(_) => None,
+        })
+        .collect()
 }
 
-/// Writes the shapes of My Shapes to a file, all at once.
-pub(crate) fn write_saved(file: &Path, saved: &[Saved]) -> std::io::Result<()> {
+/// Writes the lines of My Shapes to a file, all at once.
+fn write_lines(file: &Path, lines: &[Line]) -> std::io::Result<()> {
     if let Some(folder) = file.parent() {
         std::fs::create_dir_all(folder)?;
     }
     let mut text = format!("{HEADER}\n");
-    for shape in saved {
-        text.push_str(&format!(
-            "{:x}\t{}\t{}\n",
-            shape.id,
-            clean_name(&shape.name),
-            shape.path
-        ));
+    for line in lines {
+        match line {
+            Line::Shape(saved) => text.push_str(&saved.line()),
+            Line::Other(other) => text.push_str(other),
+        }
+        text.push('\n');
     }
     // Written beside it first, so that a failure leaves the old file.
     let mut part = file.as_os_str().to_owned();
@@ -987,16 +1081,40 @@ fn clean_name(name: &str) -> String {
     name.trim().to_owned()
 }
 
-/// Adds a shape to My Shapes in a file, and returns it; none when the
-/// shape cannot be kept or My Shapes is full.
-pub(crate) fn add_saved(file: &Path, name: &str, shape: &Shape, size: (f64, f64)) -> Option<Saved> {
-    let path = path_of_shape(shape, size.0, size.1)?;
-    let mut saved = read_saved(file);
+/// Why a shape was not added to My Shapes.
+#[derive(Debug)]
+pub(crate) enum SaveError {
+    /// It is a line, or its outline cannot be kept.
+    Unsupported,
+    /// My Shapes holds as many as it keeps.
+    Full,
+    /// Its file cannot be read or written.
+    File(std::io::Error),
+}
+
+/// Adds a shape, flipped as `flip` says, to My Shapes in a file, and
+/// returns it.
+pub(crate) fn add_saved(
+    file: &Path,
+    name: &str,
+    shape: &Shape,
+    size: (f64, f64),
+    flip: (bool, bool),
+) -> Result<Saved, SaveError> {
+    let path = path_of_shape(shape, size.0, size.1, flip).ok_or(SaveError::Unsupported)?;
+    let mut lines = read_lines(file).map_err(SaveError::File)?;
+    let saved: Vec<&Saved> = lines
+        .iter()
+        .filter_map(|l| match l {
+            Line::Shape(s) => Some(s),
+            Line::Other(_) => None,
+        })
+        .collect();
     if saved.len() >= MAX_SAVED {
-        return None;
+        return Err(SaveError::Full);
     }
     let mut id = gtk::glib::real_time().unsigned_abs();
-    while saved.iter().any(|s| s.id == id) {
+    while saved.iter().any(|s| s.id == id) || lines.iter().any(|l| taken(l, id)) {
         id = id.wrapping_add(1);
     }
     let name = clean_name(name);
@@ -1009,12 +1127,43 @@ pub(crate) fn add_saved(file: &Path, name: &str, shape: &Shape, size: (f64, f64)
         },
         path,
     };
-    saved.push(shape.clone());
-    match write_saved(file, &saved) {
-        Ok(()) => Some(shape),
+    lines.push(Line::Shape(shape.clone()));
+    write_lines(file, &lines).map_err(SaveError::File)?;
+    Ok(shape)
+}
+
+/// Whether a line not read as a shape still holds `id`, so that a new
+/// shape does not take it.
+fn taken(line: &Line, id: u64) -> bool {
+    match line {
+        Line::Shape(_) => false,
+        Line::Other(text) => {
+            text.split('\t')
+                .next()
+                .and_then(|i| u64::from_str_radix(i, 16).ok())
+                == Some(id)
+        }
+    }
+}
+
+/// Changes a shape of My Shapes in a file, leaving the other lines as
+/// they are; returns whether it was there and the file was written.
+fn change_saved(file: &Path, id: u64, change: impl FnOnce(&mut Vec<Line>, usize)) -> bool {
+    let Ok(mut lines) = read_lines(file) else {
+        return false;
+    };
+    let Some(index) = lines
+        .iter()
+        .position(|l| matches!(l, Line::Shape(s) if s.id == id))
+    else {
+        return false;
+    };
+    change(&mut lines, index);
+    match write_lines(file, &lines) {
+        Ok(()) => true,
         Err(error) => {
-            gtk::glib::g_warning!("desk", "cannot save the shape: {error}");
-            None
+            gtk::glib::g_warning!("desk", "cannot write My Shapes: {error}");
+            false
         }
     }
 }
@@ -1025,20 +1174,18 @@ pub(crate) fn rename_saved(file: &Path, id: u64, name: &str) -> bool {
     if name.is_empty() {
         return false;
     }
-    let mut saved = read_saved(file);
-    let Some(shape) = saved.iter_mut().find(|s| s.id == id) else {
-        return false;
-    };
-    shape.name = name;
-    write_saved(file, &saved).is_ok()
+    change_saved(file, id, |lines, index| {
+        if let Line::Shape(shape) = &mut lines[index] {
+            shape.name = name;
+        }
+    })
 }
 
 /// Takes a shape out of My Shapes in a file.
 pub(crate) fn delete_saved(file: &Path, id: u64) -> bool {
-    let mut saved = read_saved(file);
-    let count = saved.len();
-    saved.retain(|s| s.id != id);
-    saved.len() != count && write_saved(file, &saved).is_ok()
+    change_saved(file, id, |lines, index| {
+        lines.remove(index);
+    })
 }
 
 #[cfg(test)]
@@ -1088,7 +1235,7 @@ mod tests {
                     assert!(parts.len() > 1);
                 }
                 // What it makes can be saved to My Shapes, with its parts.
-                let path = path_of_shape(&shape, w, h).unwrap();
+                let path = path_of_shape(&shape, w, h, (false, false)).unwrap();
                 let (again, size) = shape_of_path(&path).unwrap();
                 assert_eq!(
                     matches!(again, Shape::Compound(_)),
@@ -1194,7 +1341,8 @@ mod tests {
         let file = folder.join("my-shapes.txt");
         let _ = std::fs::remove_dir_all(&folder);
         assert!(read_saved(&file).is_empty());
-        let oval = add_saved(&file, "Oval\tone\n", &Shape::Ellipse, (60.0, 30.0)).unwrap();
+        let none = (false, false);
+        let oval = add_saved(&file, "Oval\tone\n", &Shape::Ellipse, (60.0, 30.0), none).unwrap();
         assert_eq!(oval.name, "Oval one");
         let Some(Made::Saved(Shape::Path { points, closed }, (w, h))) = oval.made() else {
             panic!("{oval:?}");
@@ -1203,12 +1351,16 @@ mod tests {
         assert_eq!(points.len(), 4);
         assert!((w - 60.0).abs() < 0.01 && (h - 30.0).abs() < 0.01);
         // A line is no shape to keep.
-        assert!(add_saved(&file, "Line", &Shape::Line { rising: false }, (10.0, 10.0)).is_none());
+        let line = Shape::Line { rising: false };
+        assert!(matches!(
+            add_saved(&file, "Line", &line, (10.0, 10.0), none),
+            Err(SaveError::Unsupported)
+        ));
         let ring = entry("ring").and_then(Entry::made);
         let Some(Made::Shape(ring, size)) = ring else {
             panic!();
         };
-        let kept = add_saved(&file, "", &ring, size).unwrap();
+        let kept = add_saved(&file, "", &ring, size, none).unwrap();
         assert_eq!(kept.name, tr("My Shape"));
         assert!(matches!(
             kept.made(),
@@ -1222,14 +1374,48 @@ mod tests {
         assert!(delete_saved(&file, oval.id));
         assert!(!delete_saved(&file, oval.id));
         assert_eq!(read_saved(&file), std::slice::from_ref(&kept));
-        // Lines that are not shapes are left out.
+        // Lines that are not shapes are left out, and kept when the
+        // others change, as one of a later version would be.
         let mut text = std::fs::read_to_string(&file).unwrap();
-        text.push_str("zz\tBad\tM 0 0\nnot a shape\n1\tSame\tM 0 0 L 1 0 L 1 1 Z\n");
+        let unread = [
+            "zz\tBad\tM 0 0",
+            "not a shape",
+            "2\tLater\tM 0 0 Q 1 0 1 1 Z",
+        ];
+        for line in unread {
+            text.push_str(line);
+            text.push('\n');
+        }
+        text.push_str("1\tSame\tM 0 0 L 1 0 L 1 1 Z\n");
         text.push_str(&format!("{:x}\tTwice\tM 0 0 L 1 0 L 1 1 Z\n", kept.id));
         std::fs::write(&file, text).unwrap();
         let read = read_saved(&file);
         assert_eq!(read.len(), 2);
         assert_eq!(read[1].name, "Same");
+        assert!(rename_saved(&file, 1, "Other"));
+        assert!(delete_saved(&file, kept.id));
+        let added = add_saved(&file, "New", &Shape::Rectangle, (10.0, 10.0), none).unwrap();
+        assert_ne!(added.id, 2);
+        let text = std::fs::read_to_string(&file).unwrap();
+        for line in unread {
+            assert!(text.lines().any(|l| l == line), "{line} lost");
+        }
+        // The shape whose id was taken twice comes back once the first
+        // is deleted.
+        let names: Vec<String> = read_saved(&file).into_iter().map(|s| s.name).collect();
+        assert_eq!(names, ["Other", "Twice", "New"]);
+        // A flipped shape is kept as it shows.
+        let right = desk_model::Shape::Polygon(Arc::from(
+            &[(0, 0), (POLYGON_SCALE, POLYGON_SCALE), (0, POLYGON_SCALE)][..],
+        ));
+        let flipped = add_saved(&file, "Flipped", &right, (10.0, 10.0), (true, false)).unwrap();
+        assert!(flipped.path.starts_with("M 10 0 "), "{}", flipped.path);
+        // A curve whose handles reach out of it is as large as it draws.
+        let (_, size) = shape_of_path("M 0 0 C 0 -10 10 -10 10 0 L 10 10 L 0 10 Z").unwrap();
+        assert!(
+            (size.0 - 10.0).abs() < 1e-9 && (size.1 - 17.5).abs() < 1e-9,
+            "{size:?}"
+        );
         let _ = std::fs::remove_dir_all(&folder);
     }
 
@@ -1250,7 +1436,8 @@ mod tests {
             let (ring, frame) = shape(&editor);
             assert!(matches!(ring, Shape::Compound(ref parts) if parts.len() == 2));
             assert!((frame.width.to_pt() - 100.0).abs() < 0.01);
-            let (saved, size) = editor.shape_to_save().unwrap();
+            let (saved, size, flip) = editor.shape_to_save().unwrap();
+            assert_eq!(flip, (false, false));
             assert_eq!(saved, ring);
             assert!((size.0 - 100.0).abs() < 0.01);
             // The shapes of Insert > Shape come as it makes them.

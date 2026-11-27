@@ -679,6 +679,10 @@ fn placed_object(original: &PlacedObject, from_page: usize, placement: &Placemen
     changed
 }
 
+/// A shape to save to My Shapes: its outline, the size of its frame in
+/// points, and whether it is flipped across and up and down (W113).
+pub type ShapeToSave = (Shape, (f64, f64), (bool, bool));
+
 /// The shapes that the Insert menu puts on the page (OBJ-08).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum NewShape {
@@ -1785,10 +1789,10 @@ impl TextEditor {
         }
     }
 
-    /// The outline of the selected shape and the size of its frame in
-    /// points, to save it to My Shapes; none for a line or a connection
-    /// line (W113).
-    pub fn shape_to_save(&self) -> Option<(Shape, (f64, f64))> {
+    /// The outline of the selected shape, the size of its frame in points
+    /// and whether it is flipped across and up and down, to save it to My
+    /// Shapes as it shows; none for a line or a connection line (W113).
+    pub fn shape_to_save(&self) -> Option<ShapeToSave> {
         let info = self.object_info()?;
         let ObjectKind::Shape(shape) = &info.object.kind else {
             return None;
@@ -1796,8 +1800,13 @@ impl TextEditor {
         if info.count != 1 || shape.is_line() || matches!(shape, Shape::Connection(_)) {
             return None;
         }
-        let frame = info.object.frame;
-        Some((shape.clone(), (frame.width.to_pt(), frame.height.to_pt())))
+        let object = &info.object;
+        let frame = object.frame;
+        Some((
+            shape.clone(),
+            (frame.width.to_pt(), frame.height.to_pt()),
+            (object.flip_horizontal, object.flip_vertical),
+        ))
     }
 
     /// Puts a new shape or text box on the page: `outline` and its size in
