@@ -212,6 +212,33 @@ fn first_of_list(value: &str) -> Option<String> {
     Some(text(&first))
 }
 
+/// The entries of a list of values, as those of `CATEGORIES`, an escaped
+/// comma kept in its entry.
+fn list(value: &str) -> Vec<String> {
+    let mut entries = vec![String::new()];
+    let mut escaped = false;
+    for c in value.chars() {
+        match c {
+            ',' if !escaped => entries.push(String::new()),
+            '\\' if !escaped => escaped = true,
+            _ => {
+                if let Some(entry) = entries.last_mut() {
+                    if escaped {
+                        entry.push('\\');
+                    }
+                    entry.push(c);
+                }
+                escaped = false;
+            }
+        }
+    }
+    entries
+        .iter()
+        .map(|e| text(e).trim().to_owned())
+        .filter(|e| !e.is_empty())
+        .collect()
+}
+
 /// A value with its escapes undone, its commas and semicolons kept.
 fn text(value: &str) -> String {
     components(value).join(";")
@@ -290,6 +317,14 @@ impl Card {
             .map(|p| text(&p.value))
     }
 
+    /// The groups of the contact, as the categories of its card, which
+    /// GNOME Contacts and Evolution make its groups.
+    pub fn categories(&self) -> Vec<String> {
+        self.all("CATEGORIES")
+            .flat_map(|p| list(&p.value))
+            .collect()
+    }
+
     /// The datum of a merge field of the card, by the name of the field
     /// or one of its other names (MAL-09); none when the card has none.
     pub fn get(&self, field: &str) -> Option<String> {
@@ -357,6 +392,15 @@ mod tests {
     use super::*;
 
     const ANA: &str = "BEGIN:VCARD\r\nVERSION:3.0\r\nN:Souza;Ana;Maria;Dra.;\r\nFN:Dra. Ana Maria Souza\r\nORG:Desk Ltda.;Engenharia\r\nTITLE:Diretora\r\nTEL;TYPE=WORK,VOICE:+55 11 3000-0000\r\nTEL;TYPE=CELL:+55 11 90000-0000\r\nTEL;TYPE=WORK,FAX:+55 11 3000-0001\r\nEMAIL;TYPE=HOME:ana@example.org\r\nitem1.EMAIL;TYPE=WORK;TYPE=pref:ana@desk.example\r\nADR;TYPE=WORK:;Sala 4;Av. Paulista\\, 1000;São Paulo;SP;01310-100;Brasil\r\nNOTE:Prefere ser chamada\r\n  de Ana.\r\nBDAY:1980-04-02\r\nEND:VCARD\r\n";
+
+    #[test]
+    fn mal_04_the_groups_of_a_card_are_its_categories() {
+        let cards = parse(
+            "BEGIN:VCARD\r\nVERSION:3.0\r\nFN:Ana\r\nCATEGORIES:Clients,Família\\, perto\r\nCATEGORIES:VIP\r\nEND:VCARD\r\n",
+        );
+        assert_eq!(cards[0].categories(), ["Clients", "Família, perto", "VIP"]);
+        assert!(parse(ANA)[0].categories().is_empty());
+    }
 
     #[test]
     fn mal_09_the_fields_of_a_card_of_vcard_3() {

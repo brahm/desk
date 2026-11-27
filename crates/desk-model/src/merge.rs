@@ -51,7 +51,9 @@ impl MergeSource {
 /// a sender field; none leaves the field as it is.
 pub type MergeValue<'a> = &'a dyn Fn(&str, bool) -> Option<String>;
 
-/// The merge field filled with its datum, when `value` gives one.
+/// The merge field filled with its datum, when `value` gives one; a
+/// sender field filled already, as by a card dropped on it, stays as it
+/// is.
 fn filled(field: &Field, value: MergeValue<'_>) -> Option<Field> {
     let Field::Merge {
         name,
@@ -63,6 +65,10 @@ fn filled(field: &Field, value: MergeValue<'_>) -> Option<Field> {
     else {
         return None;
     };
+    // A sender field that a card filled keeps it (MAL-02).
+    if *sender && shown.is_some() {
+        return None;
+    }
     let datum: Arc<str> = value(name, *sender)?.into();
     (shown.as_ref() != Some(&datum)).then(|| Field::Merge {
         name: name.clone(),

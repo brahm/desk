@@ -28,6 +28,7 @@ mod comments_page;
 mod compact;
 mod contents_page;
 mod custom_format;
+mod desktop_contacts;
 mod document_controls;
 mod drop_cap_pane;
 mod drop_cap_styles;

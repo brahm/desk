@@ -517,17 +517,22 @@ struct State {
     /// The data of the record that the merge fields show, while the
     /// preview of a mail merge is on (MAL-04).
     merge_preview: Option<merge::MergePreview>,
+    /// The data of the person's own card, which the sender fields that no
+    /// card filled show (MAL-01), once the desktop gave it.
+    merge_sender: Option<merge::MergePreview>,
+    /// Whether the desktop was asked for that card.
+    sender_asked: bool,
 }
 
 impl State {
     /// Lays out a document as the view shows it: as pages, or in Screen
     /// View.
     fn lay_out(&self, document: &Document) -> DocumentLayout {
-        if let Some(filled) = self
-            .merge_preview
-            .as_ref()
-            .and_then(|preview| merge::filled(document, preview))
-        {
+        if let Some(filled) = merge::filled(
+            document,
+            self.merge_preview.as_ref(),
+            self.merge_sender.as_ref(),
+        ) {
             return lay_out_in(self.screen, &filled);
         }
         lay_out_in(self.screen, document)
@@ -722,6 +727,8 @@ impl TextEditor {
                     handlers: Vec::new(),
                 },
                 merge_preview: None,
+                merge_sender: None,
+                sender_asked: false,
             })),
         };
         this.show_pages();
@@ -3020,10 +3027,11 @@ impl TextEditor {
             let state = self.state.borrow();
             // A screen reader reads the fields of the preview as they show
             // (MAL-04).
-            let filled = state
-                .merge_preview
-                .as_ref()
-                .and_then(|preview| merge::filled(state.editor.document(), preview));
+            let filled = merge::filled(
+                state.editor.document(),
+                state.merge_preview.as_ref(),
+                state.merge_sender.as_ref(),
+            );
             let text = AccessText::new(
                 filled.as_ref().unwrap_or(state.editor.document()),
                 &state.layout,

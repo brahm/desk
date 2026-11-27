@@ -39,17 +39,26 @@ pub const COMMON_FIELDS: [&str; 10] = [
     "Birthday",
 ];
 
-/// The records of a source: those of a file, read now.
+/// The records of a source: those of a file, or the contacts of the
+/// desktop, read now.
 pub fn read_records(source: &MergeSource) -> Result<Records, SourceError> {
+    if let MergeSource::Contacts { group } = source {
+        let cards = crate::desktop_contacts::cards().map_err(|e| {
+            glib::g_warning!("desk", "cannot read the contacts of the desktop: {e}");
+            SourceError::Desktop
+        })?;
+        let cards = crate::desktop_contacts::in_group(cards, group.as_deref());
+        return Ok(Records::of_cards(&cards));
+    }
     desk_contacts::read_source(source, |path| std::fs::File::open(path))
 }
 
 /// The datum that a field of a record shows: a recipient field takes
-/// that of the record, or nothing when it has none; a sender field stays
-/// as it is until the sender's own card fills it.
+/// that of the record, or nothing when it has none; a sender field that
+/// of the person's own card, once the desktop gave it (MAL-01).
 fn datum(records: &Records, record: usize, name: &str, sender: bool) -> Option<String> {
     if sender {
-        return None;
+        return crate::desktop_contacts::own_card_now().map(|c| c.get(name).unwrap_or_default());
     }
     Some(records.datum(record, name).unwrap_or_default().to_owned())
 }
@@ -74,7 +83,7 @@ pub fn merged(editor: &TextEditor) -> Result<Document, String> {
 /// Why a source could not be read, for the person.
 fn describe_error(error: &SourceError) -> String {
     match error {
-        SourceError::Desktop => tr("The contacts of the desktop cannot be read yet."),
+        SourceError::Desktop => tr("The contacts of the desktop cannot be read."),
         SourceError::TooLarge => tr("The file is too large."),
         SourceError::Unsupported => tr("The file is not a vCard, ODS or CSV file."),
         SourceError::NoTable(name) => {
@@ -155,8 +164,15 @@ impl MailMergeGroup {
         let choose = gtk::MenuButton::builder()
             .label(tr("Choose"))
             .valign(gtk::Align::Center)
-            .menu_model(&source_menu())
+            .menu_model(&source_menu(&[]))
             .build();
+        // The groups of the contacts, read when the menu opens.
+        choose.set_create_popup_func(|button| {
+            let groups = crate::desktop_contacts::cards()
+                .map(|cards| crate::desktop_contacts::groups(&cards))
+                .unwrap_or_default();
+            button.set_menu_model(Some(&source_menu(&groups)));
+        });
         let source = compact::ActionRow::builder()
             .title(tr("Populate With"))
             .build();
@@ -279,6 +295,12 @@ impl MailMergeGroup {
             let (Some(this), Some(kind)) = (weak.upgrade(), kind.and_then(|k| k.str())) else {
                 return;
             };
+            if let Some(group) = kind.strip_prefix("group:") {
+                this.set_source(Some(MergeSource::Contacts {
+                    group: Some(group.into()),
+                }));
+                return;
+            }
             match kind {
                 "contacts" => this.set_source(Some(MergeSource::Contacts { group: None })),
                 "none" => this.set_source(None),
@@ -503,6 +525,10 @@ impl MailMergeGroup {
 
     /// Shows the source of the document.
     pub fn show(&self, format: &Format) {
+        // The sender fields show the person's own card (MAL-01).
+        if let Some(editor) = (self.editor)() {
+            editor.fill_sender_fields();
+        }
         // An edit of the document ended the preview.
         if self.preview.is_active() && !(self.editor)().is_some_and(|e| e.merge_previewing()) {
             self.updating.set(true);
@@ -540,18 +566,25 @@ impl MailMergeGroup {
     }
 }
 
-/// The menu of Populate With.
-fn source_menu() -> gio::Menu {
-    let menu = gio::Menu::new();
-    for (label, kind) in [
-        (tr("_Contacts"), "contacts"),
-        (tr("_vCard File…"), "vcard"),
-        (tr("_Spreadsheet…"), "spreadsheet"),
-    ] {
-        let item = gio::MenuItem::new(Some(&label), None);
+/// The menu of Populate With: every contact or those of a group, a
+/// vCard file or a spreadsheet.
+fn source_menu(groups: &[String]) -> gio::Menu {
+    let item = |label: &str, kind: &str| {
+        let item = gio::MenuItem::new(Some(label), None);
         item.set_action_and_target_value(Some("merge.source"), Some(&kind.to_variant()));
-        menu.append_item(&item);
+        item
+    };
+    let menu = gio::Menu::new();
+    let contacts = gio::Menu::new();
+    contacts.append_item(&item(&tr("_All Contacts"), "contacts"));
+    for group in groups {
+        contacts.append_item(&item(&group.replace('_', "__"), &format!("group:{group}")));
     }
+    menu.append_section(Some(&tr("Contacts")), &contacts);
+    let files = gio::Menu::new();
+    files.append_item(&item(&tr("_vCard File…"), "vcard"));
+    files.append_item(&item(&tr("_Spreadsheet…"), "spreadsheet"));
+    menu.append_section(None, &files);
     let remove = gio::Menu::new();
     let item = gio::MenuItem::new(Some(&tr("_Remove Source")), None);
     item.set_action_and_target_value(Some("merge.source"), Some(&"none".to_variant()));
