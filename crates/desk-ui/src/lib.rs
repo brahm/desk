@@ -44,6 +44,7 @@ mod fonts;
 mod format_pane;
 mod formatting;
 mod function_browser;
+mod gallery_pane;
 pub mod geometry;
 mod gradient_bar;
 mod graphic_pane;

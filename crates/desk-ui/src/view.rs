@@ -173,6 +173,9 @@ pub struct ObjectMark {
     /// Whether it is an object of a master, whose handles are blue
     /// (EST-21).
     pub master: bool,
+    /// Where the arrows of a selected image gallery are, back then
+    /// forward (W111).
+    pub arrows: Vec<(f64, f64)>,
 }
 
 /// A shape being drawn with the pen or having its points edited: its
@@ -1385,6 +1388,29 @@ fn draw_objects(cr: &gtk::cairo::Context, state: &State, page: usize, rect: &Pag
                 cr.set_source_rgb(0.21, 0.52, 0.89);
                 cr.stroke().ok();
             }
+        }
+    }
+    // The arrows of a selected gallery, a white disc with a chevron each
+    // (W111).
+    for mark in state.objects.iter().filter(|m| m.page == page) {
+        for (i, &point) in mark.arrows.iter().enumerate() {
+            let (x, y) = at(point);
+            let r = crate::editing::GALLERY_ARROW_RADIUS;
+            cr.new_sub_path();
+            cr.arc(x, y, r, 0.0, std::f64::consts::TAU);
+            cr.set_source_rgba(1.0, 1.0, 1.0, 0.9);
+            cr.fill_preserve().ok();
+            cr.set_source_rgba(0.0, 0.0, 0.0, 0.25);
+            cr.set_line_width(1.0);
+            cr.stroke().ok();
+            let d = if i == 0 { -1.0 } else { 1.0 };
+            cr.move_to(x - d * r * 0.15, y - r * 0.4);
+            cr.line_to(x + d * r * 0.25, y);
+            cr.line_to(x - d * r * 0.15, y + r * 0.4);
+            cr.set_source_rgb(0.2, 0.2, 0.2);
+            cr.set_line_width(2.0);
+            cr.stroke().ok();
+            cr.set_line_width(1.0);
         }
     }
     if let Some(mark) = state.path.as_ref().filter(|m| m.page == page) {

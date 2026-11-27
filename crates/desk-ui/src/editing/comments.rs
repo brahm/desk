@@ -252,6 +252,7 @@ fn object_name(document: &Document, id: NodeId) -> String {
         Some(ObjectKind::Table(_)) => "Table",
         Some(ObjectKind::Chart(_)) => "Chart",
         Some(ObjectKind::Equation(_)) => "Equation",
+        Some(ObjectKind::Gallery(_)) => "Image Gallery",
         _ => "Shape",
     })
 }

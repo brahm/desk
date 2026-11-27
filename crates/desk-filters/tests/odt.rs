@@ -5484,3 +5484,131 @@ fn w108_the_second_picture_of_a_frame_stands_for_one_desk_cannot_read() {
     assert_eq!(picture.format(), PictureFormat::Png);
     assert_eq!((picture.width(), picture.height()), (40, 30));
 }
+
+#[test]
+fn w111_a_gallery_keeps_its_pictures_descriptions_and_captions() {
+    use desk_model::{Frame, Object, ObjectKind, ParaAttrs, Paragraph, Picture, Run, Story};
+    let png = Picture::from_png(pixel_png()).unwrap();
+    let svg = desk_filters::picture::picture_within(SVG, 256).unwrap();
+    let mut editor = desk_model::Editor::new(Document::new_word_processing());
+    let id = editor
+        .edit("Gallery", |edit| {
+            let id = edit.new_id();
+            edit.add_object(Object::new(
+                id,
+                ObjectKind::Gallery(Default::default()),
+                Frame::from_pt(0.0, 0.0, 160.0, 120.0),
+            ))?;
+            edit.add_gallery_images(id, vec![png.clone(), svg.clone()])?;
+            edit.set_gallery_description(id, 1, "A blue square")?;
+            edit.show_caption(id, false, true)?;
+            edit.set_gallery_each_caption(id, true)?;
+            Ok(id)
+        })
+        .unwrap();
+    let story = Story::Caption {
+        object: id,
+        title: false,
+    };
+    let caption = |editor: &mut desk_model::Editor, text: &str| {
+        editor
+            .edit("Type", |edit| {
+                let style = edit.document().styles().default_paragraph();
+                let p = Paragraph::from_runs(
+                    edit.new_id(),
+                    style,
+                    ParaAttrs::default(),
+                    [Run::new(text)],
+                )?;
+                edit.set_story(story, vec![p])
+            })
+            .unwrap();
+    };
+    caption(&mut editor, "First");
+    editor
+        .edit("Next", |edit| edit.show_gallery_image(id, 1))
+        .unwrap();
+    caption(&mut editor, "Second");
+    let bytes = write_odt(editor.document()).unwrap();
+    keep("w111-gallery.odt", &bytes);
+    let mut archive = zip::ZipArchive::new(std::io::Cursor::new(&bytes)).unwrap();
+    let mut content = String::new();
+    std::io::Read::read_to_string(&mut archive.by_name("content.xml").unwrap(), &mut content)
+        .unwrap();
+    // Other programs see a PNG of the picture shown.
+    let frame = content.find("<desk:gallery ").unwrap();
+    let before = &content[..frame];
+    let image = before.rfind("<draw:image ").unwrap();
+    assert!(before[image..].contains(".png"), "{content}");
+    assert!(content.contains(r#"desk:shown="1""#));
+    let read = read_odt(&bytes).unwrap();
+    let object = read.objects().iter().next().unwrap();
+    let gallery = object.gallery().unwrap();
+    assert_eq!(gallery.images.len(), 2);
+    assert_eq!(gallery.shown, 1);
+    assert!(gallery.each_caption);
+    assert_eq!(gallery.images[0].picture, png);
+    assert_eq!(gallery.images[1].picture, svg);
+    assert_eq!(gallery.images[1].description, "A blue square");
+    assert_eq!(gallery.images[0].caption[0].text(), "First");
+    let id = object.id;
+    let story = Story::Caption {
+        object: id,
+        title: false,
+    };
+    assert_eq!(read.story_paragraphs(story)[0].text(), "Second");
+    // Stepping back shows the caption of the first.
+    let mut editor = desk_model::Editor::new(read);
+    editor
+        .edit("Back", |edit| edit.show_gallery_image(id, 0))
+        .unwrap();
+    assert_eq!(editor.document().story_paragraphs(story)[0].text(), "First");
+}
+
+#[test]
+fn w111_the_picture_shown_stays_shown_when_one_before_it_cannot_be_read() {
+    use desk_model::{Frame, Object, ObjectKind, Picture};
+    let png = |w: u32| {
+        let mut bytes = Vec::new();
+        {
+            let mut encoder = png::Encoder::new(&mut bytes, w, 1);
+            encoder.set_color(png::ColorType::Rgba);
+            let mut writer = encoder.write_header().unwrap();
+            writer.write_image_data(&vec![10; w as usize * 4]).unwrap();
+        }
+        Picture::from_png(bytes).unwrap()
+    };
+    let mut editor = desk_model::Editor::new(Document::new_word_processing());
+    editor
+        .edit("Gallery", |edit| {
+            let id = edit.new_id();
+            edit.add_object(Object::new(
+                id,
+                ObjectKind::Gallery(Default::default()),
+                Frame::from_pt(0.0, 0.0, 160.0, 120.0),
+            ))?;
+            edit.add_gallery_images(id, vec![png(1), png(2), png(3)])?;
+            edit.show_gallery_image(id, 1)
+        })
+        .unwrap();
+    let bytes = write_odt(editor.document()).unwrap();
+    // The first picture of the gallery is one the package does not have.
+    let bytes = with_stream(&bytes, "content.xml", |content| {
+        content.replacen(
+            "<desk:gallery-image xlink:href=\"",
+            "<desk:gallery-image xlink:href=\"Pictures/missing.png\" desk:was=\"",
+            1,
+        )
+    });
+    let read = read_odt(&bytes).unwrap();
+    let gallery = read
+        .objects()
+        .iter()
+        .next()
+        .unwrap()
+        .gallery()
+        .unwrap()
+        .clone();
+    assert_eq!(gallery.images.len(), 2);
+    assert_eq!(gallery.shown_image().unwrap().picture.width(), 2);
+}

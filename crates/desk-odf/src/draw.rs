@@ -490,6 +490,18 @@ impl DrawObject {
             DrawKind::Image { href, fallback } => std::iter::once(href.as_str())
                 .chain(fallback.as_deref())
                 .collect(),
+            DrawKind::Gallery { poster, images, .. } => poster
+                .iter()
+                .map(String::as_str)
+                .chain(images.iter().map(|i| i.href.as_str()))
+                .chain(
+                    images
+                        .iter()
+                        .flat_map(|i| &i.caption)
+                        .flat_map(Paragraph::objects)
+                        .flat_map(Self::hrefs),
+                )
+                .collect(),
             DrawKind::Media { href, poster, .. } => std::iter::once(href.as_str())
                 .chain(poster.as_deref())
                 .collect(),
@@ -510,6 +522,20 @@ impl DrawObject {
         }
     }
 }
+
+/// A `desk:gallery-image`: a picture of an image gallery (W111).
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct GalleryImage {
+    /// `xlink:href`: the path of the picture in the package.
+    pub href: String,
+    /// `desk:description`: its description.
+    pub description: String,
+    /// The `text:p` children: its own caption.
+    pub caption: Vec<Paragraph>,
+}
+
+/// The most pictures of a gallery that are read, against hostile files.
+pub const MAX_GALLERY_IMAGES: usize = 1000;
 
 /// What a drawing object is.
 #[derive(Clone, Debug, PartialEq)]
@@ -590,6 +616,20 @@ pub enum DrawKind {
         /// the first in those that cannot read it, as for an SVG or HEIC
         /// one (W108).
         fallback: Option<String>,
+    },
+    /// `draw:frame` with a `desk:gallery`: several pictures shown one at a
+    /// time, with a `draw:image` of the one shown for other programs
+    /// (W111).
+    Gallery {
+        /// The `xlink:href` of the `draw:image`: the picture shown, in a
+        /// format that other programs read.
+        poster: Option<String>,
+        /// `desk:shown`: the index of the picture shown.
+        shown: usize,
+        /// `desk:each-caption`: whether each picture has its own caption.
+        each_caption: bool,
+        /// The `desk:gallery-image` children.
+        images: Vec<GalleryImage>,
     },
     /// `draw:frame` with a `draw:plugin` that plays a movie or a sound,
     /// and the `draw:image` that stands for it.
@@ -977,6 +1017,46 @@ fn draw_object_at(
                 }
             } else if let Some(table) = table {
                 DrawKind::Table(crate::table::read_table(table, paragraph))
+            } else if let Some(gallery) = e.child(DESK, "gallery") {
+                // docs/odf-extensions.md: desk:gallery.
+                let written = gallery
+                    .attr(DESK, "shown")
+                    .and_then(|s| s.trim().parse::<usize>().ok())
+                    .unwrap_or(0);
+                // The index of the picture shown among those kept: the
+                // first when it is not one of them.
+                let mut shown = 0;
+                let mut images = Vec::new();
+                for (at, i) in gallery
+                    .children_named(DESK, "gallery-image")
+                    .take(MAX_GALLERY_IMAGES)
+                    .enumerate()
+                {
+                    let Some(href) = i.attr(XLINK, "href") else {
+                        continue;
+                    };
+                    if at == written {
+                        shown = images.len();
+                    }
+                    images.push(GalleryImage {
+                        href: href.to_owned(),
+                        description: i.attr(DESK, "description").unwrap_or_default().to_owned(),
+                        caption: i
+                            .elements()
+                            .filter(|p| p.name.is(TEXT, "p") || p.name.is(TEXT, "h"))
+                            .map(paragraph)
+                            .collect(),
+                    });
+                }
+                DrawKind::Gallery {
+                    poster: e
+                        .child(DRAW, "image")
+                        .and_then(|i| i.attr(XLINK, "href"))
+                        .map(str::to_owned),
+                    shown,
+                    each_caption: gallery.attr(DESK, "each-caption") == Some("true"),
+                    images,
+                }
             } else if let Some(plugin) = e.child(DRAW, "plugin") {
                 let text = |ns, name| plugin.attr(ns, name).map(str::to_owned);
                 DrawKind::Media {
@@ -1239,6 +1319,7 @@ fn write_shape(w: &mut Writer, object: &DrawObject, paragraph: &dyn Fn(&mut Writ
         DrawKind::Polygon { .. } => "draw:polygon",
         DrawKind::CustomShape { .. } => "draw:custom-shape",
         DrawKind::Image { .. }
+        | DrawKind::Gallery { .. }
         | DrawKind::Media { .. }
         | DrawKind::TextBox { .. }
         | DrawKind::Table(_)
@@ -1362,6 +1443,41 @@ fn write_shape(w: &mut Writer, object: &DrawObject, paragraph: &dyn Fn(&mut Writ
                     .attr("xlink:actuate", "onLoad")
                     .end();
             }
+        }
+        DrawKind::Gallery {
+            poster,
+            shown,
+            each_caption,
+            images,
+        } => {
+            // What other programs show: the picture shown.
+            if let Some(poster) = poster {
+                w.start("draw:image")
+                    .attr("xlink:href", poster)
+                    .attr("xlink:type", "simple")
+                    .attr("xlink:show", "embed")
+                    .attr("xlink:actuate", "onLoad")
+                    .end();
+            }
+            // docs/odf-extensions.md: desk:gallery.
+            w.start("desk:gallery")
+                .attr("desk:shown", &shown.to_string());
+            if *each_caption {
+                w.attr("desk:each-caption", "true");
+            }
+            for image in images {
+                w.start("desk:gallery-image")
+                    .attr("xlink:href", &image.href)
+                    .attr("xlink:type", "simple");
+                if !image.description.is_empty() {
+                    w.attr("desk:description", &image.description);
+                }
+                for p in &image.caption {
+                    paragraph(w, p);
+                }
+                w.end();
+            }
+            w.end();
         }
         DrawKind::Media {
             href,

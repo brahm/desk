@@ -433,6 +433,46 @@ These sit on the `style:graphic-properties` of the graphic style of a
 - **Fallback:** the frame, with the title, the object and the caption in
   its text, as a caption made in LibreOffice shows.
 
+#### `desk:gallery`
+
+- **Feature:** the image gallery of Pages 15.4: several pictures in one
+  frame, shown one at a time and stepped through with arrows, each with
+  its description and, when asked, its own caption (W111, PXV-23).
+- **On:** an element, a child of `draw:frame`, after its `draw:image`.
+- **Value:** the element carries `desk:shown` and `desk:each-caption`,
+  and holds one `desk:gallery-image` for each picture, in order. Desk
+  reads at most 1000 pictures.
+- **Fallback:** the `draw:image` of the frame is the picture shown, as a
+  PNG when it is an SVG or a HEIC one, so other programs show the
+  gallery as that picture, with its caption.
+
+#### `desk:gallery-image`
+
+- **On:** an element, a child of `desk:gallery`.
+- **Value:** the element carries `xlink:href`, the path of the picture in
+  the package, and `desk:description`; when the gallery gives each
+  picture its own caption, it holds the `text:p` of that caption. The
+  caption of the picture shown is that of the object (`desk:captions`).
+  A picture that Desk cannot read is left out.
+
+#### `desk:shown`
+
+- **On:** `desk:gallery`.
+- **Value:** the index of the picture shown, from 0; the last picture
+  when it is past the end.
+
+#### `desk:each-caption`
+
+- **On:** `desk:gallery`.
+- **Value:** a boolean: whether each picture has a caption of its own,
+  rather than one for all. Absent is `false`.
+
+#### `desk:description`
+
+- **On:** `desk:gallery-image`.
+- **Value:** the description of the picture, for those who cannot see
+  it (Image Description). Absent is none.
+
 ### Tables (`table:table`)
 
 #### `desk:table`
@@ -1098,7 +1138,7 @@ specified here, by the rules above, in the phase that implements it.
 | Live link of a chart or table to another document | All | ODF links an object to a file, without a table and range that update | The last data, embedded |
 | Object, table and chart styles as named presets of the template | All | ODF styles have no "preset gallery" order or thumbnails | Ordinary automatic styles |
 | Shape library entries, combined shapes, editable freehand drawings | All | ODF keeps the resulting path, not the operation | The resulting path |
-| Image gallery (several pictures in one frame, with captions) | All | No standard element | The first picture, with its caption |
+| Image gallery (several pictures in one frame, with captions) | All | No standard element | The picture shown, with its caption (`desk:gallery`, above, for Writer) |
 | Captions and titles tied to an object | All | ODF captions are free text frames | A text frame around the object (`desk:captions`, above, for Writer) |
 | 3D objects (models with a view angle) | All | No standard element for a model with a camera | A rendered picture |
 | Text fill with gradient or image, text outline options | All | ODF text properties have a colour only | The main colour |

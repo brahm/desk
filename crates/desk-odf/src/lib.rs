@@ -60,8 +60,8 @@ mod xml;
 pub use budget::{MAX_CHART_CELLS, MAX_CHART_VALUES, MAX_DOCUMENT_BYTES, MAX_DOCUMENT_CELLS};
 pub use chart::{CHART_TYPE, ChartDocument, ChartSeries};
 pub use draw::{
-    DrawKind, DrawObject, FillImage, Gradient, GradientStop, GraphicProperties, Marker,
-    parse_transform,
+    DrawKind, DrawObject, FillImage, GalleryImage, Gradient, GradientStop, GraphicProperties,
+    Marker, parse_transform,
 };
 pub use error::OdfError;
 pub use formula::{FORMULA_TYPE, MATHML, read_formula};

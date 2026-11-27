@@ -74,6 +74,7 @@ pub struct ObjectGroups {
     shape: Rc<crate::shape_pane::ShapeGroup>,
     /// How a movie or a sound plays (OBJ-19).
     media: Rc<crate::media_pane::MediaGroup>,
+    gallery: Rc<crate::gallery_pane::GalleryGroup>,
     units: Cell<Units>,
     updating: Cell<bool>,
 }
@@ -328,6 +329,7 @@ impl ObjectGroups {
             picture: crate::picture_pane::PictureGroup::new(editor.clone()),
             shape: crate::shape_pane::ShapeGroup::new(editor.clone()),
             media: crate::media_pane::MediaGroup::new(editor.clone()),
+            gallery: crate::gallery_pane::GalleryGroup::new(editor.clone()),
             units: Cell::new(units),
             updating: Cell::new(false),
         });
@@ -535,12 +537,13 @@ impl ObjectGroups {
     }
 
     /// The groups, to put at the top of the Inspector.
-    pub fn groups(&self) -> [&compact::Group; 7] {
+    pub fn groups(&self) -> [&compact::Group; 8] {
         [
             &self.metrics,
             self.shape.group(),
             self.picture.group(),
             self.media.group(),
+            self.gallery.group(),
             self.graphic.group(),
             &self.wrap_group,
             &self.text_group,
@@ -571,6 +574,7 @@ impl ObjectGroups {
         self.picture.show(info);
         self.shape.show(info);
         self.media.show(info);
+        self.gallery.show(info);
         let Some(info) = info else {
             return;
         };

@@ -376,6 +376,10 @@ pub(super) fn insert_menu(objects: bool) -> gio::Menu {
             Some(&tr("_Image, Movie or Sound…")),
             Some("win.insert-picture"),
         );
+        items.append(
+            Some(&tr("Image _Gallery")),
+            Some("win.insert-image-gallery"),
+        );
         menu.append_section(None, &items);
     }
     let breaks = gio::Menu::new();
@@ -450,6 +454,11 @@ pub(super) fn insert_menu(objects: bool) -> gio::Menu {
         Some("win.add-linked-text-box"),
     );
     other.append(Some(&tr("C_hoose…")), Some("win.insert-picture"));
+    // Insert > Image Gallery of Pages 15.4 (W111).
+    other.append(
+        Some(&tr("Image _Gallery")),
+        Some("win.insert-image-gallery"),
+    );
     other.append(Some(&tr("_Equation…")), Some("win.insert-equation"));
     menu.append_section(None, &other);
     menu

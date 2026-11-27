@@ -1040,6 +1040,17 @@ fn object_body_item(placed: &PlacedObject) -> Item {
                 });
             }
         }
+        ObjectKind::Gallery(gallery) => {
+            list.items
+                .extend(gallery_items(gallery, fill, (x, y, w, h)));
+            if stroke.is_some() {
+                list.items.push(Item::Path {
+                    path: shape_path(&Shape::Rectangle, x, y, w, h),
+                    fill: None,
+                    stroke,
+                });
+            }
+        }
         _ => {}
     }
     if let Some(frame) = style.frame
@@ -1395,6 +1406,48 @@ fn line_items(
     }];
     out.extend(items);
     out
+}
+
+/// An image gallery (W111): the picture shown, fitted whole into the
+/// frame and centered, over the fill of the object; a light gray frame
+/// while it has no pictures yet.
+fn gallery_items(
+    gallery: &desk_model::Gallery,
+    fill: Option<Paint>,
+    (x, y, w, h): (f32, f32, f32, f32),
+) -> Vec<Item> {
+    let mut items = Vec::new();
+    let back = match (&fill, gallery.shown_image()) {
+        (Some(fill), _) => Some(fill.clone()),
+        (None, None) => Some(Paint::Color(Rgba::rgb(0xe8, 0xe8, 0xe8))),
+        (None, Some(_)) => None,
+    };
+    if let Some(back) = back {
+        items.push(Item::Path {
+            path: shape_path(&Shape::Rectangle, x, y, w, h),
+            fill: Some(back),
+            stroke: None,
+        });
+    }
+    if let Some(image) = gallery.shown_image() {
+        let (pw, ph) = (
+            image.picture.width().max(1) as f32,
+            image.picture.height().max(1) as f32,
+        );
+        let scale = (w / pw).min(h / ph);
+        let (iw, ih) = (pw * scale, ph * scale);
+        items.push(Item::Clipped {
+            rect: (x, y, w, h),
+            items: vec![Item::Image {
+                picture: image.picture.clone(),
+                x: x + (w - iw) / 2.0,
+                y: y + (h - ih) / 2.0,
+                width: iw,
+                height: ih,
+            }],
+        });
+    }
+    items
 }
 
 /// What stands for a movie without a poster frame, or for a sound: a dark
