@@ -118,7 +118,7 @@ fn lines(text: &str) -> impl Iterator<Item = String> + '_ {
 
 /// A path of a file beside the OBJ as it is asked for: backslashes as
 /// slashes and `.` folders left out, then checked to stay in its folder.
-fn clean(path: &str) -> Option<String> {
+pub(crate) fn clean(path: &str) -> Option<String> {
     let path = path.replace('\\', "/");
     let parts: Vec<&str> = path.split('/').filter(|p| *p != ".").collect();
     safe_path(parts.join("/"))

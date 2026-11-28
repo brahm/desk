@@ -12,9 +12,9 @@
 //! of Universal Scene Description, with its layers in the text form
 //! (`usda`) or the binary one (`usdc`), the pictures of its textures and
 //! the samples in time that move its prims; and glTF 2.0, as text (`.gltf`) or binary (`.glb`), with the animation
-//! of its nodes. A model of a format that a document does not keep, as
-//! Wavefront OBJ with its MTL materials, is turned into a GLB by
-//! [`import`]. A reader takes the meshes of the model with their
+//! of its nodes. A model of a format that a document does not keep,
+//! Wavefront OBJ with its MTL materials or FBX with its animation, is
+//! turned into a GLB by [`import`]. A reader takes the meshes of the model with their
 //! places, the colors and textures of their materials, and leaves the
 //! rest: lights, cameras and skeletons.
 //!
@@ -28,6 +28,7 @@
 //! can reuse it.
 
 mod animation;
+mod fbx;
 mod glb;
 mod gltf;
 mod lz4;
@@ -165,21 +166,31 @@ impl Format {
 pub enum Import {
     /// Wavefront OBJ, with the MTL libraries and pictures beside it.
     Obj,
+    /// FBX, binary or text, of version 7, with the pictures inside it or
+    /// beside it.
+    Fbx,
 }
 
 impl Import {
     /// All of them, as file dialogs list them.
-    pub const ALL: [Self; 1] = [Self::Obj];
+    pub const ALL: [Self; 2] = [Self::Obj, Self::Fbx];
 
     /// The format of the bytes of a file, from its start.
     pub fn sniff(bytes: &[u8]) -> Option<Self> {
-        obj::is_obj(bytes).then_some(Self::Obj)
+        if fbx::is_fbx(bytes) {
+            Some(Self::Fbx)
+        } else if obj::is_obj(bytes) {
+            Some(Self::Obj)
+        } else {
+            None
+        }
     }
 
     /// The media type of the format.
     pub fn media_type(self) -> &'static str {
         match self {
             Self::Obj => "model/obj",
+            Self::Fbx => "application/vnd.autodesk.fbx",
         }
     }
 
@@ -187,6 +198,7 @@ impl Import {
     pub fn extension(self) -> &'static str {
         match self {
             Self::Obj => "obj",
+            Self::Fbx => "fbx",
         }
     }
 }
@@ -202,6 +214,13 @@ pub fn import(bytes: &[u8], files: &mut dyn FnMut(&str) -> Option<Vec<u8>>) -> R
         (Some(Format::Gltf), _) => gltf::pack(bytes, files),
         (None, Some(Import::Obj)) => {
             let read = obj::read(bytes, files)?;
+            if read.scene.triangle_count() == 0 {
+                return Err(Error::Empty);
+            }
+            glb::write(&read.scene, &read.pictures)
+        }
+        (None, Some(Import::Fbx)) => {
+            let read = fbx::read(bytes, files)?;
             if read.scene.triangle_count() == 0 {
                 return Err(Error::Empty);
             }
