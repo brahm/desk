@@ -3495,7 +3495,7 @@ paragraph, and objects on a second page.
   desk-3d does not do for glTF either.
 - Left in step 11, in W4: U3D and PRC (D-033).
 
-### 28 November: 3D objects from PRC (step 11 of W4, #PRNUM)
+### 28 November: 3D objects from PRC (step 11 of W4, #279)
 
 - A reader of PRC (ISO 14739-1), the 3D that CAD programs put in PDF
   documents, unpacks the sections of each file structure and reads

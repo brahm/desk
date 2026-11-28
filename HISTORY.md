@@ -9,7 +9,7 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
 ## Changes since 0.7.0 (unreleased)
 
 * Added: 3D objects from PRC, the 3D of PDF documents, by their
-  tessellations (#PRNUM).
+  tessellations (#279).
 * Added: 3D objects from FBX files, with their materials, pictures and
   animation (#278).
 * Added: the animation of USDZ models plays in the Object tab (#277).
