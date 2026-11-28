@@ -245,7 +245,13 @@ pub fn model_from_file(file: &gtk::gio::File) -> Option<desk_model::Model3d> {
     let bytes = desk_model::import_model(&bytes, &mut |path| {
         let (folder, root) = folder.as_ref()?;
         let real = std::fs::canonicalize(folder.resolve_relative_path(path).path()?).ok()?;
-        if !real.starts_with(root) || !real.is_file() {
+        // Inside the folder, and not hidden there, even through a link.
+        let hidden = real.strip_prefix(root).ok().is_none_or(|below| {
+            below
+                .components()
+                .any(|c| c.as_os_str().to_string_lossy().starts_with('.'))
+        });
+        if hidden || !real.is_file() {
             return None;
         }
         let data = load_bounded(&gtk::gio::File::for_path(&real), budget)?;
