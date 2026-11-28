@@ -514,10 +514,13 @@ These sit on the `style:graphic-properties` of the graphic style of a
 3D objects (W116, PXV-25) need no extension. Desk keeps one as a movie
 is kept: a `draw:frame` with a `draw:plugin` whose `xlink:href` is the
 file in the package (`Models/`) and whose `draw:mime-type` is that of
-the format, `model/vnd.usdz+zip` for USDZ; the `draw:param`s `Yaw` and
+the format, `model/vnd.usdz+zip` for USDZ and `model/gltf-binary`
+for glTF, which is kept as one GLB with its buffers and pictures; the `draw:param`s `Yaw` and
 `Pitch` say how far it is turned, in degrees, and the `svg:desc` of the
 frame is its description. A `draw:image` after the plugin is a PNG of
-the model as it is turned, which other programs show and print.
+the model as it is turned, which other programs show and print. The
+animation of a model is in its file; playing it changes nothing in the
+document.
 
 ### Tables (`table:table`)
 

@@ -10,6 +10,7 @@
 //! prints and exports the model as it shows it. The model is fitted by
 //! the sphere around it, so that it keeps its size as it turns.
 
+use crate::matrix::{Matrix, invert, normal, point};
 use crate::{Mesh, Scene, Texture, zip_with};
 
 /// How the model is turned.
@@ -34,6 +35,31 @@ const LIGHT: [f32; 3] = [-0.3, 0.5, 0.81];
 /// premultiplied; what the model does not cover is clear. None when a
 /// side is 0 or longer than [`MAX_SIDE`].
 pub fn render(scene: &Scene, view: View, width: u32, height: u32) -> Option<Vec<u8>> {
+    draw_scene(scene, view, None, width, height)
+}
+
+/// Draws a scene as [`render`] does, with its parts where its
+/// [`animation`](crate::Scene::animation) has them at a time, in seconds from
+/// its start; a scene that does not move is drawn as it rests. The model
+/// is fitted by the box around it at all times, so that it keeps its size
+/// as it moves.
+pub fn render_at(
+    scene: &Scene,
+    view: View,
+    seconds: f32,
+    width: u32,
+    height: u32,
+) -> Option<Vec<u8>> {
+    draw_scene(scene, view, Some(seconds), width, height)
+}
+
+fn draw_scene(
+    scene: &Scene,
+    view: View,
+    seconds: Option<f32>,
+    width: u32,
+    height: u32,
+) -> Option<Vec<u8>> {
     if width == 0 || height == 0 || width > MAX_SIDE || height > MAX_SIDE {
         return None;
     }
@@ -49,7 +75,27 @@ pub fn render(scene: &Scene, view: View, width: u32, height: u32) -> Option<Vec<
         color: vec![[0.0; 4]; w * h],
         depth: vec![f32::NEG_INFINITY; w * h],
     };
-    if let Some((lo, hi)) = scene.bounds() {
+    let bounds = match (scene.bounds(), &scene.animation) {
+        (Some((lo, hi)), Some(a)) => Some((
+            zip_with(lo, a.bounds.0, f32::min),
+            zip_with(hi, a.bounds.1, f32::max),
+        )),
+        (b, _) => b,
+    };
+    // What takes each moving mesh to where it is, with its inverse for
+    // the normals.
+    let poses: Vec<Option<(Matrix, Matrix)>> = match (&scene.animation, seconds) {
+        (Some(a), Some(t)) => a
+            .poses(t)
+            .into_iter()
+            .map(|m| {
+                let m = m?;
+                Some((m, invert(&m)?))
+            })
+            .collect(),
+        _ => Vec::new(),
+    };
+    if let Some((lo, hi)) = bounds {
         let center = zip_with(lo, hi, |l, h| (l + h) / 2.0);
         let radius = zip_with(hi, lo, |h, l| (h - l) / 2.0)
             .iter()
@@ -70,9 +116,17 @@ pub fn render(scene: &Scene, view: View, width: u32, height: u32) -> Option<Vec<
         // The opaque meshes first, then those that let the others show
         // through, over them.
         for translucent in [false, true] {
-            for mesh in &scene.meshes {
+            for (i, mesh) in scene.meshes.iter().enumerate() {
                 if (mesh.material.color[3] < 0.999) == translucent {
-                    draw(&mut target, &camera, mesh, &scene.textures, translucent);
+                    let pose = poses.get(i).and_then(Option::as_ref);
+                    draw(
+                        &mut target,
+                        &camera,
+                        mesh,
+                        pose,
+                        &scene.textures,
+                        translucent,
+                    );
                 }
             }
         }
@@ -156,6 +210,7 @@ fn draw(
     target: &mut Target,
     camera: &Camera,
     mesh: &Mesh,
+    pose: Option<&(Matrix, Matrix)>,
     textures: &[Texture],
     translucent: bool,
 ) {
@@ -164,10 +219,11 @@ fn draw(
         let n = (LIGHT[0] * LIGHT[0] + LIGHT[1] * LIGHT[1] + LIGHT[2] * LIGHT[2]).sqrt();
         LIGHT.map(|c| c / n)
     };
+    let place = |p: [f32; 3]| pose.map_or(p, |(m, _)| point(m, p));
     for tri in &mesh.triangles {
         let idx = tri.map(|i| i as usize);
         let [Some(a), Some(b), Some(c)] =
-            idx.map(|i| mesh.positions.get(i).map(|p| camera.project(*p)))
+            idx.map(|i| mesh.positions.get(i).map(|p| camera.project(place(*p))))
         else {
             continue;
         };
@@ -175,7 +231,11 @@ fn draw(
         if area == 0.0 || !area.is_finite() {
             continue;
         }
-        let normals = idx.map(|i| mesh.normals.get(i).map(|n| apply(&camera.turn, *n)));
+        let normals = idx.map(|i| {
+            mesh.normals
+                .get(i)
+                .map(|n| apply(&camera.turn, pose.map_or(*n, |(_, inv)| normal(inv, *n))))
+        });
         let uvs = idx.map(|i| mesh.uvs.get(i).copied());
         let colors = idx.map(|i| mesh.colors.get(i).copied());
         let x0 = a[0].min(b[0]).min(c[0]).floor().max(0.0) as usize;
@@ -185,9 +245,11 @@ fn draw(
         // A flat normal for corners that have none, from the corners
         // turned as the normals are, before they are put on the screen.
         let flat = {
-            let [Some(ta), Some(tb), Some(tc)] =
-                idx.map(|i| mesh.positions.get(i).map(|p| apply(&camera.turn, *p)))
-            else {
+            let [Some(ta), Some(tb), Some(tc)] = idx.map(|i| {
+                mesh.positions
+                    .get(i)
+                    .map(|p| apply(&camera.turn, place(*p)))
+            }) else {
                 continue;
             };
             let e1 = [tb[0] - ta[0], tb[1] - ta[1], tb[2] - ta[2]];
@@ -330,6 +392,7 @@ mod tests {
                 square([0.0, 0.0, 1.0, 1.0], 0.5),
             ],
             textures: Vec::new(),
+            ..Default::default()
         };
         let image = render(&scene, View::default(), 40, 40).unwrap();
         assert_eq!(image.len(), 40 * 40 * 4);
@@ -371,6 +434,7 @@ mod tests {
         let scene = Scene {
             meshes: vec![quad],
             textures: vec![texture],
+            ..Default::default()
         };
         let image = render(&scene, View::default(), 100, 100).unwrap();
         let top_left = pixel(&image, 100, 30, 30);
@@ -384,6 +448,7 @@ mod tests {
         let scene = Scene {
             meshes: vec![square([1.0, 1.0, 1.0, 0.5], 0.0)],
             textures: Vec::new(),
+            ..Default::default()
         };
         let image = render(&scene, View::default(), 20, 20).unwrap();
         let center = pixel(&image, 20, 10, 10);

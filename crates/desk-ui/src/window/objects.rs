@@ -17,10 +17,11 @@ use crate::i18n::{tr, trc};
 use crate::shape_library;
 
 /// The actions of these menus, which need a document.
-pub(super) const OBJECT_ACTIONS: [&str; 46] = [
+pub(super) const OBJECT_ACTIONS: [&str; 47] = [
     "insert-equation",
     "insert-model",
     "reset-model-rotation",
+    "play-model-animation",
     "record-audio",
     "insert-drawing",
     "edit-drawing",
@@ -93,11 +94,13 @@ type ChoiceAction = fn(&TextEditor, &str);
 
 impl DocumentWindow {
     pub(super) fn add_object_actions(self: &Rc<Self>) {
-        let simple: [(&str, EditorAction); 32] = [
+        let simple: [(&str, EditorAction); 33] = [
             // Insert > Drawing of Pages 15.4, and Edit Drawing, Done and
             // Play of the Drawing tab (W117).
             ("insert-drawing", TextEditor::start_drawing),
             ("reset-model-rotation", TextEditor::reset_model_rotation),
+            // Play and Pause of the animation of a 3D object (W116).
+            ("play-model-animation", TextEditor::play_model_animation),
             ("edit-drawing", |e| {
                 e.edit_drawing();
             }),

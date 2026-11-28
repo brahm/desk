@@ -3394,6 +3394,36 @@ paragraph, and objects on a second page.
   files wait for a file of Pages 15.4 that holds one, in the session on
   the Mac of step 13. No task moved to another phase.
 
+### 28 November: glTF and GLB, with the animation of models (step 11 of W4)
+
+- `desk-3d` reads glTF 2.0, as text (`.gltf`) and binary (`.glb`): the
+  nodes of the scene with their matrices or their translation, rotation
+  and scale, the triangles of meshes as lists, strips and fans, indexed
+  or not, the accessors of every component type, with their strides and
+  sparse values, the base colors and textures of materials (and the
+  diffuse ones of the specular-glossiness extension), their alpha modes,
+  and the colors of corners. Skins, morph targets, cameras and lights
+  are left out. The test files are made by the specification with
+  Python alone (`crates/desk-3d/tests/data/make_gltf.py`): no glTF tool
+  was installed.
+- The first animation of a file moves its nodes by translation, rotation
+  and scale, by step, line or cubic spline, and the meshes under them.
+  The model keeps its size as it moves: it is fitted by the box around
+  it at all times. The Object tab shows Play and Pause for a model that
+  moves; it plays over and over on the page and changes nothing in the
+  document.
+- A `.gltf` that names files beside it, its buffers and pictures, is
+  gathered into one GLB when it is inserted, and the document keeps that
+  GLB (`model/gltf-binary` in ODT). Only files in the folder of the
+  glTF, or under it, are read: a URI with `..`, a whole path or a scheme
+  is refused.
+- The fuzz target of models reads glTF and GLB too, and checks that a
+  file packed into a GLB reads as it did; it found two cases where the
+  packed file read more than the first, which are fixed.
+- Left in step 11, in W4: the animation of USDZ (the reader takes only
+  the first of its time samples), which comes with OBJ and FBX, then U3D
+  and PRC (D-033). No task moved to another phase.
+
 ## Decisions, with their reasons and consequences
 
 Ids `D-nnn` and `R-nnn` are those of [decisions.md](decisions.md).

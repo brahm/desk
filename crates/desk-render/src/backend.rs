@@ -84,6 +84,8 @@ type SharedScene = std::sync::Arc<desk_3d::Scene>;
 struct ModelKey {
     data: std::sync::Arc<[u8]>,
     turn: (i32, i32),
+    /// The moment of its animation, in milliseconds, while it plays.
+    moment: Option<u32>,
     size: (u32, u32),
 }
 
@@ -91,6 +93,7 @@ impl PartialEq for ModelKey {
     fn eq(&self, other: &Self) -> bool {
         std::sync::Arc::ptr_eq(&self.data, &other.data)
             && self.turn == other.turn
+            && self.moment == other.moment
             && self.size == other.size
     }
 }
@@ -144,13 +147,15 @@ impl Painter {
         let key = ModelKey {
             data: model.shared_data(),
             turn: (model.yaw, model.pitch),
+            moment: model.moment,
             size: (width, height),
         };
         if let Some(at) = self.models.iter().position(|(k, _)| *k == key) {
             return Some(used(&mut self.models, at));
         }
         let scene = self.scene(model)?;
-        let surface = model_surface(&scene, model.view(), width, height)?;
+        let seconds = model.moment.map(|ms| ms as f32 / 1000.0);
+        let surface = model_surface(&scene, model.view(), seconds, width, height)?;
         evict(&mut self.models, 16, surface_bytes(&surface));
         self.models.push((key, surface.clone()));
         Some(surface)
@@ -1439,10 +1444,14 @@ fn used<K>(kept: &mut Vec<(K, cairo::ImageSurface)>, at: usize) -> cairo::ImageS
 fn model_surface(
     scene: &desk_3d::Scene,
     view: desk_3d::View,
+    seconds: Option<f32>,
     width: u32,
     height: u32,
 ) -> Option<cairo::ImageSurface> {
-    let rgba = desk_3d::render(scene, view, width, height)?;
+    let rgba = match seconds {
+        Some(t) => desk_3d::render_at(scene, view, t, width, height)?,
+        None => desk_3d::render(scene, view, width, height)?,
+    };
     let mut surface = cairo::ImageSurface::create(
         cairo::Format::ARgb32,
         i32::try_from(width).ok()?,

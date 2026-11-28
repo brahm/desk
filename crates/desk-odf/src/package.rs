@@ -283,6 +283,8 @@ fn picture_type(path: &str) -> &'static str {
         Some("tif" | "tiff") => "image/tiff",
         Some("pdf") => "application/pdf",
         Some("usdz") => "model/vnd.usdz+zip",
+        Some("glb") => "model/gltf-binary",
+        Some("gltf") => "model/gltf+json",
         Some("mov") => "video/quicktime",
         Some("mp4") => "video/mp4",
         Some("m4a") => "audio/mp4",

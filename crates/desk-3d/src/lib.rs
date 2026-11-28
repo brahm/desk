@@ -8,12 +8,13 @@
 //! renderer that draws a scene, turned as asked, into pixels (W116,
 //! D-033).
 //!
-//! So far it reads USDZ, the format of the 3D objects of Pages 15.4: the
-//! package of Universal Scene Description, with its layers in the text
-//! form (`usda`) or the binary one (`usdc`) and the pictures of its
-//! textures. A reader takes the meshes of the model with their places,
-//! the colors and textures of their materials, and leaves the rest:
-//! lights, cameras, skeletons and animation.
+//! It reads USDZ, the format of the 3D objects of Pages 15.4: the package
+//! of Universal Scene Description, with its layers in the text form
+//! (`usda`) or the binary one (`usdc`) and the pictures of its textures;
+//! and glTF 2.0, as text (`.gltf`) or binary (`.glb`), with the animation
+//! of its nodes. A reader takes the meshes of the model with their
+//! places, the colors and textures of their materials, and leaves the
+//! rest: lights, cameras and skeletons.
 //!
 //! Files come from anywhere, so the readers treat them as hostile: they
 //! use no unsafe code, index nothing without checking it, and cap the
@@ -24,13 +25,18 @@
 //! the MPL-2.0 and depends on no other Desk crate, so that other programs
 //! can reuse it.
 
+mod animation;
+mod gltf;
 mod lz4;
+mod matrix;
 mod raster;
 mod texture;
 mod usd;
 mod usdz;
 
-pub use raster::{MAX_SIDE, View, render};
+pub use animation::Animation;
+pub use gltf::pack as pack_gltf;
+pub use raster::{MAX_SIDE, View, render, render_at};
 
 /// The limits of what is read, against hostile or huge files.
 pub mod limits {
@@ -53,6 +59,8 @@ pub mod limits {
     pub const REFERENCE_DEPTH: usize = 8;
     /// How deep prims and values nest.
     pub const DEPTH: usize = 200;
+    /// The most keys of the animation of a scene, in all its tracks.
+    pub const ANIMATION_KEYS: usize = 1_000_000;
 }
 
 /// Why a model could not be read.
@@ -94,18 +102,36 @@ pub(crate) fn malformed(why: impl Into<String>) -> Error {
 pub enum Format {
     /// USDZ: the package of Universal Scene Description.
     Usdz,
+    /// GLB: glTF 2.0 in one binary file.
+    Glb,
+    /// glTF 2.0 as text, its buffers and pictures inside it as `data:`
+    /// URIs; [`pack_gltf`] makes a GLB of one that names files beside it.
+    Gltf,
 }
 
 impl Format {
+    /// All the formats, as file dialogs list them.
+    pub const ALL: [Self; 3] = [Self::Usdz, Self::Glb, Self::Gltf];
+
     /// The format of the bytes of a file, from its start.
     pub fn sniff(bytes: &[u8]) -> Option<Self> {
-        usdz::is_usdz(bytes).then_some(Self::Usdz)
+        if usdz::is_usdz(bytes) {
+            Some(Self::Usdz)
+        } else if gltf::is_glb(bytes) {
+            Some(Self::Glb)
+        } else if gltf::is_gltf(bytes) {
+            Some(Self::Gltf)
+        } else {
+            None
+        }
     }
 
     /// The media type of the format.
     pub fn media_type(self) -> &'static str {
         match self {
             Self::Usdz => "model/vnd.usdz+zip",
+            Self::Glb => "model/gltf-binary",
+            Self::Gltf => "model/gltf+json",
         }
     }
 
@@ -113,6 +139,8 @@ impl Format {
     pub fn extension(self) -> &'static str {
         match self {
             Self::Usdz => "usdz",
+            Self::Glb => "glb",
+            Self::Gltf => "gltf",
         }
     }
 
@@ -120,6 +148,8 @@ impl Format {
     pub fn from_media_type(media_type: &str) -> Option<Self> {
         match media_type.trim() {
             "model/vnd.usdz+zip" | "model/vnd.usd+zip" => Some(Self::Usdz),
+            "model/gltf-binary" => Some(Self::Glb),
+            "model/gltf+json" => Some(Self::Gltf),
             _ => None,
         }
     }
@@ -183,6 +213,9 @@ pub struct Scene {
     pub meshes: Vec<Mesh>,
     /// The textures of their materials.
     pub textures: Vec<Texture>,
+    /// How its parts move, if they do; [`render_at`] draws them at a
+    /// time.
+    pub animation: Option<Animation>,
 }
 
 impl Scene {
@@ -243,6 +276,7 @@ pub(crate) fn zip_with<T: Copy + Default, const N: usize>(
 pub fn read(bytes: &[u8]) -> Result<Scene> {
     let scene = match Format::sniff(bytes) {
         Some(Format::Usdz) => usdz::read(bytes)?,
+        Some(Format::Glb | Format::Gltf) => gltf::read(bytes)?,
         None => return Err(Error::Unknown),
     };
     if scene.triangle_count() == 0 {

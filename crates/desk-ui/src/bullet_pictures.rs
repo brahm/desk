@@ -225,18 +225,44 @@ pub fn media_from_file(file: &gtk::gio::File) -> Option<desk_model::Media> {
 
 /// The 3D model of a file, if it is one that Desk reads (W116), as
 /// large as a movie may be.
+///
+/// A glTF comes with the files it names beside it, gathered into one GLB
+/// that the document keeps: only files in its folder, or folders under
+/// it, are read (`desk_model::pack_gltf` refuses the others).
 pub fn model_from_file(file: &gtk::gio::File) -> Option<desk_model::Model3d> {
-    let bytes = load_bounded(file, MAX_MEDIA)?;
+    let mut bytes = load_bounded(file, MAX_MEDIA)?;
+    if matches!(
+        desk_model::ModelFormat::sniff(&bytes),
+        Some(desk_model::ModelFormat::Gltf | desk_model::ModelFormat::Glb)
+    ) {
+        let folder = file.parent()?;
+        let mut budget = MAX_MEDIA.saturating_sub(bytes.len() as u64);
+        bytes = desk_model::pack_gltf(&bytes, &mut |path| {
+            let data = load_bounded(&folder.resolve_relative_path(path), budget)?;
+            budget = budget.saturating_sub(data.len() as u64);
+            Some(data)
+        })
+        .ok()?;
+        if bytes.len() as u64 > MAX_MEDIA {
+            return None;
+        }
+    }
     desk_model::Model3d::from_bytes(bytes).filter(|m| m.scene().is_ok())
+}
+
+/// Adds the 3D models that Desk reads to a filter.
+fn add_models(filter: &gtk::FileFilter) {
+    for format in desk_model::ModelFormat::ALL {
+        filter.add_mime_type(format.media_type());
+        filter.add_suffix(format.extension());
+    }
 }
 
 /// The filter of the 3D models that Desk reads (W116).
 pub fn model_filter() -> gtk::FileFilter {
     let models = gtk::FileFilter::new();
     models.set_name(Some(&crate::i18n::tr("3D Objects")));
-    let format = desk_model::ModelFormat::Usdz;
-    models.add_mime_type(format.media_type());
-    models.add_suffix(format.extension());
+    add_models(&models);
     models
 }
 
@@ -261,9 +287,7 @@ pub fn document_picture_filters(with_media: bool) -> gtk::gio::ListStore {
     for kind in ["application/pdf", "video/*", "audio/*"] {
         all.add_mime_type(kind);
     }
-    let format = desk_model::ModelFormat::Usdz;
-    all.add_mime_type(format.media_type());
-    all.add_suffix(format.extension());
+    add_models(&all);
     let filters = gtk::gio::ListStore::new::<gtk::FileFilter>();
     if with_media {
         filters.append(&all);

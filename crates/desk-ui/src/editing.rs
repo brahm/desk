@@ -509,6 +509,8 @@ struct State {
     object_drag: Option<objects::ObjectDrag>,
     /// A drag of the handle that turns a 3D object (W116).
     model_turn: Option<model3d::ModelTurn>,
+    /// The animation of a 3D model as it plays (W116).
+    model_playing: Option<model3d::ModelPlaying>,
     /// A drag that selects the objects in a rectangle (OBJ-21).
     marquee: Option<copies::MarqueeDrag>,
     /// Whether the layout view is on (INT-09).
@@ -726,6 +728,7 @@ impl TextEditor {
                 objects: Vec::new(),
                 object_drag: None,
                 model_turn: None,
+                model_playing: None,
                 marquee: None,
                 show_layout: false,
                 guide_drag: None,
