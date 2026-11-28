@@ -22,6 +22,15 @@ fuzz_target!(|data: &[u8]| {
     };
     assert!(scene.triangle_count() <= limits::TRIANGLES);
     assert!(scene.textures.len() <= limits::TEXTURES);
-    let image = render(&scene, View { yaw: 30.0, pitch: 20.0 }, 32, 24).unwrap();
+    let image = render(
+        &scene,
+        View {
+            yaw: 30.0,
+            pitch: 20.0,
+        },
+        32,
+        24,
+    )
+    .unwrap();
     assert_eq!(image.len(), 32 * 24 * 4);
 });
