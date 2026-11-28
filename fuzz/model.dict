@@ -64,3 +64,13 @@
 "\"sparse\""
 "\"CUBICSPLINE\""
 "data:application/octet-stream;base64,"
+# Wavefront OBJ.
+"v "
+"vt "
+"vn "
+"f "
+"usemtl "
+"mtllib box materials.mtl"
+"/"
+"//"
+"-1"

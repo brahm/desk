@@ -12,7 +12,9 @@
 //! of Universal Scene Description, with its layers in the text form
 //! (`usda`) or the binary one (`usdc`) and the pictures of its textures;
 //! and glTF 2.0, as text (`.gltf`) or binary (`.glb`), with the animation
-//! of its nodes. A reader takes the meshes of the model with their
+//! of its nodes. A model of a format that a document does not keep, as
+//! Wavefront OBJ with its MTL materials, is turned into a GLB by
+//! [`import`]. A reader takes the meshes of the model with their
 //! places, the colors and textures of their materials, and leaves the
 //! rest: lights, cameras and skeletons.
 //!
@@ -26,9 +28,11 @@
 //! can reuse it.
 
 mod animation;
+mod glb;
 mod gltf;
 mod lz4;
 mod matrix;
+mod obj;
 mod raster;
 mod texture;
 mod usd;
@@ -152,6 +156,58 @@ impl Format {
             "model/gltf+json" => Some(Self::Gltf),
             _ => None,
         }
+    }
+}
+
+/// The formats of 3D models that are read only to be turned into GLB, as
+/// [`import`] does: a document does not keep them.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum Import {
+    /// Wavefront OBJ, with the MTL libraries and pictures beside it.
+    Obj,
+}
+
+impl Import {
+    /// All of them, as file dialogs list them.
+    pub const ALL: [Self; 1] = [Self::Obj];
+
+    /// The format of the bytes of a file, from its start.
+    pub fn sniff(bytes: &[u8]) -> Option<Self> {
+        obj::is_obj(bytes).then_some(Self::Obj)
+    }
+
+    /// The media type of the format.
+    pub fn media_type(self) -> &'static str {
+        match self {
+            Self::Obj => "model/obj",
+        }
+    }
+
+    /// The extension of its files.
+    pub fn extension(self) -> &'static str {
+        match self {
+            Self::Obj => "obj",
+        }
+    }
+}
+
+/// The bytes that a document keeps of a model: a USDZ or a GLB as it is,
+/// a glTF with the files it names gathered into one GLB (see
+/// [`pack_gltf`]), and a format of [`Import`] turned into a GLB. `files`
+/// gives the bytes of a file beside the model by its relative path, which
+/// never leaves the folder of the model.
+pub fn import(bytes: &[u8], files: &mut dyn FnMut(&str) -> Option<Vec<u8>>) -> Result<Vec<u8>> {
+    match (Format::sniff(bytes), Import::sniff(bytes)) {
+        (Some(Format::Usdz | Format::Glb), _) => Ok(bytes.to_vec()),
+        (Some(Format::Gltf), _) => gltf::pack(bytes, files),
+        (None, Some(Import::Obj)) => {
+            let read = obj::read(bytes, files)?;
+            if read.scene.triangle_count() == 0 {
+                return Err(Error::Empty);
+            }
+            glb::write(&read.scene, &read.pictures)
+        }
+        (None, None) => Err(Error::Unknown),
     }
 }
 

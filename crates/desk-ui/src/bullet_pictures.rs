@@ -227,33 +227,40 @@ pub fn media_from_file(file: &gtk::gio::File) -> Option<desk_model::Media> {
 /// large as a movie may be.
 ///
 /// A glTF comes with the files it names beside it, gathered into one GLB
-/// that the document keeps: only files in its folder, or folders under
-/// it, are read, and only those that its views and textures use; none
-/// for a GLB. `desk_model::pack_gltf` refuses the paths that leave the
-/// folder or name hidden files, and a link that leads out of it is not
-/// followed.
+/// that the document keeps, and an OBJ with its materials and pictures,
+/// turned into a GLB (D-033): only files in its folder, or folders under
+/// it, are read, and only those that its views, textures and materials
+/// use; none for a GLB or a USDZ. `desk_model::import_model` refuses the
+/// paths that leave the folder or name hidden files, and a link that
+/// leads out of it is not followed.
 pub fn model_from_file(file: &gtk::gio::File) -> Option<desk_model::Model3d> {
-    let mut bytes = load_bounded(file, MAX_MEDIA)?;
-    if matches!(
-        desk_model::ModelFormat::sniff(&bytes),
-        Some(desk_model::ModelFormat::Gltf | desk_model::ModelFormat::Glb)
-    ) {
-        let folder = file.parent()?;
+    let bytes = load_bounded(file, MAX_MEDIA)?;
+    // The folder, as it really is, for the files beside the model; none
+    // for a file that is not on a disk.
+    let folder = file.parent().and_then(|folder| {
         let root = std::fs::canonicalize(folder.path()?).ok()?;
-        let mut budget = MAX_MEDIA.saturating_sub(bytes.len() as u64);
-        bytes = desk_model::pack_gltf(&bytes, &mut |path| {
-            let real = std::fs::canonicalize(folder.resolve_relative_path(path).path()?).ok()?;
-            if !real.starts_with(&root) {
-                return None;
-            }
-            let data = load_bounded(&gtk::gio::File::for_path(&real), budget)?;
-            budget = budget.saturating_sub(data.len() as u64);
-            Some(data)
-        })
-        .ok()?;
-        if bytes.len() as u64 > MAX_MEDIA {
+        Some((folder, root))
+    });
+    let mut budget = MAX_MEDIA.saturating_sub(bytes.len() as u64);
+    let bytes = desk_model::import_model(&bytes, &mut |path| {
+        let (folder, root) = folder.as_ref()?;
+        let real = std::fs::canonicalize(folder.resolve_relative_path(path).path()?).ok()?;
+        // Inside the folder, and not hidden there, even through a link.
+        let hidden = real.strip_prefix(root).ok().is_none_or(|below| {
+            below
+                .components()
+                .any(|c| c.as_os_str().to_string_lossy().starts_with('.'))
+        });
+        if hidden || !real.is_file() {
             return None;
         }
+        let data = load_bounded(&gtk::gio::File::for_path(&real), budget)?;
+        budget = budget.saturating_sub(data.len() as u64);
+        Some(data)
+    })
+    .ok()?;
+    if bytes.len() as u64 > MAX_MEDIA {
+        return None;
     }
     desk_model::Model3d::from_bytes(bytes).filter(|m| m.scene().is_ok())
 }
@@ -261,6 +268,10 @@ pub fn model_from_file(file: &gtk::gio::File) -> Option<desk_model::Model3d> {
 /// Adds the 3D models that Desk reads to a filter.
 fn add_models(filter: &gtk::FileFilter) {
     for format in desk_model::ModelFormat::ALL {
+        filter.add_mime_type(format.media_type());
+        filter.add_suffix(format.extension());
+    }
+    for format in desk_model::ModelImport::ALL {
         filter.add_mime_type(format.media_type());
         filter.add_suffix(format.extension());
     }
@@ -341,6 +352,29 @@ mod tests {
         assert!(file_size(&file).is_none_or(|size| size == 0));
         assert!(load_bounded(&file, 1 << 20).is_some_and(|b| !b.is_empty()));
         assert_eq!(load_bounded(&file, 10), None);
+    }
+
+    #[test]
+    fn w116_an_obj_comes_with_its_files_and_none_from_outside() {
+        let dir = std::env::temp_dir().join(format!("desk-obj-{}", std::process::id()));
+        let inside = dir.join("model");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(inside.join("pictures")).unwrap();
+        let data = concat!(env!("CARGO_MANIFEST_DIR"), "/../desk-3d/tests/data/obj");
+        for name in ["box.obj", "box materials.mtl", "pictures/wood.png"] {
+            std::fs::copy(format!("{data}/{name}"), inside.join(name)).unwrap();
+        }
+        let model = model_from_file(&gtk::gio::File::for_path(inside.join("box.obj"))).unwrap();
+        assert_eq!(model.format(), desk_model::ModelFormat::Glb);
+        let scene = model.scene().unwrap();
+        assert_eq!((scene.triangle_count(), scene.textures.len()), (12, 1));
+        // A library that is a link out of the folder is not read.
+        std::fs::rename(inside.join("box materials.mtl"), dir.join("outside.mtl")).unwrap();
+        std::os::unix::fs::symlink(dir.join("outside.mtl"), inside.join("box materials.mtl"))
+            .unwrap();
+        let model = model_from_file(&gtk::gio::File::for_path(inside.join("box.obj"))).unwrap();
+        assert!(model.scene().unwrap().textures.is_empty());
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 
     #[test]

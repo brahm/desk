@@ -143,7 +143,12 @@ pub(crate) fn relative_path(uri: &str) -> Option<String> {
             i += 1;
         }
     }
-    let path = String::from_utf8(bytes).ok()?;
+    safe_path(String::from_utf8(bytes).ok()?)
+}
+
+/// A relative path that stays in its folder: none for one that leaves
+/// it, names a whole path, has a scheme or names a hidden file.
+pub(crate) fn safe_path(path: String) -> Option<String> {
     let scheme = path.split_once(':').is_some_and(|(s, _)| !s.contains('/'));
     if path.is_empty()
         || scheme
@@ -999,24 +1004,31 @@ pub fn pack(bytes: &[u8], files: &mut dyn FnMut(&str) -> Option<Vec<u8>>) -> Res
             vec![Json::Object(buffer)]
         }),
     );
-    let mut text = serde_json::to_vec(&json).map_err(|e| malformed(e.to_string()))?;
+    glb(&json, &out)
+}
+
+/// A GLB of its JSON and its buffer, which is left out when it is empty.
+pub(crate) fn glb(json: &Json, bin: &[u8]) -> Result<Vec<u8>> {
+    let mut text = serde_json::to_vec(json).map_err(|e| malformed(e.to_string()))?;
     text.resize(text.len().next_multiple_of(4), b' ');
-    let length = 12 + 8 + text.len() + if out.is_empty() { 0 } else { 8 + out.len() };
+    let padded = bin.len().next_multiple_of(4);
+    let length = 12 + 8 + text.len() + if bin.is_empty() { 0 } else { 8 + padded };
     let length = u32::try_from(length).map_err(|_| Error::TooLarge)?;
     let mut glb = Vec::with_capacity(length as usize);
     glb.extend_from_slice(GLB);
     glb.extend_from_slice(&2u32.to_le_bytes());
     glb.extend_from_slice(&length.to_le_bytes());
-    let chunk = |glb: &mut Vec<u8>, kind: u32, data: &[u8]| -> Result<()> {
-        let size = u32::try_from(data.len()).map_err(|_| Error::TooLarge)?;
-        glb.extend_from_slice(&size.to_le_bytes());
+    let chunk = |glb: &mut Vec<u8>, kind: u32, data: &[u8], size: usize| -> Result<()> {
+        let size32 = u32::try_from(size).map_err(|_| Error::TooLarge)?;
+        glb.extend_from_slice(&size32.to_le_bytes());
         glb.extend_from_slice(&kind.to_le_bytes());
         glb.extend_from_slice(data);
+        glb.resize(glb.len() + size - data.len(), 0);
         Ok(())
     };
-    chunk(&mut glb, JSON_CHUNK, &text)?;
-    if !out.is_empty() {
-        chunk(&mut glb, BIN_CHUNK, &out)?;
+    chunk(&mut glb, JSON_CHUNK, &text, text.len())?;
+    if !bin.is_empty() {
+        chunk(&mut glb, BIN_CHUNK, bin, padded)?;
     }
     Ok(glb)
 }
