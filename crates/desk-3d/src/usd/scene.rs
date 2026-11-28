@@ -568,7 +568,11 @@ impl Builder<'_> {
             color[3] = (o as f32).clamp(0.0, 1.0);
         }
         Some(Look {
-            material: Material { color, texture },
+            material: Material {
+                color,
+                texture,
+                ..Material::default()
+            },
             uv,
         })
     }

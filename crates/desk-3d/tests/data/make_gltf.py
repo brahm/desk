@@ -151,6 +151,31 @@ def animated():
     return glb(document, b.data)
 
 
+def grow():
+    """A box that rests at a scale of 0 and grows to its size in a second,
+    with a material masked at 0.25."""
+    b = Builder()
+    mesh = box(b)
+    times = b.accessor("SCALAR", FLOAT, [0.0, 1.0], bounds=True)
+    sizes = b.accessor("VEC3", FLOAT, [[0, 0, 0], [1, 1, 1]])
+    document = {
+        "asset": {"version": "2.0"},
+        "scenes": [{"nodes": [0]}],
+        "nodes": [{"mesh": 0, "scale": [0, 0, 0]}],
+        "meshes": [{"primitives": [dict(mesh, material=0)]}],
+        "materials": [{"pbrMetallicRoughness": {"baseColorFactor": [1, 1, 1, 0.5]},
+                       "alphaMode": "MASK", "alphaCutoff": 0.25}],
+        "animations": [{
+            "channels": [{"sampler": 0, "target": {"node": 0, "path": "scale"}}],
+            "samplers": [{"input": times, "output": sizes}],
+        }],
+        "buffers": [{"byteLength": len(b.data) + (-len(b.data) % 4)}],
+        "bufferViews": b.views,
+        "accessors": b.accessors,
+    }
+    return glb(document, b.data)
+
+
 def picture():
     """A picture of 2 by 2: red, green above blue, white."""
     return png(2, 2, [255, 0, 0, 255, 0, 255, 0, 255,
@@ -200,6 +225,8 @@ def textured(external):
 def main():
     with open("animated.glb", "wb") as f:
         f.write(animated())
+    with open("grow.glb", "wb") as f:
+        f.write(grow())
     text, _, _ = textured(False)
     with open("textured.gltf", "wb") as f:
         f.write(text)

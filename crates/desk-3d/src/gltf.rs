@@ -20,7 +20,7 @@ use std::collections::HashMap;
 
 use serde_json::{Map, Value as Json};
 
-use crate::animation::{Animation, Interpolation, Joint, Local, Path, Track, trs};
+use crate::animation::{Animation, Interpolation, Joint, Local, MeshJoint, Path, Track, trs};
 use crate::matrix::{IDENTITY, Matrix, invert, mul, normal, point};
 use crate::{Error, Material, Mesh, Result, Scene, Texture, limits, malformed, texture};
 
@@ -250,10 +250,16 @@ fn integer(bytes: &[u8], kind: u64) -> Option<u32> {
     }
 }
 
+/// The most numbers of accessors read from one file, in all.
+const ACCESSOR_NUMBERS: usize = 64 * 1024 * 1024;
+
 /// The file being read: its JSON and its buffers.
 struct Document<'a> {
     json: &'a Json,
     buffers: Vec<Option<Cow<'a, [u8]>>>,
+    /// The numbers of accessors read so far, against
+    /// [`ACCESSOR_NUMBERS`].
+    read: std::cell::Cell<usize>,
 }
 
 impl Document<'_> {
@@ -284,9 +290,12 @@ impl Document<'_> {
         let n = width(accessor.get("type")?.as_str()?)?;
         let kind = accessor.get("componentType")?.as_u64()?;
         let size = component_size(kind)?;
-        if count.checked_mul(n)? > limits::CORNERS * 4 {
+        let numbers = count.checked_mul(n)?;
+        let total = self.read.get().checked_add(numbers)?;
+        if numbers > limits::CORNERS * 4 || total > ACCESSOR_NUMBERS {
             return None;
         }
+        self.read.set(total);
         let element = n * size;
         let mut out = vec![T::default(); count * n];
         if let Some(v) = index(accessor, "bufferView") {
@@ -345,7 +354,7 @@ struct Builder<'a> {
     doc: Document<'a>,
     meshes: Vec<Mesh>,
     /// The node of each mesh, by its index among the joints.
-    mesh_joints: Vec<Option<usize>>,
+    mesh_joints: Vec<MeshJoint>,
     textures: Vec<Texture>,
     /// The textures made, by the picture and whether the material is
     /// opaque.
@@ -413,23 +422,36 @@ impl Builder<'_> {
             ),
             (None, None) => ([1.0; 4], None),
         };
+        let mode = m.get("alphaMode").and_then(Json::as_str);
         let mut color = factor.map(|v| v.clamp(0.0, 1.0) as f32);
-        if opaque {
+        // A mask cuts where the alpha of the color times that of the
+        // texture is under its cutoff: the texture's alone is compared
+        // with the cutoff over the color's, and the mesh is drawn with the
+        // opaque ones. Nothing of an opaque material is cut out.
+        let cutoff = match mode {
+            Some("MASK") => {
+                let c = m
+                    .get("alphaCutoff")
+                    .and_then(Json::as_f64)
+                    .filter(|c| c.is_finite())
+                    .map_or(0.5, |c| c.clamp(0.0, 1.0) as f32);
+                if color[3] > 0.0 { c / color[3] } else { 2.0 }
+            }
+            _ => 0.0,
+        };
+        if mode != Some("BLEND") {
             color[3] = 1.0;
-        } else if m.get("alphaMode").and_then(Json::as_str) == Some("MASK") {
-            // Cut out by the opaque pass, not blended.
-            color[3] =
-                if color[3] >= m.get("alphaCutoff").and_then(Json::as_f64).unwrap_or(0.5) as f32 {
-                    1.0
-                } else {
-                    0.0
-                };
         }
         let texture = texture
             .filter(|t| index(t, "texCoord").unwrap_or(0) == 0)
             .and_then(|t| index(t, "index"))
             .and_then(|t| self.texture(t, opaque));
-        Material { color, texture }
+        Material {
+            color,
+            texture,
+            translucent: mode == Some("BLEND"),
+            cutoff,
+        }
     }
 
     /// The meshes of a primitive, placed by the world matrix of its node.
@@ -486,7 +508,13 @@ impl Builder<'_> {
             return Err(Error::TooLarge);
         }
         let material = self.material(index(p, "material"));
-        let inverse = invert(world).unwrap_or(IDENTITY);
+        // A node with no inverse, as at a scale of 0, keeps the corners in
+        // its own space, for its animation to place.
+        let (world, inverse, local) = match invert(world) {
+            Some(inverse) => (*world, inverse, false),
+            None => (IDENTITY, IDENTITY, true),
+        };
+        let world = &world;
         let positions: Vec<[f32; 3]> = positions
             .as_chunks::<3>()
             .0
@@ -540,7 +568,7 @@ impl Builder<'_> {
             triangles,
             material,
         });
-        self.mesh_joints.push(Some(joint));
+        self.mesh_joints.push(Some((joint, local)));
         Ok(())
     }
 
@@ -636,17 +664,28 @@ impl Builder<'_> {
                 Some("CUBICSPLINE") => Interpolation::Cubic,
                 _ => Interpolation::Linear,
             };
+            // The kinds of the accessors first, so that one of the wrong
+            // kind is not read.
+            let kind = |key: &str| {
+                let a = self.doc.get("accessors", index(sampler, key)?)?;
+                Some((width(a.get("type")?.as_str()?)?, index(a, "count")?))
+            };
+            let per = if interpolation == Interpolation::Cubic {
+                3
+            } else {
+                1
+            };
+            match (kind("input"), kind("output")) {
+                (Some((1, keys)), Some((n, values)))
+                    if n == path.width() && Some(values) == keys.checked_mul(per) => {}
+                _ => continue,
+            }
             let Some((1, times)) = index(sampler, "input").and_then(|a| self.doc.floats(a)) else {
                 continue;
             };
             let Some((n, values)) = index(sampler, "output").and_then(|a| self.doc.floats(a))
             else {
                 continue;
-            };
-            let per = if interpolation == Interpolation::Cubic {
-                3
-            } else {
-                1
             };
             if n != path.width()
                 || times.is_empty()
@@ -700,6 +739,7 @@ pub(crate) fn read(bytes: &[u8]) -> Result<Scene> {
     let doc = Document {
         buffers: buffers(&json, bin),
         json: &json,
+        read: std::cell::Cell::new(0),
     };
     let mut builder = Builder {
         doc,
@@ -744,6 +784,17 @@ pub(crate) fn read(bytes: &[u8]) -> Result<Scene> {
         &builder.mesh_joints,
         &builder.meshes,
     );
+    // With nothing to move them, the meshes of nodes at a scale of 0 are
+    // nowhere to be seen.
+    if animation.is_none() {
+        let keep: Vec<bool> = builder
+            .mesh_joints
+            .iter()
+            .map(|j| !matches!(j, Some((_, true))))
+            .collect();
+        let mut keep = keep.into_iter();
+        builder.meshes.retain(|_| keep.next().unwrap_or(true));
+    }
     Ok(Scene {
         meshes: builder.meshes,
         textures: builder.textures,
@@ -867,12 +918,19 @@ pub fn pack(bytes: &[u8], files: &mut dyn FnMut(&str) -> Option<Vec<u8>>) -> Res
             let Some(uri) = image.remove("uri") else {
                 continue;
             };
-            // A view wins over a URI, as the reader takes it.
-            if let Some(r) = image.get_mut("bufferView") {
-                if r.as_u64().is_some_and(|i| i >= known) {
-                    *r = u64::MAX.into();
+            // A view wins over a URI, as the reader takes it, when it is an
+            // index; a view that is none is dropped, and the URI taken.
+            match image.get_mut("bufferView") {
+                Some(r) if r.as_u64().is_some() => {
+                    if r.as_u64().is_some_and(|i| i >= known) {
+                        *r = u64::MAX.into();
+                    }
+                    continue;
                 }
-                continue;
+                Some(_) => {
+                    image.remove("bufferView");
+                }
+                None => {}
             }
             let Some(data) = uri.as_str().and_then(&mut fetch) else {
                 continue;
@@ -972,7 +1030,7 @@ mod tests {
         let scene = read(bytes).unwrap();
         let animation = scene.animation.as_ref().unwrap();
         let at = |time: f32, mesh: usize, p: [f32; 3]| {
-            let poses = animation.poses(time);
+            let poses = animation.poses(Some(time));
             match poses.get(mesh).copied().flatten() {
                 Some(m) => point(&m, p),
                 None => p,
@@ -990,7 +1048,7 @@ mod tests {
         );
         assert!((p[2] + 2.0).abs() < 1e-4, "{p:?}");
         // The green box does not move.
-        assert!(animation.poses(1.0)[2].is_none());
+        assert!(animation.poses(Some(1.0))[2].is_none());
         let (lo, hi) = animation.bounds;
         assert_eq!((lo[1], hi[1]), (-2.0, 15.0));
     }

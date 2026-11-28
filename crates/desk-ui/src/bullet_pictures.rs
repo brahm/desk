@@ -228,7 +228,8 @@ pub fn media_from_file(file: &gtk::gio::File) -> Option<desk_model::Media> {
 ///
 /// A glTF comes with the files it names beside it, gathered into one GLB
 /// that the document keeps: only files in its folder, or folders under
-/// it, are read (`desk_model::pack_gltf` refuses the others).
+/// it, are read. `desk_model::pack_gltf` refuses the paths that leave
+/// it, and a link that leads out of it is not followed.
 pub fn model_from_file(file: &gtk::gio::File) -> Option<desk_model::Model3d> {
     let mut bytes = load_bounded(file, MAX_MEDIA)?;
     if matches!(
@@ -236,9 +237,14 @@ pub fn model_from_file(file: &gtk::gio::File) -> Option<desk_model::Model3d> {
         Some(desk_model::ModelFormat::Gltf | desk_model::ModelFormat::Glb)
     ) {
         let folder = file.parent()?;
+        let root = std::fs::canonicalize(folder.path()?).ok()?;
         let mut budget = MAX_MEDIA.saturating_sub(bytes.len() as u64);
         bytes = desk_model::pack_gltf(&bytes, &mut |path| {
-            let data = load_bounded(&folder.resolve_relative_path(path), budget)?;
+            let real = std::fs::canonicalize(folder.resolve_relative_path(path).path()?).ok()?;
+            if !real.starts_with(&root) {
+                return None;
+            }
+            let data = load_bounded(&gtk::gio::File::for_path(&real), budget)?;
             budget = budget.saturating_sub(data.len() as u64);
             Some(data)
         })

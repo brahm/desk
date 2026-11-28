@@ -3111,6 +3111,13 @@ impl TextEditor {
         {
             self.stop_drawing_animation();
         }
+        // And that of a 3D model while it alone is (W116).
+        let model = self.state.borrow().model_playing.as_ref().map(|p| p.id());
+        if let Some(id) = model
+            && self.state.borrow().objects != [id]
+        {
+            self.stop_model_animation();
+        }
         let callbacks = self.state.borrow().on_select.clone();
         for callback in callbacks {
             callback();

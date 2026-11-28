@@ -9,7 +9,7 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
 ## Changes since 0.7.0 (unreleased)
 
 * Added: 3D objects from glTF and GLB, whose animation plays in the
-  Object tab.
+  Object tab (#275).
 * Added: 3D objects from USDZ files, drawn on the page and turned by
   dragging the handle in their middle or in the Object tab (#274).
 * Added: donut, radar and bubble charts, shared X values, rounded

@@ -3394,7 +3394,7 @@ paragraph, and objects on a second page.
   files wait for a file of Pages 15.4 that holds one, in the session on
   the Mac of step 13. No task moved to another phase.
 
-### 28 November: glTF and GLB, with the animation of models (step 11 of W4)
+### 28 November: glTF and GLB, with the animation of models (step 11 of W4, #275)
 
 - `desk-3d` reads glTF 2.0, as text (`.gltf`) and binary (`.glb`): the
   nodes of the scene with their matrices or their translation, rotation

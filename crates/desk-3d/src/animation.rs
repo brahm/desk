@@ -7,7 +7,9 @@
 //! The meshes of a [`Scene`](crate::Scene) stay where they rest. A part
 //! that moves keeps the node it hangs from and the inverse of where that
 //! node rests, so that at a time its corners go back from where they rest
-//! and on to where the node is then.
+//! and on to where the node is then. A node that rests at a scale of 0
+//! has no inverse: the corners of its meshes are kept in its own space
+//! instead, and placed where the node is even at rest.
 
 use crate::matrix::{IDENTITY, Matrix, invert, mul, point, quaternion, scale, translate};
 
@@ -21,12 +23,26 @@ pub struct Animation {
     pub(crate) joints: Vec<Joint>,
     /// What moves them.
     pub(crate) tracks: Vec<Track>,
-    /// For each mesh of the scene, the node it hangs from and the inverse
-    /// of where that node rests, if the node moves.
-    pub(crate) bindings: Vec<Option<(usize, Matrix)>>,
+    /// For each mesh of the scene that moves, how.
+    pub(crate) bindings: Vec<Option<Binding>>,
     /// The box around the scene at all times.
     pub(crate) bounds: ([f32; 3], [f32; 3]),
 }
+
+/// A mesh that moves: the node it hangs from, and what takes its corners
+/// to the space of that node.
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct Binding {
+    joint: usize,
+    /// The inverse of where the node rests, or none when the corners are
+    /// in the node's space already.
+    inverse: Option<Matrix>,
+}
+
+/// The node of a mesh as it is read: its joint, and whether its corners
+/// are kept in the joint's space, as they are when the joint rests where
+/// it has no inverse.
+pub(crate) type MeshJoint = Option<(usize, bool)>;
 
 /// A node: its parent, and where it is in its parent when nothing moves
 /// it.
@@ -240,25 +256,31 @@ impl Animation {
     }
 
     /// For each mesh of the scene, what takes its corners from where they
-    /// rest to where they are at a time: none for one that does not move.
-    pub(crate) fn poses(&self, time: f32) -> Vec<Option<Matrix>> {
-        let worlds = self.worlds(Some(time));
+    /// are kept to where they are at a time, or at rest: none for one
+    /// that is where it is kept.
+    pub(crate) fn poses(&self, time: Option<f32>) -> Vec<Option<Matrix>> {
+        let worlds = self.worlds(time);
         self.bindings
             .iter()
             .map(|b| {
-                let (joint, inverse) = b.as_ref()?;
-                Some(mul(inverse, worlds.get(*joint)?))
+                let b = b.as_ref()?;
+                let world = worlds.get(b.joint)?;
+                match &b.inverse {
+                    None => Some(*world),
+                    Some(_) if time.is_none() => None,
+                    Some(inverse) => Some(mul(inverse, world)),
+                }
             })
             .collect()
     }
 
     /// Makes the animation of a scene: binds the meshes that hang from
-    /// moving nodes, and finds the box around the scene as it moves.
-    /// None when nothing moves.
+    /// moving nodes, and those kept in the space of their node, and finds
+    /// the box around the scene as it moves. None when nothing moves.
     pub(crate) fn new(
         joints: Vec<Joint>,
         tracks: Vec<Track>,
-        mesh_joints: &[Option<usize>],
+        mesh_joints: &[MeshJoint],
         meshes: &[crate::Mesh],
     ) -> Option<Self> {
         let duration = tracks
@@ -293,11 +315,20 @@ impl Animation {
         animation.bindings = mesh_joints
             .iter()
             .map(|j| {
-                let j = (*j)?;
-                if !moves.get(j).copied().unwrap_or(false) {
+                let (joint, local) = (*j)?;
+                if local {
+                    return Some(Binding {
+                        joint,
+                        inverse: None,
+                    });
+                }
+                if !moves.get(joint).copied().unwrap_or(false) {
                     return None;
                 }
-                Some((j, invert(rest.get(j)?)?))
+                Some(Binding {
+                    joint,
+                    inverse: Some(invert(rest.get(joint)?)?),
+                })
             })
             .collect();
         if animation.bindings.iter().all(Option::is_none) {
@@ -314,9 +345,20 @@ impl Animation {
                 hi = crate::zip_with(hi, p, f32::max);
             }
         };
+        // At rest, at even times, and at the keys, as many as are not too
+        // many.
         const SAMPLES: usize = 48;
-        for step in 0..=SAMPLES {
-            let time = duration * step as f32 / SAMPLES as f32;
+        const KEYS: usize = 1024;
+        let mut times: Vec<Option<f32>> = vec![None];
+        times.extend((0..=SAMPLES).map(|step| Some(duration * step as f32 / SAMPLES as f32)));
+        let keys: Vec<f32> = animation
+            .tracks
+            .iter()
+            .flat_map(|t| t.times.iter().copied())
+            .collect();
+        let every = keys.len().div_ceil(KEYS).max(1);
+        times.extend(keys.iter().step_by(every).map(|t| Some(*t)));
+        for time in times {
             let poses = animation.poses(time);
             for (i, b) in boxes.iter().enumerate() {
                 let Some((l, h)) = b else { continue };
@@ -439,9 +481,15 @@ mod tests {
             ..Default::default()
         };
         let meshes = [mesh([1.0, 1.0, 0.0]), mesh([0.0, 0.0, 0.0])];
-        let animation = Animation::new(joints, tracks, &[Some(1), Some(2)], &meshes).unwrap();
+        let animation = Animation::new(
+            joints,
+            tracks,
+            &[Some((1, false)), Some((2, false))],
+            &meshes,
+        )
+        .unwrap();
         assert_eq!(animation.duration(), 2.0);
-        let poses = animation.poses(1.0);
+        let poses = animation.poses(Some(1.0));
         assert!(poses[1].is_none());
         assert_eq!(
             point(poses[0].as_ref().unwrap(), [1.0, 1.0, 0.0]),

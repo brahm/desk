@@ -130,3 +130,31 @@ fn w116_what_is_not_a_gltf_is_refused() {
         assert!(read(&bytes[..cut]).is_err(), "{cut}");
     }
 }
+
+#[test]
+fn w116_a_model_that_grows_from_nothing() {
+    let scene = read(&data("grow.glb")).unwrap();
+    let material = &scene.meshes[0].material;
+    assert_eq!(material.color[3], 1.0);
+    assert!(!material.translucent);
+    assert_eq!(material.cutoff, 0.5);
+    let covered = |image: &[u8]| image.as_chunks::<4>().0.iter().filter(|p| p[3] > 0).count();
+    let view = View::default();
+    // At rest, and at the start, it is at a scale of 0: nothing shows.
+    assert_eq!(covered(&render(&scene, view, 40, 40).unwrap()), 0);
+    assert_eq!(covered(&render_at(&scene, view, 0.0, 40, 40).unwrap()), 0);
+    let half = covered(&render_at(&scene, view, 0.5, 40, 40).unwrap());
+    let whole = covered(&render_at(&scene, view, 1.0, 40, 40).unwrap());
+    assert!(0 < half && half < whole, "{half} {whole}");
+}
+
+#[test]
+fn w116_blended_materials_let_what_is_behind_show() {
+    let scene = read(&data("animated.glb")).unwrap();
+    let translucent: Vec<bool> = scene
+        .meshes
+        .iter()
+        .map(|m| m.material.translucent)
+        .collect();
+    assert_eq!(translucent, [false, false, true]);
+}

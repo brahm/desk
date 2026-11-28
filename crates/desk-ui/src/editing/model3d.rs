@@ -39,7 +39,8 @@ pub(super) struct ModelTurn {
     turned: Model3d,
 }
 
-/// The animation of a 3D object as it plays on the page.
+/// The animation of a 3D object as it plays on the page, or as it was
+/// paused.
 pub(super) struct ModelPlaying {
     /// The object.
     id: NodeId,
@@ -47,10 +48,22 @@ pub(super) struct ModelPlaying {
     page: usize,
     /// How long the animation lasts, in milliseconds.
     duration: u32,
-    /// When it started, in microseconds of the clock of the frames.
+    /// Where it starts or goes on from, in milliseconds.
+    from: u32,
+    /// When it started or went on, in microseconds of the clock of the
+    /// frames.
     started: Option<i64>,
-    /// The callback that draws each frame.
+    /// Where it shows now, in milliseconds.
+    moment: u32,
+    /// The callback that draws each frame; none while it is paused.
     tick: Option<gtk::TickCallbackId>,
+}
+
+impl ModelPlaying {
+    /// The object.
+    pub(super) fn id(&self) -> NodeId {
+        self.id
+    }
 }
 
 /// Where the handle that turns a 3D object is, in points on its page; none
@@ -128,22 +141,42 @@ impl TextEditor {
         Some((seconds * 1000.0).round().clamp(1.0, u32::MAX as f32) as u32)
     }
 
-    /// Whether the animation of a 3D model plays.
+    /// Whether the animation of a 3D model plays, not paused.
     pub fn model_playing(&self) -> bool {
-        self.state.borrow().model_playing.is_some()
+        self.state
+            .borrow()
+            .model_playing
+            .as_ref()
+            .is_some_and(|p| p.tick.is_some())
     }
 
-    /// Plays the animation of the selected 3D model, or pauses the one
-    /// that plays.
+    /// Plays the animation of the selected 3D model, from where it was
+    /// paused, or pauses the one that plays, which holds where it is.
     pub fn play_model_animation(&self) {
-        if self.model_playing() {
-            self.stop_model_animation();
+        let selected = self.selected_model().map(|(id, _)| id);
+        let paused = {
+            let mut state = self.state.borrow_mut();
+            match state.model_playing.as_mut() {
+                Some(p) if p.tick.is_some() => {
+                    if let Some(tick) = p.tick.take() {
+                        tick.remove();
+                    }
+                    p.from = p.moment;
+                    true
+                }
+                _ => false,
+            }
+        };
+        if paused {
+            self.changed();
             return;
         }
-        let (Some((id, _)), Some(duration)) =
-            (self.selected_model(), self.selected_model_animation())
-        else {
+        let (Some(id), Some(duration)) = (selected, self.selected_model_animation()) else {
             return;
+        };
+        let from = match &self.state.borrow().model_playing {
+            Some(p) if p.id == id => p.from,
+            _ => 0,
         };
         let Some(page) = find(&self.state.borrow().layout, id).map(|(p, _)| p) else {
             return;
@@ -168,7 +201,9 @@ impl TextEditor {
             id,
             page,
             duration,
+            from,
             started: None,
+            moment: from,
             tick: Some(tick),
         });
         self.changed();
@@ -196,8 +231,9 @@ impl TextEditor {
                 return false;
             };
             let started = *playing.started.get_or_insert(now);
-            let elapsed = ((now - started).max(0) / 1000) as u64;
+            let elapsed = ((now - started).max(0) / 1000) as u64 + u64::from(playing.from);
             let moment = (elapsed % u64::from(playing.duration.max(1))) as u32;
+            playing.moment = moment;
             (playing.id, playing.page, moment)
         };
         let list = {
@@ -397,8 +433,28 @@ mod tests {
                 "playing changes nothing"
             );
             assert!(find(&editor.state.borrow().layout, id).is_some());
+            // Paused, it holds where it was, and goes on from there.
             editor.play_model_animation();
             assert!(!editor.model_playing());
+            assert_eq!(
+                editor.state.borrow().model_playing.as_ref().map(|p| p.from),
+                Some(1500)
+            );
+            editor.play_model_animation();
+            assert!(editor.model_playing());
+            assert!(editor.model_frame(3_000_000));
+            assert_eq!(
+                editor
+                    .state
+                    .borrow()
+                    .model_playing
+                    .as_ref()
+                    .map(|p| p.moment),
+                Some(1500)
+            );
+            // Another object selected, it stops.
+            editor.insert_model(cube(), None);
+            assert!(editor.state.borrow().model_playing.is_none());
         });
     }
 }

@@ -174,6 +174,12 @@ pub struct Material {
     pub color: [f32; 4],
     /// A texture over the color, by its index in [`Scene::textures`].
     pub texture: Option<usize>,
+    /// Whether what is behind shows through, by the alpha of the color
+    /// and of the texture; a color whose alpha is under 1 always lets it.
+    pub translucent: bool,
+    /// For a mesh that does not let what is behind show through, the
+    /// alpha under which the texture cuts it out.
+    pub cutoff: f32,
 }
 
 impl Default for Material {
@@ -181,6 +187,8 @@ impl Default for Material {
         Self {
             color: [0.7, 0.7, 0.7, 1.0],
             texture: None,
+            translucent: false,
+            cutoff: 0.5,
         }
     }
 }

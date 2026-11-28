@@ -75,25 +75,20 @@ fn draw_scene(
         color: vec![[0.0; 4]; w * h],
         depth: vec![f32::NEG_INFINITY; w * h],
     };
-    let bounds = match (scene.bounds(), &scene.animation) {
-        (Some((lo, hi)), Some(a)) => Some((
-            zip_with(lo, a.bounds.0, f32::min),
-            zip_with(hi, a.bounds.1, f32::max),
-        )),
-        (b, _) => b,
+    // A scene that moves is fitted by the box around it at all times.
+    let bounds = match &scene.animation {
+        Some(a) => Some(a.bounds),
+        None => scene.bounds(),
     };
-    // What takes each moving mesh to where it is, with its inverse for
-    // the normals.
-    let poses: Vec<Option<(Matrix, Matrix)>> = match (&scene.animation, seconds) {
-        (Some(a), Some(t)) => a
-            .poses(t)
+    // What takes each mesh that moves to where it is, with its inverse
+    // for the normals: none when it has none, as at a scale of 0.
+    let poses: Vec<Option<(Matrix, Option<Matrix>)>> = match &scene.animation {
+        Some(a) => a
+            .poses(seconds)
             .into_iter()
-            .map(|m| {
-                let m = m?;
-                Some((m, invert(&m)?))
-            })
+            .map(|m| m.map(|m| (m, invert(&m))))
             .collect(),
-        _ => Vec::new(),
+        None => Vec::new(),
     };
     if let Some((lo, hi)) = bounds {
         let center = zip_with(lo, hi, |l, h| (l + h) / 2.0);
@@ -117,7 +112,8 @@ fn draw_scene(
         // through, over them.
         for translucent in [false, true] {
             for (i, mesh) in scene.meshes.iter().enumerate() {
-                if (mesh.material.color[3] < 0.999) == translucent {
+                let lets = mesh.material.translucent || mesh.material.color[3] < 0.999;
+                if lets == translucent {
                     let pose = poses.get(i).and_then(Option::as_ref);
                     draw(
                         &mut target,
@@ -210,7 +206,7 @@ fn draw(
     target: &mut Target,
     camera: &Camera,
     mesh: &Mesh,
-    pose: Option<&(Matrix, Matrix)>,
+    pose: Option<&(Matrix, Option<Matrix>)>,
     textures: &[Texture],
     translucent: bool,
 ) {
@@ -232,9 +228,14 @@ fn draw(
             continue;
         }
         let normals = idx.map(|i| {
-            mesh.normals
-                .get(i)
-                .map(|n| apply(&camera.turn, pose.map_or(*n, |(_, inv)| normal(inv, *n))))
+            let n = mesh.normals.get(i)?;
+            let n = match pose {
+                None => *n,
+                Some((_, Some(inverse))) => normal(inverse, *n),
+                // Flat, as the normals have nowhere to go.
+                Some((_, None)) => return None,
+            };
+            Some(apply(&camera.turn, n))
         });
         let uvs = idx.map(|i| mesh.uvs.get(i).copied());
         let colors = idx.map(|i| mesh.colors.get(i).copied());
@@ -304,7 +305,7 @@ fn draw(
                     }
                 }
                 // A texture's clear texels cut the opaque meshes out.
-                if !translucent && color[3] < 0.5 {
+                if !translucent && color[3] < mesh.material.cutoff {
                     continue;
                 }
                 let n = mix3(normals).unwrap_or(flat);
@@ -373,7 +374,7 @@ mod tests {
             triangles: vec![[0, 1, 2], [0, 2, 3]],
             material: Material {
                 color,
-                texture: None,
+                ..Material::default()
             },
             ..Mesh::default()
         }
