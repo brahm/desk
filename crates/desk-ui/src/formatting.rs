@@ -447,6 +447,7 @@ impl Inspector {
             chart_group,
             scene,
             value_axis,
+            references,
             category_axis,
             series,
         ] = chart.groups();
@@ -454,7 +455,7 @@ impl Inspector {
             Context::Chart,
             vec![
                 Tab::new("chart", n_("Chart"), &[chart_styles, chart_group, scene]),
-                Tab::new("axis", n_("Axis"), &[value_axis, category_axis]),
+                Tab::new("axis", n_("Axis"), &[value_axis, references, category_axis]),
                 Tab::new("series", n_("Series"), &[series]),
                 arrange(),
             ],

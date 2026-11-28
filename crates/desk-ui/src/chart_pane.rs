@@ -3,8 +3,9 @@
 
 //! The Chart, Axis and Series tabs of the Inspector for a selected chart
 //! (GRF-01 to GRF-20): the kind, 3D, title, legend, colors and data of
-//! the chart; the scale, gridlines and labels of its axes; and the
-//! colors, value labels, trendlines and error bars of each series.
+//! the chart; the scale, gridlines, labels and reference lines of its
+//! axes; and the colors, value labels, trendlines and error bars of each
+//! series.
 
 use std::cell::Cell;
 use std::rc::Rc;
@@ -12,7 +13,7 @@ use std::rc::Rc;
 use adw::prelude::*;
 use desk_model::chart::{
     Chart, ChartKind, Collection, ErrorAmount, ErrorBars, ErrorDirection, LabelPosition, Lighting,
-    Scale, SeriesFill, Symbol, TrendKind, Trendline,
+    ReferenceKind, ReferenceLine, Scale, SeriesFill, Symbol, TrendKind, Trendline,
 };
 use desk_model::table::Num;
 
@@ -57,6 +58,39 @@ const TRENDS: [&str; 7] = [
     n_("Exponential"),
     n_("Moving Average"),
 ];
+
+/// The kinds of reference lines, in the order of [`reference_kind`]
+/// (W144).
+const REFERENCES: [&str; 5] = [
+    n_("Average"),
+    n_("Median"),
+    n_("Minimum"),
+    n_("Maximum"),
+    n_("Custom"),
+];
+
+/// The kind of reference line at a place of the menu, with the value of
+/// a custom one.
+fn reference_kind(index: u32, value: f64) -> ReferenceKind {
+    match index {
+        1 => ReferenceKind::Median,
+        2 => ReferenceKind::Minimum,
+        3 => ReferenceKind::Maximum,
+        4 => ReferenceKind::Custom(Num(value)),
+        _ => ReferenceKind::Average,
+    }
+}
+
+/// The place of a kind of reference line in the menu.
+fn reference_index(kind: ReferenceKind) -> u32 {
+    match kind {
+        ReferenceKind::Average => 0,
+        ReferenceKind::Median => 1,
+        ReferenceKind::Minimum => 2,
+        ReferenceKind::Maximum => 3,
+        ReferenceKind::Custom(_) => 4,
+    }
+}
 
 const ERRORS: [&str; 5] = [
     n_("None"),
@@ -125,6 +159,7 @@ pub struct ChartGroups {
     scene: compact::Group,
     value_axis: compact::Group,
     category_axis: compact::Group,
+    references: compact::Group,
     series: compact::Group,
     kind: compact::ComboRow,
     three_d: compact::SwitchRow,
@@ -158,6 +193,16 @@ pub struct ChartGroups {
     category_labels: compact::SwitchRow,
     category_gridlines: compact::SwitchRow,
     category_title: compact::EntryRow,
+    reference_which: compact::ComboRow,
+    reference_remove: gtk::Button,
+    reference_kind: compact::ComboRow,
+    reference_value: compact::SpinRow,
+    reference_name: compact::EntryRow,
+    reference_show_name: compact::SwitchRow,
+    reference_show_value: compact::SwitchRow,
+    /// The reference line the group shows, by its place on the value
+    /// axis.
+    reference: Cell<usize>,
     which: compact::ComboRow,
     color: gtk::ColorDialogButton,
     labels: compact::SwitchRow,
@@ -281,6 +326,43 @@ impl ChartGroups {
         category_axis.add(&category_gridlines);
         category_axis.add(&category_title);
 
+        // Reference Lines of the Axis tab of Pages 15.4 (W144): a line
+        // chosen from those of the value axis, with Add and Remove.
+        let reference_which = compact::ComboRow::builder()
+            .title(tr("Reference Line"))
+            .model(&gtk::StringList::new(&[]))
+            .build();
+        let icon_button = |icon: &str, tip: &str| {
+            gtk::Button::builder()
+                .icon_name(icon)
+                .tooltip_text(tr(tip))
+                .valign(gtk::Align::Center)
+                .css_classes(["flat"])
+                .build()
+        };
+        let reference_remove = icon_button("list-remove-symbolic", n_("Remove Reference Line"));
+        reference_which.add_suffix(&reference_remove);
+        let reference_kind = combo(n_("Type"), &REFERENCES);
+        let reference_value = spin(n_("Value"), -1e12, 1e12, 1.0);
+        reference_value.set_digits(2);
+        let reference_name = compact::EntryRow::builder().title(tr("Name")).build();
+        let reference_show_name = switch(n_("Show Name"));
+        let reference_show_value = switch(n_("Show Value"));
+        let add_reference = gtk::Button::builder()
+            .label(tr("Add Reference Line"))
+            .margin_top(6)
+            .build();
+        let references = compact::Group::builder()
+            .title(tr("Reference Lines"))
+            .build();
+        references.add(&reference_which);
+        references.add(&reference_kind);
+        references.add(&reference_value);
+        references.add(&reference_name);
+        references.add(&reference_show_name);
+        references.add(&reference_show_value);
+        references.add_widget(&add_reference);
+
         let which = compact::ComboRow::builder()
             .title(tr("Series"))
             .model(&gtk::StringList::new(&[]))
@@ -374,6 +456,7 @@ impl ChartGroups {
             scene,
             value_axis,
             category_axis,
+            references,
             series,
             kind,
             three_d,
@@ -407,6 +490,14 @@ impl ChartGroups {
             category_labels,
             category_gridlines,
             category_title,
+            reference_which,
+            reference_remove,
+            reference_kind,
+            reference_value,
+            reference_name,
+            reference_show_name,
+            reference_show_value,
+            reference: Cell::new(0),
             which,
             color,
             labels,
@@ -421,20 +512,135 @@ impl ChartGroups {
             updating: Cell::new(false),
         });
         this.connect(&editor);
+        this.connect_references(&editor, &add_reference);
         this
     }
 
     /// The groups: Chart Styles, Chart and 3D Scene for the Chart tab,
-    /// the axes for the Axis tab and Series for the Series tab.
-    pub fn groups(&self) -> [&compact::Group; 6] {
+    /// the axes and their reference lines for the Axis tab and Series
+    /// for the Series tab.
+    pub fn groups(&self) -> [&compact::Group; 7] {
         [
             &self.styles,
             &self.chart,
             &self.scene,
             &self.value_axis,
+            &self.references,
             &self.category_axis,
             &self.series,
         ]
+    }
+
+    /// The reference lines: adding and removing one, choosing one, and
+    /// its settings (W144).
+    fn connect_references(self: &Rc<Self>, editor: &EditorOf, add: &gtk::Button) {
+        type Change = fn(&ChartGroups, &mut Chart);
+        let make = |this: &Rc<Self>, f: Change| {
+            let weak = Rc::downgrade(this);
+            let editor = editor.clone();
+            move || {
+                let Some(this) = weak.upgrade() else { return };
+                if this.updating.get() {
+                    return;
+                }
+                if let Some(editor) = editor() {
+                    editor.change_chart("Reference Line", |chart| f(&this, chart));
+                    this.show(&editor);
+                }
+            }
+        };
+        let f = make(self, |this, c| {
+            let lines = &mut c.value_axis.reference_lines;
+            this.reference.set(lines.len());
+            lines.push(ReferenceLine {
+                kind: ReferenceKind::Average,
+                name: tr("Average"),
+                show_name: true,
+                show_value: true,
+            });
+        });
+        add.connect_clicked(move |_| f());
+        let f = make(self, |this, c| {
+            let lines = &mut c.value_axis.reference_lines;
+            let at = this.reference.get();
+            if at < lines.len() {
+                lines.remove(at);
+                this.reference.set(at.saturating_sub(1));
+            }
+        });
+        self.reference_remove.connect_clicked(move |_| f());
+        let f = make(self, |this, c| {
+            let value = this.reference_value.value();
+            if let Some(line) = this.reference_line(c) {
+                // A name that was that of its kind follows the new kind.
+                let old = REFERENCES
+                    .get(reference_index(line.kind) as usize)
+                    .map(|n| tr(n));
+                let kind = reference_kind(this.reference_kind.selected(), value);
+                if old.as_deref() == Some(line.name.as_str())
+                    && let Some(new) = REFERENCES.get(reference_index(kind) as usize)
+                {
+                    line.name = tr(new);
+                }
+                line.kind = kind;
+            }
+        });
+        self.reference_kind.connect_selected_notify(move |_| f());
+        let f = make(self, |this, c| {
+            let value = this.reference_value.value();
+            if let Some(line) = this.reference_line(c)
+                && matches!(line.kind, ReferenceKind::Custom(_))
+            {
+                line.kind = ReferenceKind::Custom(Num(value));
+            }
+        });
+        self.reference_value.connect_value_notify(move |_| f());
+        let f = make(self, |this, c| {
+            let name = this.reference_name.text().to_string();
+            if let Some(line) = this.reference_line(c) {
+                line.name = name;
+            }
+        });
+        self.reference_name.connect_apply(move |_| f());
+        let switches: [(&compact::SwitchRow, Change); 2] = [
+            (&self.reference_show_name, |this, c| {
+                let on = this.reference_show_name.is_active();
+                if let Some(line) = this.reference_line(c) {
+                    line.show_name = on;
+                }
+            }),
+            (&self.reference_show_value, |this, c| {
+                let on = this.reference_show_value.is_active();
+                if let Some(line) = this.reference_line(c) {
+                    line.show_value = on;
+                }
+            }),
+        ];
+        for (row, f) in switches {
+            let f = make(self, f);
+            row.connect_active_notify(move |_| f());
+        }
+        // Another line shows its settings.
+        let weak = Rc::downgrade(self);
+        let editor = editor.clone();
+        self.reference_which.connect_selected_notify(move |row| {
+            let Some(this) = weak.upgrade() else { return };
+            if this.updating.get() || row.selected() == gtk::INVALID_LIST_POSITION {
+                return;
+            }
+            this.reference.set(row.selected() as usize);
+            if let Some(editor) = editor() {
+                this.show(&editor);
+            }
+        });
+    }
+
+    /// The reference line the group shows, in a chart being changed.
+    fn reference_line<'a>(&self, chart: &'a mut Chart) -> Option<&'a mut ReferenceLine> {
+        chart
+            .value_axis
+            .reference_lines
+            .get_mut(self.reference.get())
     }
 
     /// The series the Series group shows.
@@ -755,6 +961,7 @@ impl ChartGroups {
         set_switch(&self.bevel, chart.scene.bevel);
         self.value_axis.set_visible(!pie);
         self.category_axis.set_visible(!pie);
+        self.show_references(&chart);
         let axis = &chart.value_axis;
         set_switch(&self.min_on, axis.min.is_some());
         set_switch(&self.max_on, axis.max.is_some());
@@ -861,6 +1068,64 @@ impl ChartGroups {
     }
 }
 
+impl ChartGroups {
+    /// The reference lines of the value axis, and the settings of the one
+    /// chosen (W144): only charts with a plot across have them.
+    fn show_references(&self, chart: &Chart) {
+        self.references
+            .set_visible(!chart.kind.is_round() && chart.kind != ChartKind::Radar);
+        let lines = &chart.value_axis.reference_lines;
+        let at = self.reference.get().min(lines.len().saturating_sub(1));
+        self.reference.set(at);
+        let names: Vec<String> = lines
+            .iter()
+            .enumerate()
+            .map(|(i, l)| {
+                if l.name.is_empty() {
+                    tr("Line {number}").replace("{number}", &(i + 1).to_string())
+                } else {
+                    l.name.clone()
+                }
+            })
+            .collect();
+        let names: Vec<&str> = names.iter().map(String::as_str).collect();
+        self.reference_which
+            .set_model(Some(&gtk::StringList::new(&names)));
+        let line = lines.get(at);
+        let shown = line.is_some();
+        self.reference_which.set_visible(shown);
+        self.reference_kind.set_visible(shown);
+        self.reference_name.set_visible(shown);
+        self.reference_show_name.set_visible(shown);
+        self.reference_show_value.set_visible(shown);
+        let Some(line) = line else {
+            self.reference_value.set_visible(false);
+            return;
+        };
+        self.reference_which.set_selected(at as u32);
+        self.reference_kind.set_selected(reference_index(line.kind));
+        let custom = match line.kind {
+            ReferenceKind::Custom(v) => Some(v.0),
+            _ => None,
+        };
+        self.reference_value.set_visible(custom.is_some());
+        if let Some(v) = custom
+            && (self.reference_value.value() - v).abs() > 1e-9
+        {
+            self.reference_value.set_value(v);
+        }
+        if self.reference_name.text() != line.name {
+            self.reference_name.set_text(&line.name);
+        }
+        if self.reference_show_name.is_active() != line.show_name {
+            self.reference_show_name.set_active(line.show_name);
+        }
+        if self.reference_show_value.is_active() != line.show_value {
+            self.reference_show_value.set_active(line.show_value);
+        }
+    }
+}
+
 /// The series whose look the nth series of the Series group shows: of a
 /// scatter or a bubble chart, that of its y values (W142).
 fn look_of(chart: &Chart, shown: usize) -> usize {
@@ -934,5 +1199,13 @@ mod tests {
             assert_eq!(error_index(bars.as_ref()).0, i);
         }
         assert_eq!(KINDS.len(), ChartKind::ALL.len());
+    }
+
+    #[test]
+    fn w144_the_kinds_of_reference_lines_come_back_to_their_place() {
+        for i in 0..REFERENCES.len() as u32 {
+            assert_eq!(reference_index(reference_kind(i, 7.0)), i);
+        }
+        assert_eq!(reference_kind(4, 7.0), ReferenceKind::Custom(Num(7.0)));
     }
 }

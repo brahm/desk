@@ -144,7 +144,7 @@ W140	3.9 Tables	Lock table	Only 15	15.4	D-001	In	Done	-	done	Lock and Unlock of 
 W141	3.10 Charts	Types	Different	15.4	D-001	In	Partial	the window changes (D-008)	W4	Eleven 2D and 3D types (GRF-01); donut, radar and bubble (W4 step 10); the interactive chart is missing
 W142	3.10 Charts	Data	Different	15.4	D-001	In	Partial	the window changes (D-008)	W4	Data Editor (GRF-03, GRF-05); sharing the X values (W4 step 10); sampling and the rest of the editor of 15.4 are checked on the Mac
 W143	3.10 Charts	Axes, labels, legends	Equal	Equal in both	-	In	Done	the window changes (D-008)	W4	Axes, labels and legend (GRF-07, GRF-10, GRF-12)
-W144	3.10 Charts	Error bars and trendlines	Different	15.4	D-001	In	Partial	the window changes (D-008)	W4	Error bars and trendline (GRF-13, GRF-14); reference lines are missing
+W144	3.10 Charts	Error bars and trendlines	Different	15.4	D-001	In	Done	the window changes (D-008)	W4	Error bars and trendline (GRF-13, GRF-14); reference lines of the average, median, minimum, maximum or a value, with their name and value, in the Axis tab (W4 step 12)
 W145	3.10 Charts	Rounded corners, 3D bevel, donut hole	Only 15	15.4	D-001	In	Done	-	W4	Rounded corners with Outside Corners Only, the bevel of 3D bars and pies, and the hole of the donut (W4 step 10)
 W146	3.10 Charts	3D scene (light, angle)	Different	15.4, plus what the '09 did	D-001, D-003	In	Done	the target changed; the window changes (D-008)	W4	3D scene with light (GRF-20)
 W147	3.10 Charts	Chart styles	Only 15	15.4	D-001	In	Done	-	done	Chart styles, done with W080 in W1: six in a new document, in view in the Chart button and the Chart tab, with Copy Style, Paste Style and Create Style
