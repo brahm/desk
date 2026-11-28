@@ -597,7 +597,11 @@ pub(crate) fn export_chart(chart: &Chart, width: f64, height: f64) -> odf::Chart
         ChartKind::Line => "line",
         ChartKind::Area | ChartKind::StackedArea => "area",
         ChartKind::Pie => "circle",
-        ChartKind::Scatter => "scatter",
+        ChartKind::Donut => "ring",
+        // A bubble chart goes to other programs as the scatter of its x
+        // and y values; desk:chart keeps the sizes (W141).
+        ChartKind::Scatter | ChartKind::Bubble => "scatter",
+        ChartKind::Radar => "radar",
         ChartKind::Mixed | ChartKind::TwoAxis => "bar",
     };
     let mut out = odf::ChartDocument {
@@ -620,13 +624,13 @@ pub(crate) fn export_chart(chart: &Chart, width: f64, height: f64) -> odf::Chart
             .map(|c| chart.value(s, c))
             .collect()
     };
-    if chart.kind == ChartKind::Scatter {
-        for s in 0..n / 2 {
+    if chart.kind.has_x_values() {
+        for ps in chart.point_series() {
             out.series.push(odf::ChartSeries {
-                name: chart.series_name(2 * s + 1).to_owned(),
-                values: values(2 * s + 1),
-                x_values: Some(values(2 * s)),
-                color: Some(odf_color(chart.style(2 * s + 1).color())),
+                name: chart.series_name(ps.y).to_owned(),
+                values: values(ps.y),
+                x_values: Some(values(ps.x)),
+                color: Some(odf_color(chart.style(ps.y).color())),
                 ..odf::ChartSeries::default()
             });
         }
@@ -675,7 +679,9 @@ pub(crate) fn import_chart(
         ("line", ..) => ChartKind::Line,
         ("area", _, false) => ChartKind::Area,
         ("area", _, true) => ChartKind::StackedArea,
-        ("circle" | "ring", ..) => ChartKind::Pie,
+        ("circle", ..) => ChartKind::Pie,
+        ("ring", ..) => ChartKind::Donut,
+        ("radar" | "filled-radar", ..) => ChartKind::Radar,
         ("scatter" | "bubble", ..) => ChartKind::Scatter,
         _ => ChartKind::Column,
     };

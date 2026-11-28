@@ -37,11 +37,19 @@ pub enum ChartKind {
     /// Like Mixed, with the second series on a second value axis on the
     /// right.
     TwoAxis,
+    /// A pie with a hole in the middle, of the first value of each series
+    /// (W141, W145).
+    Donut,
+    /// A spoke for each category, with each series as a closed line
+    /// around the center (W141).
+    Radar,
+    /// Bubbles by values of three: x, y and the size (W141).
+    Bubble,
 }
 
 impl ChartKind {
     /// All the kinds, in the order of the chart menu.
-    pub const ALL: [Self; 11] = [
+    pub const ALL: [Self; 14] = [
         Self::Column,
         Self::StackedColumn,
         Self::Bar,
@@ -50,15 +58,42 @@ impl ChartKind {
         Self::Area,
         Self::StackedArea,
         Self::Pie,
+        Self::Donut,
         Self::Scatter,
+        Self::Bubble,
+        Self::Radar,
         Self::Mixed,
         Self::TwoAxis,
     ];
 
-    /// Whether the kind can be drawn in 3D: all but scatter, mixed and 2
-    /// axes.
+    /// Whether the kind can be drawn in 3D: all but scatter, bubble,
+    /// radar, mixed and 2 axes, and the donut, which Pages 15.4 has in 2D
+    /// only (W141).
     pub fn has_3d(self) -> bool {
-        !matches!(self, Self::Scatter | Self::Mixed | Self::TwoAxis)
+        !matches!(
+            self,
+            Self::Scatter | Self::Bubble | Self::Radar | Self::Donut | Self::Mixed | Self::TwoAxis
+        )
+    }
+
+    /// Whether the kind is round: a pie or a donut.
+    pub fn is_round(self) -> bool {
+        matches!(self, Self::Pie | Self::Donut)
+    }
+
+    /// Whether the kind places its points by x values: scatter and bubble
+    /// (W142).
+    pub fn has_x_values(self) -> bool {
+        matches!(self, Self::Scatter | Self::Bubble)
+    }
+
+    /// Whether the kind draws bars or columns, whose ends can be rounded
+    /// (W145).
+    pub fn has_bars(self) -> bool {
+        matches!(
+            self,
+            Self::Column | Self::StackedColumn | Self::Bar | Self::StackedBar
+        )
     }
 
     /// Whether the series are stacked.
@@ -77,12 +112,12 @@ impl ChartKind {
     /// Whether the kind has error bars and trendlines: the 2D charts
     /// other than pie; trendlines only when not stacked (GRF-13, GRF-14).
     pub fn has_error_bars(self) -> bool {
-        self != Self::Pie
+        !self.is_round() && !matches!(self, Self::Radar | Self::Bubble)
     }
 
     /// Whether the kind takes trendlines (GRF-14).
     pub fn has_trendlines(self) -> bool {
-        self != Self::Pie && !self.is_stacked()
+        !self.is_round() && self != Self::Radar && !self.is_stacked()
     }
 }
 
@@ -842,6 +877,29 @@ impl Default for PieOptions {
     }
 }
 
+/// The options of a bubble chart (W141).
+#[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub struct BubbleOptions {
+    /// How big the biggest bubble is, in percent of a sixth of the
+    /// shorter side of the plot.
+    pub scale: u16,
+    /// Whether the size value sets the diameter of a bubble rather than
+    /// its area.
+    pub by_diameter: bool,
+    /// Whether bubbles of negative sizes show, as rings.
+    pub negative: bool,
+}
+
+impl Default for BubbleOptions {
+    fn default() -> Self {
+        Self {
+            scale: 100,
+            by_diameter: false,
+            negative: false,
+        }
+    }
+}
+
 /// The text of a chart (GRF-08).
 #[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct ChartText {
@@ -921,19 +979,70 @@ pub struct Chart {
     /// The spreadsheet that the data comes from, when it was pasted from
     /// Desk Tables and stays linked to it (GRF-06).
     pub link: Option<DataLink>,
+    /// The size of the hole of a donut, in percent of its radius (W145).
+    /// The fields from here are new in W4; files written before them
+    /// take their defaults.
+    #[serde(default = "default_inner_radius")]
+    pub inner_radius: u8,
+    /// How round the ends of bars and columns are, in percent of their
+    /// width, up to 50 for a half circle (W145).
+    #[serde(default)]
+    pub corner_radius: u8,
+    /// Whether only the outer end of a stack of bars is rounded, rather
+    /// than the end of each bar (W145).
+    #[serde(default)]
+    pub outside_corners_only: bool,
+    /// For a scatter or a bubble chart: whether the first series holds
+    /// the x values of all the others, rather than each series having its
+    /// own (W142).
+    #[serde(default)]
+    pub share_x: bool,
+    /// The options of a bubble chart.
+    #[serde(default)]
+    pub bubble: BubbleOptions,
+    /// Whether the grid of a radar chart is of circles rather than of
+    /// polygons (W141).
+    #[serde(default)]
+    pub radar_circular: bool,
+}
+
+/// The hole of a new donut, as Pages draws it.
+fn default_inner_radius() -> u8 {
+    50
+}
+
+/// How a scatter or a bubble chart reads its series (W141, W142): each
+/// plotted series takes the values of some series of the data, by their
+/// index.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct PointSeries {
+    /// The series of the x values.
+    pub x: usize,
+    /// The series of the y values, whose name and look it takes.
+    pub y: usize,
+    /// For a bubble chart, the series of the sizes.
+    pub size: Option<usize>,
 }
 
 impl Chart {
     /// A new chart of a kind, with the data of iWork (GRF-03).
     pub fn new(kind: ChartKind) -> Self {
+        let mut data = ChartData::sample();
+        // A bubble takes a third series for the sizes of the first two.
+        if kind == ChartKind::Bubble {
+            data.rows.push("Região 3".into());
+            data.values
+                .push([30.0, 12.0, 45.0, 20.0].map(|v| Some(Num(v))).to_vec());
+        }
+        let n = data.rows.len();
         Self {
             kind,
             three_d: false,
-            data: ChartData::sample(),
+            data,
             series_in_rows: true,
             title: None,
             legend: true,
-            series: (0..2).map(SeriesStyle::nth).collect(),
+            series: (0..n).map(SeriesStyle::nth).collect(),
             value_axis: ValueAxis::default(),
             value_axis2: ValueAxis {
                 gridlines: false,
@@ -950,6 +1059,51 @@ impl Chart {
             scene: Scene::default(),
             text: ChartText::default(),
             link: None,
+            inner_radius: default_inner_radius(),
+            corner_radius: 0,
+            outside_corners_only: false,
+            share_x: false,
+            bubble: BubbleOptions::default(),
+            radar_circular: false,
+        }
+    }
+
+    /// The series that a scatter or a bubble chart plots, from the series
+    /// of the data (W141, W142). Without shared x values, a scatter takes
+    /// them by pairs (x, y) and a bubble by threes (x, y, size); with
+    /// them, the first series is the x of all, and the rest go alone or
+    /// by pairs (y, size). A last group without all its series is left
+    /// out. Other kinds plot none.
+    pub fn point_series(&self) -> Vec<PointSeries> {
+        let n = self.series_count();
+        let bubble = self.kind == ChartKind::Bubble;
+        if !self.kind.has_x_values() {
+            return Vec::new();
+        }
+        let group = if bubble { 2 } else { 1 };
+        if self.share_x {
+            (0..n.saturating_sub(1) / group)
+                .map(|i| {
+                    let y = 1 + i * group;
+                    PointSeries {
+                        x: 0,
+                        y,
+                        size: bubble.then_some(y + 1),
+                    }
+                })
+                .collect()
+        } else {
+            let group = group + 1;
+            (0..n / group)
+                .map(|i| {
+                    let x = i * group;
+                    PointSeries {
+                        x,
+                        y: x + 1,
+                        size: bubble.then_some(x + 2),
+                    }
+                })
+                .collect()
         }
     }
 
@@ -1021,6 +1175,27 @@ impl Chart {
         if !kind.has_3d() {
             self.three_d = false;
         }
+        // A bubble chart with too few series for one bubble gets sizes:
+        // those of its last series, so that its points show as bubbles.
+        if kind == ChartKind::Bubble && self.point_series().is_empty() && self.series_count() > 0 {
+            let last = self.series_count() - 1;
+            let sizes: Vec<Option<f64>> = (0..self.category_count())
+                .map(|c| self.value(last, c).map(f64::abs))
+                .collect();
+            let at = self.series_count();
+            if self.series_in_rows {
+                self.data.insert_row(at, "Tamanho".into());
+            } else {
+                self.data.insert_col(at, "Tamanho".into());
+            }
+            for (c, v) in sizes.into_iter().enumerate() {
+                if self.series_in_rows {
+                    self.data.set(at, c, v);
+                } else {
+                    self.data.set(c, at, v);
+                }
+            }
+        }
         for (i, s) in self.series.iter_mut().enumerate() {
             let fresh = SeriesStyle::nth(i);
             s.labels = fresh.labels;
@@ -1059,6 +1234,70 @@ mod tests {
         let data = ChartData::from_text("\tA\tB\tC\tD\nx\t1.234,56\t1,234.56\t2,5\t3.5");
         let row: Vec<Option<f64>> = (0..4).map(|c| data.get(0, c)).collect();
         assert_eq!(row, [Some(1234.56), Some(1234.56), Some(2.5), Some(3.5)]);
+    }
+
+    #[test]
+    fn w141_w142_scatter_and_bubble_series_take_their_values_by_groups() {
+        let ps = |x, y, size| PointSeries { x, y, size };
+        let mut chart = Chart::new(ChartKind::Scatter);
+        for name in ["C", "D", "E"] {
+            chart.data.insert_row(chart.data.rows.len(), name.into());
+        }
+        // Five series: two pairs and one left over.
+        assert_eq!(chart.point_series(), [ps(0, 1, None), ps(2, 3, None)]);
+        chart.share_x = true;
+        assert_eq!(
+            chart.point_series(),
+            (1..5).map(|y| ps(0, y, None)).collect::<Vec<_>>()
+        );
+        chart.kind = ChartKind::Bubble;
+        assert_eq!(chart.point_series(), [ps(0, 1, Some(2)), ps(0, 3, Some(4))]);
+        chart.share_x = false;
+        assert_eq!(chart.point_series(), [ps(0, 1, Some(2))]);
+        chart.kind = ChartKind::Radar;
+        assert!(chart.point_series().is_empty());
+        // A chart of two series made a bubble chart gets their sizes.
+        let mut chart = Chart::new(ChartKind::Column);
+        chart.set_kind(ChartKind::Bubble);
+        assert_eq!(chart.point_series(), [ps(0, 1, Some(2))]);
+        assert_eq!(chart.value(2, 3), Some(58.0));
+        // A new bubble chart has its three series.
+        assert_eq!(Chart::new(ChartKind::Bubble).point_series().len(), 1);
+    }
+
+    #[test]
+    fn w141_w145_charts_of_older_files_take_the_new_defaults() {
+        let chart = Chart::new(ChartKind::Column);
+        let mut json: serde_json::Value = serde_json::to_value(&chart).unwrap();
+        let map = json.as_object_mut().unwrap();
+        for key in [
+            "inner_radius",
+            "corner_radius",
+            "outside_corners_only",
+            "share_x",
+            "bubble",
+            "radar_circular",
+        ] {
+            assert!(map.remove(key).is_some(), "{key}");
+        }
+        let read: Chart = serde_json::from_value(json).unwrap();
+        assert_eq!(read, chart);
+        assert_eq!(read.inner_radius, 50);
+        assert_eq!(read.bubble.scale, 100);
+    }
+
+    #[test]
+    fn w141_the_new_kinds_are_flat_and_keep_what_they_draw() {
+        for kind in [ChartKind::Donut, ChartKind::Radar, ChartKind::Bubble] {
+            assert!(!kind.has_3d(), "{kind:?}");
+            assert!(!kind.has_error_bars(), "{kind:?}");
+        }
+        assert!(ChartKind::Bubble.has_trendlines());
+        assert!(!ChartKind::Donut.has_trendlines());
+        let mut chart = Chart::new(ChartKind::Pie);
+        chart.three_d = true;
+        chart.set_kind(ChartKind::Donut);
+        assert!(!chart.three_d);
     }
 
     #[test]

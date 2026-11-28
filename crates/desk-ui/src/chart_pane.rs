@@ -23,7 +23,7 @@ use crate::i18n::{n_, tr};
 use crate::table_pane::{from_gdk, to_gdk};
 
 /// The kinds of the menu, in the order of [`ChartKind::ALL`].
-pub(crate) const KINDS: [&str; 11] = [
+pub(crate) const KINDS: [&str; 14] = [
     n_("Column"),
     n_("Stacked Column"),
     n_("Bar"),
@@ -32,7 +32,10 @@ pub(crate) const KINDS: [&str; 11] = [
     n_("Area"),
     n_("Stacked Area"),
     n_("Pie"),
+    n_("Donut"),
     n_("Scatter"),
+    n_("Bubble"),
+    n_("Radar"),
     n_("Mixed"),
     n_("2-Axis"),
 ];
@@ -131,6 +134,14 @@ pub struct ChartGroups {
     colors: compact::ComboRow,
     gap: compact::SpinRow,
     percentages: compact::SwitchRow,
+    inner_radius: compact::SpinRow,
+    corners: compact::SpinRow,
+    outside_corners: compact::SwitchRow,
+    share_x: compact::SwitchRow,
+    radar_circular: compact::SwitchRow,
+    bubble_scale: compact::SpinRow,
+    by_diameter: compact::SwitchRow,
+    negative_bubbles: compact::SwitchRow,
     depth: compact::SpinRow,
     lighting: compact::ComboRow,
     bevel: compact::SwitchRow,
@@ -186,6 +197,18 @@ impl ChartGroups {
         let gap = spin(n_("Gap Between Bars"), 0.0, 500.0, 5.0);
         gap.set_subtitle(&tr("Percent"));
         let percentages = switch(n_("Values as Percentages"));
+        // The shapes of Pages 15.4 (W141, W142, W145).
+        let inner_radius = spin(n_("Inner Radius"), 0.0, 95.0, 5.0);
+        inner_radius.set_subtitle(&tr("Percent"));
+        let corners = spin(n_("Rounded Corners"), 0.0, 50.0, 5.0);
+        corners.set_subtitle(&tr("Percent"));
+        let outside_corners = switch(n_("Outside Corners Only"));
+        let share_x = switch(n_("Share X Values"));
+        let radar_circular = switch(n_("Circular Grid"));
+        let bubble_scale = spin(n_("Bubble Size"), 10.0, 300.0, 10.0);
+        bubble_scale.set_subtitle(&tr("Percent"));
+        let by_diameter = switch(n_("Size by Diameter"));
+        let negative_bubbles = switch(n_("Show Negative Bubbles"));
         let edit = gtk::Button::builder()
             .label(tr("Edit Data"))
             .action_name("win.edit-chart-data")
@@ -204,7 +227,15 @@ impl ChartGroups {
         chart.add(&legend);
         chart.add(&colors);
         chart.add(&gap);
+        chart.add(&corners);
+        chart.add(&outside_corners);
+        chart.add(&inner_radius);
         chart.add(&percentages);
+        chart.add(&share_x);
+        chart.add(&bubble_scale);
+        chart.add(&by_diameter);
+        chart.add(&negative_bubbles);
+        chart.add(&radar_circular);
         chart.add(&three_d);
         let depth = spin(n_("Depth"), 10.0, 400.0, 10.0);
         depth.set_subtitle(&tr("Percent"));
@@ -352,6 +383,14 @@ impl ChartGroups {
             colors,
             gap,
             percentages,
+            inner_radius,
+            corners,
+            outside_corners,
+            share_x,
+            radar_circular,
+            bubble_scale,
+            by_diameter,
+            negative_bubbles,
             depth,
             lighting,
             bevel,
@@ -475,7 +514,22 @@ impl ChartGroups {
             let f = make(self, name, f);
             row.connect_selected_notify(move |_| f());
         }
-        let switches: [(&compact::SwitchRow, &'static str, Change); 14] = [
+        let switches: [(&compact::SwitchRow, &'static str, Change); 19] = [
+            (&self.outside_corners, "Rounded Corners", |this, c| {
+                c.outside_corners_only = this.outside_corners.is_active();
+            }),
+            (&self.share_x, "Share X Values", |this, c| {
+                c.share_x = this.share_x.is_active();
+            }),
+            (&self.radar_circular, "Circular Grid", |this, c| {
+                c.radar_circular = this.radar_circular.is_active();
+            }),
+            (&self.by_diameter, "Bubble Size", |this, c| {
+                c.bubble.by_diameter = this.by_diameter.is_active();
+            }),
+            (&self.negative_bubbles, "Bubble Size", |this, c| {
+                c.bubble.negative = this.negative_bubbles.is_active();
+            }),
             (&self.three_d, "3D", |this, c| {
                 c.three_d = this.three_d.is_active()
             }),
@@ -523,7 +577,16 @@ impl ChartGroups {
             let f = make(self, name, f);
             row.connect_active_notify(move |_| f());
         }
-        let spins: [(&compact::SpinRow, &'static str, Change); 8] = [
+        let spins: [(&compact::SpinRow, &'static str, Change); 11] = [
+            (&self.inner_radius, "Inner Radius", |this, c| {
+                c.inner_radius = this.inner_radius.value() as u8;
+            }),
+            (&self.corners, "Rounded Corners", |this, c| {
+                c.corner_radius = this.corners.value() as u8;
+            }),
+            (&self.bubble_scale, "Bubble Size", |this, c| {
+                c.bubble.scale = this.bubble_scale.value() as u16;
+            }),
             (&self.gap, "Gap Between Bars", |this, c| {
                 c.bar_gap = this.gap.value() as u16
             }),
@@ -655,19 +718,34 @@ impl ChartGroups {
         set_switch(&self.title_on, chart.title.is_some());
         set_entry(&self.title, chart.title.as_deref().unwrap_or_default());
         set_switch(&self.legend, chart.legend);
-        let bars = !matches!(
-            chart.kind,
-            ChartKind::Line
-                | ChartKind::Pie
-                | ChartKind::Scatter
-                | ChartKind::Area
-                | ChartKind::StackedArea
-        );
+        let bars =
+            chart.kind.has_bars() || matches!(chart.kind, ChartKind::Mixed | ChartKind::TwoAxis);
         self.gap.set_visible(bars);
         set_spin(&self.gap, f64::from(chart.bar_gap));
-        let pie = chart.kind == ChartKind::Pie;
+        let pie = chart.kind.is_round();
         self.percentages.set_visible(pie);
         set_switch(&self.percentages, chart.pie.percentages);
+        self.corners.set_visible(chart.kind.has_bars());
+        set_spin(&self.corners, f64::from(chart.corner_radius));
+        self.outside_corners
+            .set_visible(chart.kind.has_bars() && chart.corner_radius > 0);
+        set_switch(&self.outside_corners, chart.outside_corners_only);
+        self.inner_radius
+            .set_visible(chart.kind == ChartKind::Donut);
+        set_spin(&self.inner_radius, f64::from(chart.inner_radius));
+        self.share_x.set_visible(chart.kind.has_x_values());
+        set_switch(&self.share_x, chart.share_x);
+        let bubble = chart.kind == ChartKind::Bubble;
+        for row in [&self.by_diameter, &self.negative_bubbles] {
+            row.set_visible(bubble);
+        }
+        self.bubble_scale.set_visible(bubble);
+        set_spin(&self.bubble_scale, f64::from(chart.bubble.scale));
+        set_switch(&self.by_diameter, chart.bubble.by_diameter);
+        set_switch(&self.negative_bubbles, chart.bubble.negative);
+        self.radar_circular
+            .set_visible(chart.kind == ChartKind::Radar);
+        set_switch(&self.radar_circular, chart.radar_circular);
         set_spin(&self.depth, f64::from(chart.scene.depth));
         self.lighting.set_selected(match chart.scene.lighting {
             Lighting::Soft => 0,
@@ -705,11 +783,13 @@ impl ChartGroups {
             &self.category_title,
             category.title.as_deref().unwrap_or_default(),
         );
-        // The series, by name: of a scatter chart, the y of each pair.
-        let scatter = chart.kind == ChartKind::Scatter;
-        let names: Vec<String> = if scatter {
-            (0..chart.series_count() / 2)
-                .map(|s| chart.series_name(2 * s + 1).to_owned())
+        // The series, by name: of a scatter or a bubble chart, those of
+        // the y values that it plots (W142).
+        let names: Vec<String> = if chart.kind.has_x_values() {
+            chart
+                .point_series()
+                .iter()
+                .map(|ps| chart.series_name(ps.y).to_owned())
                 .collect()
         } else {
             (0..chart.series_count())
@@ -721,8 +801,7 @@ impl ChartGroups {
         let model = gtk::StringList::new(&names);
         self.which.set_model(Some(&model));
         self.which.set_selected(shown as u32);
-        let index = if scatter { 2 * shown + 1 } else { shown };
-        let style = chart.style(index);
+        let style = chart.style(look_of(&chart, shown));
         self.color.set_rgba(&to_gdk(style.color()));
         set_switch(&self.labels, style.labels.show);
         self.position.set_selected(match style.labels.position {
@@ -731,8 +810,14 @@ impl ChartGroups {
             LabelPosition::Middle => 2,
             LabelPosition::InsideBase => 3,
         });
-        let lines = matches!(chart.kind, ChartKind::Line | ChartKind::Scatter)
-            || matches!(chart.kind, ChartKind::Mixed | ChartKind::TwoAxis);
+        let lines = matches!(
+            chart.kind,
+            ChartKind::Line
+                | ChartKind::Scatter
+                | ChartKind::Radar
+                | ChartKind::Mixed
+                | ChartKind::TwoAxis
+        );
         self.symbol.set_visible(lines);
         self.symbol.set_selected(match style.symbol {
             Symbol::None => 0,
@@ -776,13 +861,19 @@ impl ChartGroups {
     }
 }
 
+/// The series whose look the nth series of the Series group shows: of a
+/// scatter or a bubble chart, that of its y values (W142).
+fn look_of(chart: &Chart, shown: usize) -> usize {
+    if chart.kind.has_x_values() {
+        chart.point_series().get(shown).map_or(shown, |ps| ps.y)
+    } else {
+        shown
+    }
+}
+
 /// The style of a series, made when the chart has none of its own yet.
 fn series_style(chart: &mut Chart, s: usize) -> &mut desk_model::chart::SeriesStyle {
-    let s = if chart.kind == ChartKind::Scatter {
-        2 * s + 1
-    } else {
-        s
-    };
+    let s = look_of(chart, s);
     while chart.series.len() <= s {
         let n = chart.series.len();
         chart.series.push(chart.style(n));

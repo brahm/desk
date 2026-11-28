@@ -260,3 +260,78 @@ fn iop_15_formulas_that_name_headers_keep_the_names_and_compute() {
     assert_eq!(values.get(3, 1), &desk_table::Value::Number(17.0));
     assert_eq!(values.get(3, 2), &desk_table::Value::Number(21.5));
 }
+
+/// A document of one chart.
+fn chart_document(chart: Chart) -> Document {
+    let mut editor = Editor::new(Document::new_word_processing());
+    editor
+        .edit("Insert", |edit| {
+            let mut o = Object::new(
+                edit.new_id(),
+                ObjectKind::Chart(Arc::new(chart)),
+                Frame::from_pt(72.0, 72.0, 300.0, 200.0),
+            );
+            o.anchor = Anchor::Page(0);
+            edit.add_object(o)
+        })
+        .unwrap();
+    editor.document().clone()
+}
+
+/// The chart of a document as another program reads it: from the chart
+/// of ODF alone, without what only Desk reads.
+fn as_others_read(document: &Document) -> (odf::ChartDocument, Chart) {
+    let bytes = write_odt(document).unwrap();
+    let mut plain = odf::read_odt(&bytes).unwrap();
+    for o in objects(&mut plain) {
+        if let odf::DrawKind::Object { desk, .. } = &mut o.kind {
+            *desk = None;
+        }
+    }
+    let chart = plain.charts[0].1.clone();
+    let after = read_odt(&odf::write_odt(&plain).unwrap()).unwrap();
+    (chart, chart_of(&after))
+}
+
+#[test]
+fn w141_w142_w145_donut_radar_and_bubble_charts_survive_odt() {
+    let mut donut = Chart::new(ChartKind::Donut);
+    donut.inner_radius = 65;
+    let mut bubble = Chart::new(ChartKind::Bubble);
+    bubble.share_x = true;
+    bubble.bubble.by_diameter = true;
+    let mut radar = Chart::new(ChartKind::Radar);
+    radar.radar_circular = true;
+    let mut column = Chart::new(ChartKind::StackedColumn);
+    column.corner_radius = 25;
+    column.outside_corners_only = true;
+    for chart in [donut, bubble, radar, column] {
+        let before = chart_document(chart);
+        let after = read_odt(&write_odt(&before).unwrap()).unwrap();
+        assert_eq!(chart_of(&after), chart_of(&before));
+    }
+}
+
+#[test]
+fn w141_other_programs_read_donuts_radars_and_bubbles() {
+    let (odf_chart, chart) = as_others_read(&chart_document(Chart::new(ChartKind::Donut)));
+    assert_eq!(odf_chart.class, "ring");
+    assert_eq!(chart.kind, ChartKind::Donut);
+    let (odf_chart, chart) = as_others_read(&chart_document(Chart::new(ChartKind::Radar)));
+    assert_eq!(odf_chart.class, "radar");
+    assert_eq!(chart.kind, ChartKind::Radar);
+    assert_eq!(chart.value(1, 3), Some(58.0));
+    // A bubble goes as the scatter of its x and y values.
+    let (odf_chart, chart) = as_others_read(&chart_document(Chart::new(ChartKind::Bubble)));
+    assert_eq!(odf_chart.class, "scatter");
+    assert_eq!(odf_chart.series.len(), 1);
+    assert_eq!(odf_chart.series[0].name, "Região 2");
+    assert_eq!(chart.kind, ChartKind::Scatter);
+    // Shared x values go to each series.
+    let mut shared = Chart::new(ChartKind::Scatter);
+    shared.data.insert_row(2, "Região 3".into());
+    shared.share_x = true;
+    let (odf_chart, _) = as_others_read(&chart_document(shared));
+    assert_eq!(odf_chart.series.len(), 2);
+    assert_eq!(odf_chart.series[0].x_values, odf_chart.series[1].x_values);
+}

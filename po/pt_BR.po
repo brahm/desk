@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Desk\n"
 "Report-Msgid-Bugs-To: https://github.com/brahm/desk/issues\n"
-"POT-Creation-Date: 2026-11-28 00:27+0000\n"
+"POT-Creation-Date: 2026-11-28 01:03+0000\n"
 "PO-Revision-Date: 2026-11-02 00:54+0000\n"
 "Last-Translator: Desk contributors\n"
 "Language-Team: Brazilian Portuguese\n"
@@ -145,7 +145,7 @@ msgstr "Direita"
 msgid "Inside"
 msgstr "Interno"
 
-#: crates/desk-ui/src/auto_numbers.rs:61 crates/desk-ui/src/chart_pane.rs:266
+#: crates/desk-ui/src/auto_numbers.rs:61 crates/desk-ui/src/chart_pane.rs:297
 msgid "Outside"
 msgstr "Externo"
 
@@ -358,115 +358,131 @@ msgstr "Objeto"
 msgid "Paragraph Break"
 msgstr "Quebra de Parágrafo"
 
-#: crates/desk-ui/src/chart_data.rs:177 crates/desk-ui/src/undo_names.rs:16
+#: crates/desk-ui/src/chart_data.rs:178 crates/desk-ui/src/undo_names.rs:16
 msgid "Add Row"
 msgstr "Adicionar linha"
 
-#: crates/desk-ui/src/chart_data.rs:178 crates/desk-ui/src/undo_names.rs:35
+#: crates/desk-ui/src/chart_data.rs:179 crates/desk-ui/src/undo_names.rs:35
 msgid "Delete Row"
 msgstr "Excluir linha"
 
-#: crates/desk-ui/src/chart_data.rs:179 crates/desk-ui/src/undo_names.rs:14
+#: crates/desk-ui/src/chart_data.rs:180 crates/desk-ui/src/undo_names.rs:14
 msgid "Add Column"
 msgstr "Adicionar coluna"
 
-#: crates/desk-ui/src/chart_data.rs:180 crates/desk-ui/src/undo_names.rs:34
+#: crates/desk-ui/src/chart_data.rs:181 crates/desk-ui/src/undo_names.rs:34
 msgid "Delete Column"
 msgstr "Excluir coluna"
 
-#: crates/desk-ui/src/chart_data.rs:194
+#: crates/desk-ui/src/chart_data.rs:195
 msgid "Series in Rows"
 msgstr "Séries em linhas"
 
-#: crates/desk-ui/src/chart_data.rs:195
+#: crates/desk-ui/src/chart_data.rs:196
 msgid "Series in Columns"
 msgstr "Séries em colunas"
 
-#: crates/desk-ui/src/chart_data.rs:217
+#: crates/desk-ui/src/chart_data.rs:216 crates/desk-ui/src/chart_pane.rs:206
+msgid "Share X Values"
+msgstr "Compartilhar Valores X"
+
+#: crates/desk-ui/src/chart_data.rs:226
 msgid "Row"
 msgstr "Linha"
 
-#: crates/desk-ui/src/chart_data.rs:228 crates/desk-ui/src/chart_pane.rs:27
-#: crates/desk-ui/src/window/tables.rs:146
+#: crates/desk-ui/src/chart_data.rs:237 crates/desk-ui/src/chart_pane.rs:27
+#: crates/desk-ui/src/window/tables.rs:149
 msgid "Column"
 msgstr "Coluna"
 
-#: crates/desk-ui/src/chart_data.rs:242
+#: crates/desk-ui/src/chart_data.rs:251
 msgid "Done"
 msgstr "Concluído"
 
-#: crates/desk-ui/src/chart_data.rs:250 crates/desk-ui/src/chart_pane.rs:195
+#: crates/desk-ui/src/chart_data.rs:259 crates/desk-ui/src/chart_pane.rs:218
 msgid "Chart Data"
 msgstr "Dados do gráfico"
 
-#: crates/desk-ui/src/chart_pane.rs:28 crates/desk-ui/src/window/tables.rs:147
+#: crates/desk-ui/src/chart_pane.rs:28 crates/desk-ui/src/window/tables.rs:150
 msgid "Stacked Column"
 msgstr "Colunas empilhadas"
 
 #: crates/desk-ui/src/chart_pane.rs:29 crates/desk-ui/src/graphic_pane.rs:94
-#: crates/desk-ui/src/window/tables.rs:148
+#: crates/desk-ui/src/window/tables.rs:151
 msgid "Bar"
 msgstr "Barra"
 
-#: crates/desk-ui/src/chart_pane.rs:30 crates/desk-ui/src/window/tables.rs:149
+#: crates/desk-ui/src/chart_pane.rs:30 crates/desk-ui/src/window/tables.rs:152
 msgid "Stacked Bar"
 msgstr "Barras empilhadas"
 
 #: crates/desk-ui/src/chart_pane.rs:31 crates/desk-ui/src/tab_stops.rs:53
-#: crates/desk-ui/src/window/tables.rs:150
+#: crates/desk-ui/src/window/tables.rs:153
 msgid "Line"
 msgstr "Linha"
 
-#: crates/desk-ui/src/chart_pane.rs:32 crates/desk-ui/src/window/tables.rs:151
+#: crates/desk-ui/src/chart_pane.rs:32 crates/desk-ui/src/window/tables.rs:154
 msgid "Area"
 msgstr "Área"
 
-#: crates/desk-ui/src/chart_pane.rs:33 crates/desk-ui/src/window/tables.rs:152
+#: crates/desk-ui/src/chart_pane.rs:33 crates/desk-ui/src/window/tables.rs:155
 msgid "Stacked Area"
 msgstr "Área empilhada"
 
-#: crates/desk-ui/src/chart_pane.rs:34 crates/desk-ui/src/window/tables.rs:153
+#: crates/desk-ui/src/chart_pane.rs:34 crates/desk-ui/src/window/tables.rs:156
 msgid "Pie"
 msgstr "Pizza"
 
-#: crates/desk-ui/src/chart_pane.rs:35 crates/desk-ui/src/window/tables.rs:154
+#: crates/desk-ui/src/chart_pane.rs:35 crates/desk-ui/src/window/tables.rs:157
+msgid "Donut"
+msgstr "Rosca"
+
+#: crates/desk-ui/src/chart_pane.rs:36 crates/desk-ui/src/window/tables.rs:158
 msgid "Scatter"
 msgstr "Dispersão"
 
-#: crates/desk-ui/src/chart_pane.rs:36 crates/desk-ui/src/window/tables.rs:155
+#: crates/desk-ui/src/chart_pane.rs:37 crates/desk-ui/src/window/tables.rs:159
+msgid "Bubble"
+msgstr "Bolhas"
+
+#: crates/desk-ui/src/chart_pane.rs:38 crates/desk-ui/src/window/tables.rs:160
+msgid "Radar"
+msgstr "Radar"
+
+#: crates/desk-ui/src/chart_pane.rs:39 crates/desk-ui/src/window/tables.rs:161
 msgid "Mixed"
 msgstr "Misto"
 
-#: crates/desk-ui/src/chart_pane.rs:37 crates/desk-ui/src/window/tables.rs:156
+#: crates/desk-ui/src/chart_pane.rs:40 crates/desk-ui/src/window/tables.rs:162
 msgid "2-Axis"
 msgstr "2 eixos"
 
-#: crates/desk-ui/src/chart_pane.rs:41
+#: crates/desk-ui/src/chart_pane.rs:44
 #: crates/desk-ui/src/editing/objects.rs:1711
 #: crates/desk-ui/src/editing/objects.rs:1739 crates/desk-ui/src/effects.rs:46
 msgid "Default"
 msgstr "Padrão"
 
-#: crates/desk-ui/src/chart_pane.rs:42
+#: crates/desk-ui/src/chart_pane.rs:45
 msgid "Pastel"
 msgstr "Pastel"
 
-#: crates/desk-ui/src/chart_pane.rs:43
+#: crates/desk-ui/src/chart_pane.rs:46
 #: crates/desk-ui/src/object_styles_pane.rs:38
 #: crates/desk-ui/src/tables/window.rs:64
 msgid "Gray"
 msgstr "Cinza"
 
-#: crates/desk-ui/src/chart_pane.rs:44
+#: crates/desk-ui/src/chart_pane.rs:47
 msgid "Gradients"
 msgstr "Degradês"
 
-#: crates/desk-ui/src/chart_pane.rs:45
+#: crates/desk-ui/src/chart_pane.rs:48
 msgid "Textures"
 msgstr "Texturas"
 
-#: crates/desk-ui/src/chart_pane.rs:49 crates/desk-ui/src/chart_pane.rs:59
-#: crates/desk-ui/src/chart_pane.rs:275 crates/desk-ui/src/color_popover.rs:160
+#: crates/desk-ui/src/chart_pane.rs:52 crates/desk-ui/src/chart_pane.rs:62
+#: crates/desk-ui/src/chart_pane.rs:306 crates/desk-ui/src/color_popover.rs:160
 #: crates/desk-ui/src/effects.rs:55 crates/desk-ui/src/effects.rs:123
 #: crates/desk-ui/src/fonts.rs:187 crates/desk-ui/src/format_pane.rs:39
 #: crates/desk-ui/src/format_pane.rs:111 crates/desk-ui/src/format_pane.rs:224
@@ -485,79 +501,81 @@ msgstr "Texturas"
 msgid "None"
 msgstr "Nenhum"
 
-#: crates/desk-ui/src/chart_pane.rs:50 crates/desk-ui/src/chart_pane.rs:226
+#: crates/desk-ui/src/chart_pane.rs:53 crates/desk-ui/src/chart_pane.rs:257
 #: crates/desk-ui/src/fill_rows.rs:174
 msgid "Linear"
 msgstr "Linear"
 
-#: crates/desk-ui/src/chart_pane.rs:51 crates/desk-ui/src/chart_pane.rs:226
+#: crates/desk-ui/src/chart_pane.rs:54 crates/desk-ui/src/chart_pane.rs:257
 msgid "Logarithmic"
 msgstr "Logarítmica"
 
-#: crates/desk-ui/src/chart_pane.rs:52
+#: crates/desk-ui/src/chart_pane.rs:55
 msgid "Polynomial"
 msgstr "Polinomial"
 
-#: crates/desk-ui/src/chart_pane.rs:53
+#: crates/desk-ui/src/chart_pane.rs:56
 msgid "Power"
 msgstr "Potência"
 
-#: crates/desk-ui/src/chart_pane.rs:54
+#: crates/desk-ui/src/chart_pane.rs:57
 msgid "Exponential"
 msgstr "Exponencial"
 
-#: crates/desk-ui/src/chart_pane.rs:55
+#: crates/desk-ui/src/chart_pane.rs:58
 msgid "Moving Average"
 msgstr "Média móvel"
 
-#: crates/desk-ui/src/chart_pane.rs:60
+#: crates/desk-ui/src/chart_pane.rs:63
 msgid "Fixed Value"
 msgstr "Valor fixo"
 
-#: crates/desk-ui/src/chart_pane.rs:61 crates/desk-ui/src/chart_pane.rs:226
+#: crates/desk-ui/src/chart_pane.rs:64 crates/desk-ui/src/chart_pane.rs:257
 #: crates/desk-ui/src/table_pane.rs:30
 msgid "Percentage"
 msgstr "Porcentagem"
 
-#: crates/desk-ui/src/chart_pane.rs:62
+#: crates/desk-ui/src/chart_pane.rs:65
 msgid "Standard Deviation"
 msgstr "Desvio padrão"
 
-#: crates/desk-ui/src/chart_pane.rs:63
+#: crates/desk-ui/src/chart_pane.rs:66
 msgid "Standard Error"
 msgstr "Erro padrão"
 
-#: crates/desk-ui/src/chart_pane.rs:180
+#: crates/desk-ui/src/chart_pane.rs:191
 msgid "Chart Type"
 msgstr "Tipo de gráfico"
 
-#: crates/desk-ui/src/chart_pane.rs:181 crates/desk-ui/src/window/tables.rs:170
+#: crates/desk-ui/src/chart_pane.rs:192 crates/desk-ui/src/window/tables.rs:176
 msgid "3D"
 msgstr "3D"
 
-#: crates/desk-ui/src/chart_pane.rs:182 crates/desk-ui/src/chart_pane.rs:485
+#: crates/desk-ui/src/chart_pane.rs:193 crates/desk-ui/src/chart_pane.rs:539
 #: crates/desk-ui/src/graphic_pane.rs:157 crates/desk-ui/src/table_pane.rs:248
 msgid "Title"
 msgstr "Título"
 
-#: crates/desk-ui/src/chart_pane.rs:183
+#: crates/desk-ui/src/chart_pane.rs:194
 msgid "Title Text"
 msgstr "Texto do título"
 
-#: crates/desk-ui/src/chart_pane.rs:184
+#: crates/desk-ui/src/chart_pane.rs:195
 msgid "Legend"
 msgstr "Legenda"
 
-#: crates/desk-ui/src/chart_pane.rs:185
+#: crates/desk-ui/src/chart_pane.rs:196
 msgid "Chart Colors"
 msgstr "Cores do gráfico"
 
-#: crates/desk-ui/src/chart_pane.rs:186
+#: crates/desk-ui/src/chart_pane.rs:197
 msgid "Gap Between Bars"
 msgstr "Espaço entre barras"
 
-#: crates/desk-ui/src/chart_pane.rs:187 crates/desk-ui/src/chart_pane.rs:210
-#: crates/desk-ui/src/compact.rs:46 crates/desk-ui/src/custom_format.rs:59
+#: crates/desk-ui/src/chart_pane.rs:198 crates/desk-ui/src/chart_pane.rs:202
+#: crates/desk-ui/src/chart_pane.rs:204 crates/desk-ui/src/chart_pane.rs:209
+#: crates/desk-ui/src/chart_pane.rs:241 crates/desk-ui/src/compact.rs:46
+#: crates/desk-ui/src/custom_format.rs:59
 #: crates/desk-ui/src/drop_cap_pane.rs:80 crates/desk-ui/src/effects.rs:269
 #: crates/desk-ui/src/effects.rs:343 crates/desk-ui/src/fill_rows.rs:238
 #: crates/desk-ui/src/fill_rows.rs:242 crates/desk-ui/src/fill_rows.rs:244
@@ -569,15 +587,43 @@ msgstr "Espaço entre barras"
 msgid "Percent"
 msgstr "Porcentagem"
 
-#: crates/desk-ui/src/chart_pane.rs:188
+#: crates/desk-ui/src/chart_pane.rs:199
 msgid "Values as Percentages"
 msgstr "Valores em porcentagem"
 
-#: crates/desk-ui/src/chart_pane.rs:190
+#: crates/desk-ui/src/chart_pane.rs:201 crates/desk-ui/src/shape_pane.rs:119
+msgid "Inner Radius"
+msgstr "Raio interno"
+
+#: crates/desk-ui/src/chart_pane.rs:203
+msgid "Rounded Corners"
+msgstr "Cantos Arredondados"
+
+#: crates/desk-ui/src/chart_pane.rs:205
+msgid "Outside Corners Only"
+msgstr "Só Cantos Externos"
+
+#: crates/desk-ui/src/chart_pane.rs:207
+msgid "Circular Grid"
+msgstr "Grade Circular"
+
+#: crates/desk-ui/src/chart_pane.rs:208
+msgid "Bubble Size"
+msgstr "Tamanho das Bolhas"
+
+#: crates/desk-ui/src/chart_pane.rs:210
+msgid "Size by Diameter"
+msgstr "Tamanho pelo Diâmetro"
+
+#: crates/desk-ui/src/chart_pane.rs:211
+msgid "Show Negative Bubbles"
+msgstr "Mostrar Bolhas Negativas"
+
+#: crates/desk-ui/src/chart_pane.rs:213
 msgid "Edit Data"
 msgstr "Editar dados"
 
-#: crates/desk-ui/src/chart_pane.rs:199
+#: crates/desk-ui/src/chart_pane.rs:222
 #: crates/desk-ui/src/editing/tables.rs:680
 #: crates/desk-ui/src/formatting.rs:445 crates/desk-ui/src/inspector.rs:77
 #: crates/desk-ui/src/tables/header.rs:54
@@ -587,187 +633,187 @@ msgstr "Editar dados"
 msgid "Chart"
 msgstr "Gráfico"
 
-#: crates/desk-ui/src/chart_pane.rs:209
+#: crates/desk-ui/src/chart_pane.rs:240
 msgid "Depth"
 msgstr "Profundidade"
 
-#: crates/desk-ui/src/chart_pane.rs:211
+#: crates/desk-ui/src/chart_pane.rs:242
 msgid "Flat"
 msgstr "Plana"
 
-#: crates/desk-ui/src/chart_pane.rs:211
+#: crates/desk-ui/src/chart_pane.rs:242
 msgid "Lighting"
 msgstr "Iluminação"
 
-#: crates/desk-ui/src/chart_pane.rs:211
+#: crates/desk-ui/src/chart_pane.rs:242
 msgid "Soft"
 msgstr "Suave"
 
-#: crates/desk-ui/src/chart_pane.rs:211
+#: crates/desk-ui/src/chart_pane.rs:242
 msgid "Strong"
 msgstr "Forte"
 
-#: crates/desk-ui/src/chart_pane.rs:212
+#: crates/desk-ui/src/chart_pane.rs:243
 msgid "Bevel Edges"
 msgstr "Bordas chanfradas"
 
-#: crates/desk-ui/src/chart_pane.rs:213
+#: crates/desk-ui/src/chart_pane.rs:244
 msgid "3D Scene"
 msgstr "Cena 3D"
 
-#: crates/desk-ui/src/chart_pane.rs:218
+#: crates/desk-ui/src/chart_pane.rs:249
 msgid "Fixed Minimum"
 msgstr "Mínimo fixo"
 
-#: crates/desk-ui/src/chart_pane.rs:219
+#: crates/desk-ui/src/chart_pane.rs:250
 msgid "Minimum"
 msgstr "Mínimo"
 
-#: crates/desk-ui/src/chart_pane.rs:220
+#: crates/desk-ui/src/chart_pane.rs:251
 msgid "Fixed Maximum"
 msgstr "Máximo fixo"
 
-#: crates/desk-ui/src/chart_pane.rs:221
+#: crates/desk-ui/src/chart_pane.rs:252
 msgid "Maximum"
 msgstr "Máximo"
 
-#: crates/desk-ui/src/chart_pane.rs:222
+#: crates/desk-ui/src/chart_pane.rs:253
 msgid "Steps"
 msgstr "Divisões"
 
-#: crates/desk-ui/src/chart_pane.rs:223
+#: crates/desk-ui/src/chart_pane.rs:254
 msgid "0 for automatic"
 msgstr "0 para automático"
 
-#: crates/desk-ui/src/chart_pane.rs:225 crates/desk-ui/src/custom_format.rs:51
+#: crates/desk-ui/src/chart_pane.rs:256 crates/desk-ui/src/custom_format.rs:51
 msgid "Scale"
 msgstr "Escala"
 
-#: crates/desk-ui/src/chart_pane.rs:228 crates/desk-ui/src/chart_pane.rs:246
+#: crates/desk-ui/src/chart_pane.rs:259 crates/desk-ui/src/chart_pane.rs:277
 msgid "Gridlines"
 msgstr "Linhas de grade"
 
-#: crates/desk-ui/src/chart_pane.rs:229 crates/desk-ui/src/chart_pane.rs:262
+#: crates/desk-ui/src/chart_pane.rs:260 crates/desk-ui/src/chart_pane.rs:293
 msgid "Value Labels"
 msgstr "Rótulos dos valores"
 
-#: crates/desk-ui/src/chart_pane.rs:230 crates/desk-ui/src/table_pane.rs:310
+#: crates/desk-ui/src/chart_pane.rs:261 crates/desk-ui/src/table_pane.rs:310
 #: crates/desk-ui/src/tables/bars.rs:64
 msgid "Decimals"
 msgstr "Casas decimais"
 
-#: crates/desk-ui/src/chart_pane.rs:231
+#: crates/desk-ui/src/chart_pane.rs:262
 msgid "-1 for automatic"
 msgstr "-1 para automático"
 
-#: crates/desk-ui/src/chart_pane.rs:232 crates/desk-ui/src/chart_pane.rs:247
+#: crates/desk-ui/src/chart_pane.rs:263 crates/desk-ui/src/chart_pane.rs:278
 msgid "Axis Title"
 msgstr "Título do eixo"
 
-#: crates/desk-ui/src/chart_pane.rs:233
+#: crates/desk-ui/src/chart_pane.rs:264
 msgid "Value Axis"
 msgstr "Eixo de valores"
 
-#: crates/desk-ui/src/chart_pane.rs:245
+#: crates/desk-ui/src/chart_pane.rs:276
 msgid "Category Labels"
 msgstr "Rótulos das categorias"
 
-#: crates/desk-ui/src/chart_pane.rs:248
+#: crates/desk-ui/src/chart_pane.rs:279
 msgid "Category Axis"
 msgstr "Eixo de categorias"
 
-#: crates/desk-ui/src/chart_pane.rs:254 crates/desk-ui/src/chart_pane.rs:289
+#: crates/desk-ui/src/chart_pane.rs:285 crates/desk-ui/src/chart_pane.rs:320
 #: crates/desk-ui/src/formatting.rs:447
 msgid "Series"
 msgstr "Séries"
 
-#: crates/desk-ui/src/chart_pane.rs:264
+#: crates/desk-ui/src/chart_pane.rs:295
 msgid "Label Position"
 msgstr "Posição dos rótulos"
 
-#: crates/desk-ui/src/chart_pane.rs:267
+#: crates/desk-ui/src/chart_pane.rs:298
 msgid "Inside End"
 msgstr "Dentro, na ponta"
 
-#: crates/desk-ui/src/chart_pane.rs:268 crates/desk-ui/src/objects_pane.rs:294
+#: crates/desk-ui/src/chart_pane.rs:299 crates/desk-ui/src/objects_pane.rs:294
 #: crates/desk-ui/src/table_pane.rs:375
 msgid "Middle"
 msgstr "Meio"
 
-#: crates/desk-ui/src/chart_pane.rs:269
+#: crates/desk-ui/src/chart_pane.rs:300
 msgid "Inside Base"
 msgstr "Dentro, na base"
 
-#: crates/desk-ui/src/chart_pane.rs:273
+#: crates/desk-ui/src/chart_pane.rs:304
 msgid "Data Symbol"
 msgstr "Símbolo dos dados"
 
-#: crates/desk-ui/src/chart_pane.rs:276 crates/desk-ui/src/graphic_pane.rs:92
+#: crates/desk-ui/src/chart_pane.rs:307 crates/desk-ui/src/graphic_pane.rs:92
 msgid "Circle"
 msgstr "Círculo"
 
-#: crates/desk-ui/src/chart_pane.rs:277 crates/desk-ui/src/picture_pane.rs:95
+#: crates/desk-ui/src/chart_pane.rs:308 crates/desk-ui/src/picture_pane.rs:95
 msgid "Triangle"
 msgstr "Triângulo"
 
-#: crates/desk-ui/src/chart_pane.rs:278 crates/desk-ui/src/graphic_pane.rs:93
+#: crates/desk-ui/src/chart_pane.rs:309 crates/desk-ui/src/graphic_pane.rs:93
 msgid "Square"
 msgstr "Quadrado"
 
-#: crates/desk-ui/src/chart_pane.rs:279 crates/desk-ui/src/picture_pane.rs:97
+#: crates/desk-ui/src/chart_pane.rs:310 crates/desk-ui/src/picture_pane.rs:97
 msgid "Diamond"
 msgstr "Losango"
 
-#: crates/desk-ui/src/chart_pane.rs:282
+#: crates/desk-ui/src/chart_pane.rs:313
 msgid "Trendline"
 msgstr "Linha de tendência"
 
-#: crates/desk-ui/src/chart_pane.rs:283
+#: crates/desk-ui/src/chart_pane.rs:314
 msgid "Order or Period"
 msgstr "Ordem ou período"
 
-#: crates/desk-ui/src/chart_pane.rs:284
+#: crates/desk-ui/src/chart_pane.rs:315
 msgid "Show Equation"
 msgstr "Mostrar equação"
 
-#: crates/desk-ui/src/chart_pane.rs:285
+#: crates/desk-ui/src/chart_pane.rs:316
 msgid "Show R²"
 msgstr "Mostrar R²"
 
-#: crates/desk-ui/src/chart_pane.rs:286
+#: crates/desk-ui/src/chart_pane.rs:317
 msgid "Error Bars"
 msgstr "Barras de erro"
 
-#: crates/desk-ui/src/chart_pane.rs:287
+#: crates/desk-ui/src/chart_pane.rs:318
 msgid "Amount"
 msgstr "Quantidade"
 
-#: crates/desk-ui/src/chart_pane.rs:312 crates/desk-ui/src/table_pane.rs:394
+#: crates/desk-ui/src/chart_pane.rs:343 crates/desk-ui/src/table_pane.rs:394
 msgid "Copy Style"
 msgstr "Copiar estilo"
 
-#: crates/desk-ui/src/chart_pane.rs:313 crates/desk-ui/src/table_pane.rs:395
+#: crates/desk-ui/src/chart_pane.rs:344 crates/desk-ui/src/table_pane.rs:395
 #: crates/desk-ui/src/undo_names.rs:128
 msgid "Paste Style"
 msgstr "Colar estilo"
 
-#: crates/desk-ui/src/chart_pane.rs:314 crates/desk-ui/src/table_pane.rs:396
+#: crates/desk-ui/src/chart_pane.rs:345 crates/desk-ui/src/table_pane.rs:396
 msgid "Create Style"
 msgstr "Criar estilo"
 
-#: crates/desk-ui/src/chart_pane.rs:315
+#: crates/desk-ui/src/chart_pane.rs:346
 msgid "Copy Chart Style"
 msgstr "Copiar estilo de gráfico"
 
-#: crates/desk-ui/src/chart_pane.rs:316 crates/desk-ui/src/undo_names.rs:47
+#: crates/desk-ui/src/chart_pane.rs:347 crates/desk-ui/src/undo_names.rs:47
 msgid "Paste Chart Style"
 msgstr "Colar estilo de gráfico"
 
-#: crates/desk-ui/src/chart_pane.rs:317 crates/desk-ui/src/undo_names.rs:28
+#: crates/desk-ui/src/chart_pane.rs:348 crates/desk-ui/src/undo_names.rs:28
 msgid "Create Chart Style"
 msgstr "Criar estilo de gráfico"
 
-#: crates/desk-ui/src/chart_pane.rs:321 crates/desk-ui/src/chart_styles.rs:100
+#: crates/desk-ui/src/chart_pane.rs:352 crates/desk-ui/src/chart_styles.rs:100
 msgid "Chart Styles"
 msgstr "Estilos de gráfico"
 
@@ -5439,10 +5485,6 @@ msgstr "Minha Forma"
 msgid "Star Points"
 msgstr "Pontas"
 
-#: crates/desk-ui/src/shape_pane.rs:119
-msgid "Inner Radius"
-msgstr "Raio interno"
-
 #: crates/desk-ui/src/shape_pane.rs:120
 msgid "Percent of the outer radius"
 msgstr "Porcentagem do raio externo"
@@ -8632,7 +8674,7 @@ msgstr "Pulado"
 msgid "Untitled Presentation"
 msgstr "Apresentação sem título"
 
-#: crates/desk-ui/src/window/tables.rs:169
+#: crates/desk-ui/src/window/tables.rs:175
 msgid "2D"
 msgstr "2D"
 

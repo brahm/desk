@@ -1167,11 +1167,12 @@ impl TextEditor {
             parent.as_ref(),
             &chart,
             locale,
-            move |data, series_in_rows| {
+            move |data, series_in_rows, share_x| {
                 if let Some(this) = weak.upgrade() {
                     this.change_chart("Edit Chart Data", |chart| {
                         chart.data = data;
                         chart.series_in_rows = series_in_rows;
+                        chart.share_x = share_x;
                     });
                 }
             },

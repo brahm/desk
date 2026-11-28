@@ -130,6 +130,81 @@ fn rect(x: f32, y: f32, w: f32, h: f32) -> Vec<PathOp> {
     ]
 }
 
+/// A box with rounded corners, by the radius of each: top left, top
+/// right, bottom right and bottom left; a radius is at most half the side.
+fn rounded_rect(x: f32, y: f32, w: f32, h: f32, radii: [f32; 4]) -> Vec<PathOp> {
+    let most = (w.min(h) / 2.0).max(0.0);
+    let [tl, tr, br, bl] = radii.map(|r| r.clamp(0.0, most));
+    if tl + tr + br + bl <= 0.0 {
+        return rect(x, y, w, h);
+    }
+    let k = 1.0 - 0.552_284_8;
+    let mut path = vec![PathOp::Move(x + tl, y), PathOp::Line(x + w - tr, y)];
+    // A corner of no radius stays a corner, with no curve to it.
+    let corner = |path: &mut Vec<PathOp>, r: f32, c: [f32; 6]| {
+        if r > 0.0 {
+            path.push(PathOp::Curve(c[0], c[1], c[2], c[3], c[4], c[5]));
+        }
+    };
+    corner(
+        &mut path,
+        tr,
+        [x + w - tr * k, y, x + w, y + tr * k, x + w, y + tr],
+    );
+    path.push(PathOp::Line(x + w, y + h - br));
+    corner(
+        &mut path,
+        br,
+        [
+            x + w,
+            y + h - br * k,
+            x + w - br * k,
+            y + h,
+            x + w - br,
+            y + h,
+        ],
+    );
+    path.push(PathOp::Line(x + bl, y + h));
+    corner(
+        &mut path,
+        bl,
+        [x + bl * k, y + h, x, y + h - bl * k, x, y + h - bl],
+    );
+    path.push(PathOp::Line(x, y + tl));
+    corner(&mut path, tl, [x, y + tl * k, x + tl * k, y, x + tl, y]);
+    path.push(PathOp::Close);
+    path
+}
+
+/// The radii of the corners of a 2D bar, as [`rounded_rect`] takes them
+/// (W145): all four corners, or with Outside Corners Only those of the
+/// end away from the axis, and in a stack only at its outer end;
+/// `negative` is whether that end is at the bottom or the left.
+fn bar_corners(
+    chart: &Chart,
+    thickness: f32,
+    negative: bool,
+    horizontal: bool,
+    outermost: bool,
+) -> [f32; 4] {
+    let r = thickness * f32::from(chart.corner_radius.min(50)) / 100.0;
+    if !chart.kind.has_bars() || r <= 0.0 {
+        return [0.0; 4];
+    }
+    if !chart.outside_corners_only {
+        return [r; 4];
+    }
+    if !outermost {
+        return [0.0; 4];
+    }
+    match (horizontal, negative) {
+        (false, false) => [r, r, 0.0, 0.0],
+        (false, true) => [0.0, 0.0, r, r],
+        (true, false) => [0.0, r, r, 0.0],
+        (true, true) => [r, 0.0, 0.0, r],
+    }
+}
+
 fn polygon(points: &[(f32, f32)]) -> Vec<PathOp> {
     let mut path: Vec<PathOp> = points
         .iter()
@@ -471,8 +546,9 @@ pub fn draw(
         return cx.out;
     }
     match chart.kind {
-        ChartKind::Pie => pie(&mut cx, area),
-        ChartKind::Scatter => scatter(&mut cx, area),
+        ChartKind::Pie | ChartKind::Donut => pie(&mut cx, area),
+        ChartKind::Scatter | ChartKind::Bubble => scatter(&mut cx, area),
+        ChartKind::Radar => radar(&mut cx, area),
         _ => cartesian(&mut cx, area),
     }
     cx.out
@@ -483,31 +559,36 @@ fn legend(cx: &mut Ctx<'_>, left: f32, right: f32, top: f32) -> f32 {
     let size = cx.size;
     let swatch = size * 0.8;
     let gap = size;
-    let names: Vec<(usize, String)> = if chart.kind == ChartKind::Scatter {
-        (0..chart.series_count() / 2)
-            .map(|s| (s, chart.series_name(2 * s + 1).to_owned()))
+    // A scatter or a bubble chart names each plotted series after its y
+    // values, and shows its look; other kinds, each series (W142).
+    let names: Vec<(usize, usize, String)> = if chart.kind.has_x_values() {
+        chart
+            .point_series()
+            .iter()
+            .enumerate()
+            .map(|(p, ps)| (p, ps.y, chart.series_name(ps.y).to_owned()))
             .collect()
     } else {
         (0..chart.series_count())
-            .map(|s| (s, chart.series_name(s).to_owned()))
+            .map(|s| (s, s, chart.series_name(s).to_owned()))
             .collect()
     };
-    let entries: Vec<(usize, String, f32)> = names
+    let entries: Vec<(usize, usize, String, f32)> = names
         .into_iter()
-        .map(|(s, n)| {
+        .map(|(s, look, n)| {
             let w = swatch + 4.0 + cx.width(&n, size);
-            (s, n, w)
+            (s, look, n, w)
         })
         .collect();
     // Lines of entries, centered.
-    let mut lines: Vec<Vec<&(usize, String, f32)>> = vec![Vec::new()];
+    let mut lines: Vec<Vec<&(usize, usize, String, f32)>> = vec![Vec::new()];
     let mut line_w = 0.0;
     for e in &entries {
-        if line_w > 0.0 && line_w + gap + e.2 > right - left {
+        if line_w > 0.0 && line_w + gap + e.3 > right - left {
             lines.push(Vec::new());
             line_w = 0.0;
         }
-        line_w += if line_w > 0.0 { gap } else { 0.0 } + e.2;
+        line_w += if line_w > 0.0 { gap } else { 0.0 } + e.3;
         if let Some(l) = lines.last_mut() {
             l.push(e);
         }
@@ -515,11 +596,11 @@ fn legend(cx: &mut Ctx<'_>, left: f32, right: f32, top: f32) -> f32 {
     let mut y = top;
     for line in lines {
         let total: f32 =
-            line.iter().map(|e| e.2).sum::<f32>() + gap * line.len().saturating_sub(1) as f32;
+            line.iter().map(|e| e.3).sum::<f32>() + gap * line.len().saturating_sub(1) as f32;
         let mut x = (left + right - total) / 2.0;
         y += size * 1.2;
-        for (s, name, w) in line {
-            let style = chart.style(*s);
+        for (s, look, name, w) in line {
+            let style = chart.style(*look);
             let sy = y - swatch;
             cx.shape(
                 rect(x, sy, swatch, swatch),
@@ -695,6 +776,40 @@ fn prism(
         opacity,
         style.shadow,
     );
+    // Beveled edges: the front catches the light on its top and left and
+    // falls in shadow on its bottom and right (W145).
+    if cx.chart.scene.bevel && w > 2.0 && h > 2.0 {
+        let b = (w.min(h) * 0.12).clamp(0.5, 3.0);
+        let color = style.color();
+        cx.shape(
+            polygon(&[
+                (x, y + h),
+                (x, y),
+                (x + w, y),
+                (x + w - b, y + b),
+                (x + b, y + b),
+                (x + b, y + h - b),
+            ]),
+            Some(Paint::Color(lighter(lighter(color)))),
+            None,
+            opacity * 0.8,
+            false,
+        );
+        cx.shape(
+            polygon(&[
+                (x + w, y),
+                (x + w, y + h),
+                (x, y + h),
+                (x + b, y + h - b),
+                (x + w - b, y + h - b),
+                (x + w - b, y + b),
+            ]),
+            Some(Paint::Color(darker(color))),
+            None,
+            opacity * 0.8,
+            false,
+        );
+    }
     cx.out.hits.push(Hit {
         series: s,
         category: Some(c),
@@ -712,17 +827,7 @@ fn symbol(cx: &mut Ctx<'_>, kind: Symbol, x: f32, y: f32, size: f32, color: Colo
     let r = size / 2.0;
     let path = match kind {
         Symbol::None => return,
-        Symbol::Circle => {
-            let k = 0.552_284_8 * r;
-            vec![
-                PathOp::Move(x + r, y),
-                PathOp::Curve(x + r, y + k, x + k, y + r, x, y + r),
-                PathOp::Curve(x - k, y + r, x - r, y + k, x - r, y),
-                PathOp::Curve(x - r, y - k, x - k, y - r, x, y - r),
-                PathOp::Curve(x + k, y - r, x + r, y - k, x + r, y),
-                PathOp::Close,
-            ]
-        }
+        Symbol::Circle => circle(x, y, r),
         Symbol::Square => rect(x - r, y - r, size, size),
         Symbol::Triangle => polygon(&[(x, y - r), (x + r, y + r), (x - r, y + r)]),
         Symbol::Diamond => polygon(&[(x, y - r), (x + r, y), (x, y + r), (x - r, y)]),
@@ -1095,6 +1200,15 @@ fn cartesian(cx: &mut Ctx<'_>, area: (f32, f32, f32, f32)) {
     let d = depth_offset(chart, bar);
     let mut pos_stack = vec![0.0f64; nc];
     let mut neg_stack = vec![0.0f64; nc];
+    // The series at the outer end of each stack, above and below the axis,
+    // whose corners Outside Corners Only rounds (W145).
+    let outer = |c: usize, negative: bool| -> Option<usize> {
+        column_series
+            .iter()
+            .rev()
+            .copied()
+            .find(|s| values[*s][c].is_some_and(|v| (v < 0.0) == negative && v != 0.0))
+    };
     let mut labels: Vec<(f32, f32, String, Align)> = Vec::new();
     let draw_order: Vec<usize> = (0..ns).collect();
     // Areas first, then columns, then lines, so lines stay visible.
@@ -1150,8 +1264,14 @@ fn cartesian(cx: &mut Ctx<'_>, area: (f32, f32, f32, f32)) {
                         if chart.three_d {
                             prism(cx, x, y, bw, bh, d, &style, s, c);
                         } else {
+                            let outermost = !stacked || outer(c, v < 0.0) == Some(s);
+                            // The end of the value is down or left when the
+                            // bar grows that way from its base, as a value
+                            // under a fixed minimum of the axis does.
+                            let toward = if horizontal { b < a } else { b > a };
+                            let corners = bar_corners(chart, bar, toward, horizontal, outermost);
                             cx.shape(
-                                rect(x, y, bw, bh),
+                                rounded_rect(x, y, bw, bh, corners),
                                 Some(paint(&style.fill)),
                                 stroke_of(&style),
                                 opacity,
@@ -1542,21 +1662,93 @@ fn trendline(
     );
 }
 
+/// A point of a scatter or a bubble chart: x, y, for a bubble the size,
+/// and the category it comes from.
+type Point = (f64, f64, Option<f64>, usize);
+
+/// The points of each series that a scatter or a bubble chart plots, by
+/// [`Chart::point_series`]: a category gives a point when it has all the
+/// values the point needs (GRF-18, W141, W142).
+fn chart_points(chart: &Chart) -> Vec<Vec<Point>> {
+    let nc = chart.category_count();
+    chart
+        .point_series()
+        .iter()
+        .map(|ps| {
+            (0..nc)
+                .filter_map(|c| {
+                    let size = match ps.size {
+                        Some(s) => Some(chart.value(s, c)?),
+                        None => None,
+                    };
+                    // A hidden negative bubble takes no room on the axes
+                    // nor in the scale of the others.
+                    if size.is_some_and(|v| v < 0.0) && !chart.bubble.negative {
+                        return None;
+                    }
+                    Some((chart.value(ps.x, c)?, chart.value(ps.y, c)?, size, c))
+                })
+                .collect()
+        })
+        .collect()
+}
+
+/// The radius of each bubble, in points, by its size: by area or by
+/// diameter, the largest at `largest` (W141). A bubble of a negative size
+/// gets the radius of its magnitude; [`chart_points`] leaves it out when
+/// negatives are hidden.
+fn bubble_radii(chart: &Chart, points: &[Vec<Point>], largest: f32) -> Vec<Vec<Option<f32>>> {
+    let top = points
+        .iter()
+        .flatten()
+        .filter_map(|p| p.2)
+        .map(f64::abs)
+        .filter(|v| v.is_finite())
+        .fold(0.0, f64::max);
+    points
+        .iter()
+        .map(|pts| {
+            pts.iter()
+                .map(|p| {
+                    let size = p.2?;
+                    if !size.is_finite() || (size < 0.0 && !chart.bubble.negative) {
+                        return None;
+                    }
+                    let part = if top > 0.0 { size.abs() / top } else { 0.0 };
+                    let part = if chart.bubble.by_diameter {
+                        part
+                    } else {
+                        part.sqrt()
+                    };
+                    Some((part as f32 * largest).max(1.0))
+                })
+                .collect()
+        })
+        .collect()
+}
+
+/// The path of a circle.
+fn circle(x: f32, y: f32, r: f32) -> Vec<PathOp> {
+    let k = 0.552_284_8 * r;
+    vec![
+        PathOp::Move(x + r, y),
+        PathOp::Curve(x + r, y + k, x + k, y + r, x, y + r),
+        PathOp::Curve(x - k, y + r, x - r, y + k, x - r, y),
+        PathOp::Curve(x - r, y - k, x - k, y - r, x, y - r),
+        PathOp::Curve(x + k, y - r, x + r, y - k, x + r, y),
+        PathOp::Close,
+    ]
+}
+
+/// A scatter chart, or a bubble chart, whose points are circles as big
+/// as their sizes (GRF-18, W141).
 fn scatter(cx: &mut Ctx<'_>, area: (f32, f32, f32, f32)) {
     let chart = cx.chart;
     let size = cx.size;
-    // Each series is a pair: x then y; an odd one left over is ignored
-    // (GRF-04, GRF-18).
-    let pairs = chart.series_count() / 2;
-    let nc = chart.category_count();
-    let points: Vec<Vec<(f64, f64)>> = (0..pairs)
-        .map(|p| {
-            (0..nc)
-                .filter_map(|c| Some((chart.value(2 * p, c)?, chart.value(2 * p + 1, c)?)))
-                .collect()
-        })
-        .collect();
-    let all: Vec<&(f64, f64)> = points.iter().flatten().collect();
+    let bubble = chart.kind == ChartKind::Bubble;
+    let plotted = chart.point_series();
+    let points = chart_points(chart);
+    let all: Vec<&Point> = points.iter().flatten().collect();
     let (xlo, xhi) = all.iter().fold((f64::INFINITY, f64::NEG_INFINITY), |a, p| {
         (a.0.min(p.0), a.1.max(p.0))
     });
@@ -1602,8 +1794,17 @@ fn scatter(cx: &mut Ctx<'_>, area: (f32, f32, f32, f32)) {
         return;
     }
     let grid = Color::rgb(0xd0, 0xd0, 0xd0);
-    let px = |v: f64| x0 + rx.fraction(v) * w;
-    let py = |v: f64| y0 + h - ry.fraction(v) * h;
+    // The largest bubble is a sixth of the shorter side at a scale of 100;
+    // the values keep that far from the sides, so that no bubble spills
+    // over the axes.
+    let largest = if bubble {
+        w.min(h) / 6.0 * f32::from(chart.bubble.scale.clamp(10, 300)) / 100.0
+    } else {
+        0.0
+    };
+    let pad = largest.min(w / 4.0).min(h / 4.0);
+    let px = |v: f64| x0 + pad + rx.fraction(v) * (w - 2.0 * pad);
+    let py = |v: f64| y0 + h - pad - ry.fraction(v) * (h - 2.0 * pad);
     for t in ry.ticks() {
         if chart.value_axis.gridlines {
             cx.line((x0, py(t)), (x0 + w, py(t)), 0.5, grid);
@@ -1641,10 +1842,13 @@ fn scatter(cx: &mut Ctx<'_>, area: (f32, f32, f32, f32)) {
     let axis_color = Color::rgb(0x77, 0x76, 0x7b);
     cx.line((x0, y0 + h), (x0 + w, y0 + h), 0.75, axis_color);
     cx.line((x0, y0), (x0, y0 + h), 0.75, axis_color);
+    let radii = bubble_radii(chart, &points, largest);
     for (p, pts) in points.iter().enumerate() {
-        let style = chart.style(p);
-        let xy: Vec<(f32, f32)> = pts.iter().map(|(x, y)| (px(*x), py(*y))).collect();
-        if style.connect && xy.len() > 1 {
+        // A plotted series takes the look of its series of y values, as
+        // the inspector and ODT do.
+        let style = chart.style(plotted[p].y);
+        let xy: Vec<(f32, f32)> = pts.iter().map(|(x, y, ..)| (px(*x), py(*y))).collect();
+        if style.connect && xy.len() > 1 && !bubble {
             let mut sorted = xy.clone();
             sorted.sort_by(|a, b| a.0.total_cmp(&b.0));
             cx.shape(
@@ -1660,21 +1864,48 @@ fn scatter(cx: &mut Ctx<'_>, area: (f32, f32, f32, f32)) {
         } else {
             style.symbol
         };
-        for (i, (x, y)) in xy.iter().enumerate() {
-            symbol(
-                cx,
-                symbol_kind,
-                *x,
-                *y,
-                f32::from(style.symbol_size),
-                style.point_color.unwrap_or(style.color()),
-            );
-            cx.out.hits.push(Hit {
-                series: p,
-                category: Some(i),
-                rect: (x - 4.0, y - 4.0, 8.0, 8.0),
+        // The larger bubbles first, so that the smaller stay in sight.
+        let mut order: Vec<usize> = (0..xy.len()).collect();
+        if bubble {
+            order.sort_by(|a, b| {
+                let r = |i: usize| radii[p][i].unwrap_or(0.0);
+                r(*b).total_cmp(&r(*a))
             });
-            if let Some(errors) = &style.errors {
+        }
+        for i in order {
+            let (x, y) = xy[i];
+            let color = style.point_color.unwrap_or(style.color());
+            if bubble {
+                let Some(r) = radii[p][i] else { continue };
+                // A negative size shows as a ring.
+                let negative = pts[i].2.is_some_and(|v| v < 0.0);
+                cx.shape(
+                    circle(x, y, r),
+                    (!negative).then(|| paint(&style.fill)),
+                    stroke_of(&style).or(Some((
+                        if negative { 1.5 } else { 0.75 },
+                        if negative { color } else { Color::WHITE },
+                        Vec::new(),
+                    ))),
+                    f32::from(style.opacity) / 100.0,
+                    style.shadow,
+                );
+                cx.out.hits.push(Hit {
+                    series: p,
+                    category: Some(pts[i].3),
+                    rect: (x - r, y - r, 2.0 * r, 2.0 * r),
+                });
+            } else {
+                symbol(cx, symbol_kind, x, y, f32::from(style.symbol_size), color);
+                cx.out.hits.push(Hit {
+                    series: p,
+                    category: Some(pts[i].3),
+                    rect: (x - 4.0, y - 4.0, 8.0, 8.0),
+                });
+            }
+            if let Some(errors) = &style.errors
+                && chart.kind.has_error_bars()
+            {
                 let along: Vec<f64> = pts
                     .iter()
                     .map(|q| if errors.along_x { q.0 } else { q.1 })
@@ -1687,17 +1918,24 @@ fn scatter(cx: &mut Ctx<'_>, area: (f32, f32, f32, f32)) {
                 };
                 let color = Color::rgb(0x24, 0x1f, 0x31);
                 if errors.along_x {
-                    cx.line((px(lo), *y), (px(hi), *y), 0.75, color);
+                    cx.line((px(lo), y), (px(hi), y), 0.75, color);
                 } else {
-                    cx.line((*x, py(lo)), (*x, py(hi)), 0.75, color);
+                    cx.line((x, py(lo)), (x, py(hi)), 0.75, color);
                 }
             }
             if style.labels.show {
-                let text = cx.number(&style.labels.number, pts[i].1);
-                cx.text(*x, *y - 5.0, text, size * 0.9, Align::Middle, 0.0, false);
+                // A bubble tells its size, in its middle; a point its y.
+                let (value, ly) = match pts[i].2 {
+                    Some(v) => (v, y + size * 0.35),
+                    None => (pts[i].1, y - 5.0),
+                };
+                let text = cx.number(&style.labels.number, value);
+                cx.text(x, ly, text, size * 0.9, Align::Middle, 0.0, false);
             }
         }
-        if let Some(trend) = &style.trend {
+        if let Some(trend) = &style.trend
+            && chart.kind.has_trendlines()
+        {
             let xs: Vec<f64> = pts.iter().map(|q| q.0).collect();
             let ys: Vec<f64> = pts.iter().map(|q| q.1).collect();
             let mut order: Vec<usize> = (0..xs.len()).collect();
@@ -1705,6 +1943,155 @@ fn scatter(cx: &mut Ctx<'_>, area: (f32, f32, f32, f32)) {
             let xs: Vec<f64> = order.iter().map(|i| xs[*i]).collect();
             let ys: Vec<f64> = order.iter().map(|i| ys[*i]).collect();
             trendline(cx, trend, &style, &xs, &ys, &|x, y| (px(x), py(y)));
+        }
+    }
+}
+
+/// A radar chart: a spoke for each category from the center, the grid
+/// at the steps of the value axis as polygons or circles, and each series
+/// as a closed line through its values, filled lightly (W141).
+#[allow(clippy::too_many_lines)]
+fn radar(cx: &mut Ctx<'_>, area: (f32, f32, f32, f32)) {
+    let chart = cx.chart;
+    let size = cx.size;
+    let ns = chart.series_count();
+    let nc = chart.category_count();
+    if nc == 0 {
+        return;
+    }
+    let (lo, hi) = (0..ns)
+        .flat_map(|s| (0..nc).filter_map(move |c| chart.value(s, c)))
+        .fold((f64::INFINITY, f64::NEG_INFINITY), |a, v| {
+            (a.0.min(v), a.1.max(v))
+        });
+    let (lo, hi) = if lo.is_finite() { (lo, hi) } else { (0.0, 1.0) };
+    let range = value_range(&chart.value_axis, lo, hi, true);
+    let (x0, y0, w, h) = area;
+    let label_w = (0..nc)
+        .map(|c| cx.width(chart.category_name(c), size))
+        .fold(0.0, f32::max);
+    let r = (w / 2.0 - label_w - 6.0).min(h / 2.0 - size * 1.6);
+    if r <= 4.0 {
+        return;
+    }
+    let (ccx, ccy) = (x0 + w / 2.0, y0 + h / 2.0);
+    // The first spoke points up, the others go clockwise.
+    let angle = |c: usize| -PI / 2.0 + 2.0 * PI * c as f32 / nc as f32;
+    let at = |c: usize, f: f32| {
+        let a = angle(c);
+        (ccx + r * f * a.cos(), ccy + r * f * a.sin())
+    };
+    let grid = Color::rgb(0xd0, 0xd0, 0xd0);
+    let axis_color = Color::rgb(0x77, 0x76, 0x7b);
+    let axis = &chart.value_axis;
+    for (i, t) in range.ticks().iter().enumerate() {
+        let f = range.fraction(*t).clamp(0.0, 1.0);
+        if axis.gridlines && f > 0.0 {
+            let path = if chart.radar_circular || nc < 3 {
+                circle(ccx, ccy, r * f)
+            } else {
+                polygon(&(0..nc).map(|c| at(c, f)).collect::<Vec<_>>())
+            };
+            cx.shape(path, None, Some((0.5, grid, Vec::new())), 1.0, false);
+        }
+        if axis.labels && (i > 0 || axis.min_label) {
+            let (lx, ly) = at(0, f);
+            let text = axis_text(cx, axis, *t);
+            cx.text(
+                lx + 3.0,
+                ly + size * 0.35,
+                text,
+                size * 0.9,
+                Align::Start,
+                0.0,
+                false,
+            );
+        }
+    }
+    // The spokes and the names of the categories at their ends.
+    for c in 0..nc {
+        if chart.category_axis.line || chart.category_axis.gridlines {
+            cx.line((ccx, ccy), at(c, 1.0), 0.5, axis_color);
+        }
+        if chart.category_axis.labels {
+            let a = angle(c);
+            let (lx, ly) = at(c, 1.0);
+            let align = if a.cos() > 0.2 {
+                Align::Start
+            } else if a.cos() < -0.2 {
+                Align::End
+            } else {
+                Align::Middle
+            };
+            cx.text(
+                lx + 4.0 * a.cos(),
+                ly + 4.0 * a.sin() + size * (0.35 + 0.5 * a.sin()),
+                chart.category_name(c).to_owned(),
+                size,
+                align,
+                0.0,
+                false,
+            );
+        }
+    }
+    for s in 0..ns {
+        let style = chart.style(s);
+        let opacity = f32::from(style.opacity) / 100.0;
+        let pts: Vec<(f32, f32)> = (0..nc)
+            .map(|c| {
+                let f = chart
+                    .value(s, c)
+                    .map_or(0.0, |v| range.fraction(v).clamp(0.0, 1.0));
+                at(c, f)
+            })
+            .collect();
+        let line = stroke_of(&style).or(Some((
+            style.line_width as f32 / 1000.0,
+            style.color(),
+            Vec::new(),
+        )));
+        let present = |c: usize| chart.value(s, c).is_some();
+        if (0..nc).all(present) {
+            cx.shape(
+                polygon(&pts),
+                Some(paint(&style.fill)),
+                None,
+                opacity * 0.35,
+                false,
+            );
+            cx.shape(polygon(&pts), None, line, opacity, style.shadow);
+        } else {
+            // An empty value breaks the line, rather than drawing it at
+            // the minimum, and leaves the series unfilled.
+            for c in (0..nc).filter(|c| present(*c) && present((c + 1) % nc) && nc > 1) {
+                cx.shape(
+                    polyline(&[pts[c], pts[(c + 1) % nc]], false),
+                    None,
+                    line.clone(),
+                    opacity,
+                    false,
+                );
+            }
+        }
+        for (c, (x, y)) in pts.iter().enumerate() {
+            let Some(v) = chart.value(s, c) else { continue };
+            symbol(
+                cx,
+                style.symbol,
+                *x,
+                *y,
+                f32::from(style.symbol_size),
+                style.point_color.unwrap_or(style.color()),
+            );
+            cx.out.hits.push(Hit {
+                series: s,
+                category: Some(c),
+                rect: (x - 4.0, y - 4.0, 8.0, 8.0),
+            });
+            if style.labels.show {
+                let text = cx.number(&style.labels.number, v);
+                cx.text(*x, *y - 5.0, text, size * 0.9, Align::Middle, 0.0, false);
+            }
         }
     }
 }
@@ -1719,8 +2106,16 @@ fn arc_points(cx0: f32, cy0: f32, rx: f32, ry: f32, a0: f32, a1: f32) -> Vec<(f3
         .collect()
 }
 
+/// A pie, or a donut, whose slices have a hole of the inner radius in
+/// the middle (GRF-15, W141, W145).
 fn pie(cx: &mut Ctx<'_>, area: (f32, f32, f32, f32)) {
     let chart = cx.chart;
+    let three_d = chart.three_d && chart.kind.has_3d();
+    let hole = if chart.kind == ChartKind::Donut {
+        f32::from(chart.inner_radius.min(95)) / 100.0
+    } else {
+        0.0
+    };
     let size = cx.size;
     let ns = chart.series_count();
     // A pie draws the first value of each series (GRF-02).
@@ -1733,7 +2128,7 @@ fn pie(cx: &mut Ctx<'_>, area: (f32, f32, f32, f32)) {
     }
     let (x0, y0, w, h) = area;
     let max_explode = (0..ns).map(|s| chart.style(s).explode).max().unwrap_or(0);
-    let tilt = if chart.three_d {
+    let tilt = if three_d {
         f32::from(chart.scene.pitch.clamp(5, 45))
             .to_radians()
             .sin()
@@ -1741,7 +2136,7 @@ fn pie(cx: &mut Ctx<'_>, area: (f32, f32, f32, f32)) {
     } else {
         1.0
     };
-    let thickness = if chart.three_d {
+    let thickness = if three_d {
         h * 0.12 * f32::from(chart.scene.depth.min(200)) / 100.0
     } else {
         0.0
@@ -1765,7 +2160,17 @@ fn pie(cx: &mut Ctx<'_>, area: (f32, f32, f32, f32)) {
         (ccx + e * mid.cos(), ccy + e * mid.sin() * tilt)
     };
     if chart.pie.group_shadow && (0..ns).any(|s| chart.style(s).shadow) {
-        let pts = arc_points(ccx + 3.0, ccy + 4.0, r, r * tilt, 0.0, 2.0 * PI);
+        let mut pts = arc_points(ccx + 3.0, ccy + 4.0, r, r * tilt, 0.0, 2.0 * PI);
+        if hole > 0.0 {
+            pts.extend(arc_points(
+                ccx + 3.0,
+                ccy + 4.0,
+                r * hole,
+                r * hole * tilt,
+                2.0 * PI,
+                0.0,
+            ));
+        }
         cx.shape(
             polygon(&pts),
             Some(Paint::Color(Color {
@@ -1777,7 +2182,7 @@ fn pie(cx: &mut Ctx<'_>, area: (f32, f32, f32, f32)) {
             false,
         );
     }
-    if chart.three_d {
+    if three_d {
         // The sides of the slices that face the viewer, from back to front.
         for &(s, a0, a1, _) in &slices {
             let style = chart.style(s);
@@ -1804,7 +2209,11 @@ fn pie(cx: &mut Ctx<'_>, area: (f32, f32, f32, f32)) {
     for &(s, a0, a1, v) in &slices {
         let style = chart.style(s);
         let (sx, sy) = center(s, a0, a1);
-        let mut pts = vec![(sx, sy)];
+        let mut pts = if hole > 0.0 {
+            arc_points(sx, sy, r * hole, r * hole * tilt, a1, a0)
+        } else {
+            vec![(sx, sy)]
+        };
         pts.extend(arc_points(sx, sy, r, r * tilt, a0, a1));
         let shadow = style.shadow && !chart.pie.group_shadow;
         cx.shape(
@@ -1820,6 +2229,17 @@ fn pie(cx: &mut Ctx<'_>, area: (f32, f32, f32, f32)) {
         let (miny, maxy) = pts
             .iter()
             .fold((f32::MAX, f32::MIN), |a, p| (a.0.min(p.1), a.1.max(p.1)));
+        // A beveled 3D pie catches the light on the rim of its top (W145).
+        if three_d && chart.scene.bevel {
+            let rim = arc_points(sx, sy, r - 1.0, (r - 1.0) * tilt, a0, a1);
+            cx.shape(
+                polyline(&rim, false),
+                None,
+                Some((2.0, lighter(lighter(style.color())), Vec::new())),
+                0.8,
+                false,
+            );
+        }
         cx.out.hits.push(Hit {
             series: s,
             category: Some(0),
@@ -1827,7 +2247,8 @@ fn pie(cx: &mut Ctx<'_>, area: (f32, f32, f32, f32)) {
         });
         // Labels at their distance from the center (GRF-15).
         let mid = (a0 + a1) / 2.0;
-        let dist = r * f32::from(chart.pie.label_distance) / 100.0;
+        // On a donut the distance runs across the ring, from the hole.
+        let dist = r * (hole + (1.0 - hole) * f32::from(chart.pie.label_distance) / 100.0);
         let (lx, ly) = (sx + dist * mid.cos(), sy + dist * mid.sin() * tilt);
         let mut lines = Vec::new();
         if chart.pie.series_names {
@@ -2118,6 +2539,277 @@ mod tests {
         let d = draw(&chart, 300.0, 200.0, &rough_width, ',', '.');
         // One pair of four points; the third series has no pair.
         assert_eq!(d.hits.iter().filter(|h| h.category.is_some()).count(), 4);
+    }
+
+    /// The points of the path of a filled shape.
+    fn points(path: &[PathOp]) -> Vec<(f32, f32)> {
+        path.iter()
+            .filter_map(|op| match *op {
+                PathOp::Move(x, y) | PathOp::Line(x, y) | PathOp::Curve(_, _, _, _, x, y) => {
+                    Some((x, y))
+                }
+                PathOp::Close => None,
+            })
+            .collect()
+    }
+
+    /// The paths of the shapes filled with a color, in order.
+    fn filled_with(d: &Drawing, color: Color) -> Vec<Vec<PathOp>> {
+        d.marks
+            .iter()
+            .filter_map(|m| match m {
+                Mark::Shape {
+                    path,
+                    fill: Some(Paint::Color(c)),
+                    ..
+                } if *c == color => Some(path.clone()),
+                _ => None,
+            })
+            .collect()
+    }
+
+    #[test]
+    fn w141_w145_a_donut_has_a_hole_of_its_inner_radius() {
+        let mut chart = Chart::new(ChartKind::Donut);
+        chart.legend = false;
+        let first = chart.style(0).color();
+        // The distances from the center of the points of the first slice,
+        // the center being that of the box of all the slices.
+        let reach = |chart: &Chart| -> (f32, f32) {
+            let d = draw(chart, 300.0, 300.0, &rough_width, ',', '.');
+            let (x0, y0, x1, y1) =
+                d.hits
+                    .iter()
+                    .fold((f32::MAX, f32::MAX, f32::MIN, f32::MIN), |a, h| {
+                        let (x, y, w, h) = h.rect;
+                        (a.0.min(x), a.1.min(y), a.2.max(x + w), a.3.max(y + h))
+                    });
+            let center = ((x0 + x1) / 2.0, (y0 + y1) / 2.0);
+            let distances: Vec<f32> = points(&filled_with(&d, first)[0])
+                .iter()
+                .map(|p| ((p.0 - center.0).powi(2) + (p.1 - center.1).powi(2)).sqrt())
+                .collect();
+            (
+                distances.iter().copied().fold(f32::MAX, f32::min),
+                distances.iter().copied().fold(0.0, f32::max),
+            )
+        };
+        let near = |chart: &Chart| reach(chart).0;
+        let (ring, outer) = reach(&chart);
+        // Half the radius by default, and as much as the inspector says.
+        assert!((ring / outer - 0.5).abs() < 0.05, "{ring} {outer}");
+        chart.inner_radius = 80;
+        assert!((near(&chart) / outer - 0.8).abs() < 0.05);
+        // A pie has its center in each slice.
+        chart.kind = ChartKind::Pie;
+        assert!(near(&chart) < 1.0);
+    }
+
+    #[test]
+    fn w141_a_radar_has_a_spoke_for_each_category() {
+        let mut chart = Chart::new(ChartKind::Radar);
+        chart.legend = false;
+        let d = draw(&chart, 300.0, 300.0, &rough_width, ',', '.');
+        // A point for each value of each series, and the names around.
+        assert_eq!(d.hits.iter().filter(|h| h.category.is_some()).count(), 8);
+        let t = texts(&d);
+        for name in ["2007", "2008", "2009", "2010"] {
+            assert!(t.contains(&name.to_string()), "{name}");
+        }
+        // The first series goes through four points, filled lightly.
+        let area = filled_with(&d, chart.style(0).color());
+        assert_eq!(points(&area[0]).len(), 4);
+        let curves = |d: &Drawing| {
+            d.marks
+                .iter()
+                .filter(|m| {
+                    matches!(m, Mark::Shape { path, fill: None, .. }
+                        if path.iter().any(|op| matches!(op, PathOp::Curve(..))))
+                })
+                .count()
+        };
+        assert_eq!(curves(&d), 0);
+        chart.radar_circular = true;
+        let round = draw(&chart, 300.0, 300.0, &rough_width, ',', '.');
+        assert!(curves(&round) > 0);
+    }
+
+    #[test]
+    fn w141_bubbles_are_as_big_as_their_sizes() {
+        let mut chart = Chart::new(ChartKind::Bubble);
+        // Sizes 30, 12, 45 and 20; by area the radius goes as the root.
+        let radius = |chart: &Chart, c: usize| {
+            let d = draw(chart, 400.0, 300.0, &rough_width, ',', '.');
+            hit(&d, 0, c).2 / 2.0
+        };
+        let (small, large) = (radius(&chart, 1), radius(&chart, 2));
+        assert!(((large / small) - (45.0f32 / 12.0).sqrt()).abs() < 0.05);
+        chart.bubble.by_diameter = true;
+        let (small, large) = (radius(&chart, 1), radius(&chart, 2));
+        assert!(((large / small) - 45.0 / 12.0).abs() < 0.05);
+        chart.bubble.scale = 50;
+        assert!((radius(&chart, 2) - large / 2.0).abs() < 0.05);
+        // A negative bubble shows only when asked to, as a ring.
+        chart.data.set(2, 0, Some(-30.0));
+        let d = draw(&chart, 400.0, 300.0, &rough_width, ',', '.');
+        assert!(!d.hits.iter().any(|h| h.category == Some(0)));
+        chart.bubble.negative = true;
+        let d = draw(&chart, 400.0, 300.0, &rough_width, ',', '.');
+        assert!(d.hits.iter().any(|h| h.category == Some(0)));
+        // The legend names the series of the y values.
+        assert!(texts(&d).contains(&"Região 2".to_string()));
+    }
+
+    #[test]
+    fn w142_series_share_the_x_values_of_the_first() {
+        let mut chart = Chart::new(ChartKind::Scatter);
+        chart.data.insert_row(2, "Região 3".into());
+        for c in 0..4 {
+            chart.data.set(2, c, Some(10.0 * c as f64));
+        }
+        chart.share_x = true;
+        let d = draw(&chart, 400.0, 300.0, &rough_width, ',', '.');
+        // Two series of four points, each point of a category on the
+        // same x.
+        assert_eq!(d.hits.iter().filter(|h| h.category.is_some()).count(), 8);
+        for c in 0..4 {
+            let (a, b) = (hit(&d, 0, c), hit(&d, 1, c));
+            assert!((a.0 - b.0).abs() < 0.01);
+        }
+        let t = texts(&d);
+        assert!(t.contains(&"Região 2".to_string()));
+        assert!(t.contains(&"Região 3".to_string()));
+    }
+
+    #[test]
+    fn w145_bars_get_rounded_ends() {
+        let curved = |path: &[PathOp]| path.iter().any(|op| matches!(op, PathOp::Curve(..)));
+        let mut chart = Chart::new(ChartKind::StackedColumn);
+        chart.legend = false;
+        let (first, second) = (chart.style(0).color(), chart.style(1).color());
+        let d = draw(&chart, 300.0, 200.0, &rough_width, ',', '.');
+        assert!(!curved(&filled_with(&d, first)[0]));
+        chart.corner_radius = 30;
+        let d = draw(&chart, 300.0, 200.0, &rough_width, ',', '.');
+        assert!(filled_with(&d, first).iter().all(|p| curved(p)));
+        assert!(filled_with(&d, second).iter().all(|p| curved(p)));
+        // Outside Corners Only rounds the top of the stack alone.
+        chart.outside_corners_only = true;
+        let d = draw(&chart, 300.0, 200.0, &rough_width, ',', '.');
+        assert!(filled_with(&d, first).iter().all(|p| !curved(p)));
+        let top = &filled_with(&d, second)[0];
+        assert!(curved(top));
+        // Its bottom corners stay square: the lowest points are corners.
+        let pts = points(top);
+        let bottom = pts.iter().map(|p| p.1).fold(f32::MIN, f32::max);
+        assert_eq!(
+            pts.iter().filter(|p| (p.1 - bottom).abs() < 0.01).count(),
+            2
+        );
+    }
+
+    #[test]
+    fn w141_w145_review_of_273() {
+        // A hidden negative bubble leaves the others their size.
+        let mut chart = Chart::new(ChartKind::Bubble);
+        chart.legend = false;
+        let radius = |chart: &Chart| {
+            let d = draw(chart, 400.0, 300.0, &rough_width, ',', '.');
+            hit(&d, 0, 2).2 / 2.0
+        };
+        let before = radius(&chart);
+        chart.data.set(2, 0, Some(-1000.0));
+        assert!((radius(&chart) - before).abs() < 0.01);
+        // No bubble spills over the frame of the plot.
+        let d = draw(&chart, 400.0, 300.0, &rough_width, ',', '.');
+        for h in &d.hits {
+            let (x, y, w, hh) = h.rect;
+            assert!(x >= 0.0 && y >= 0.0 && x + w <= 400.0 && y + hh <= 300.0);
+        }
+        // The labels of a donut stay on its ring.
+        let mut donut = Chart::new(ChartKind::Donut);
+        donut.legend = false;
+        donut.inner_radius = 90;
+        donut.series[0].labels.show = true;
+        let d = draw(&donut, 300.0, 300.0, &rough_width, ',', '.');
+        let label = d
+            .marks
+            .iter()
+            .find_map(|m| match m {
+                Mark::Text { x, y, text, .. } if text.ends_with('%') => Some((*x, *y)),
+                _ => None,
+            })
+            .unwrap();
+        let all: Vec<(f32, f32)> = d
+            .marks
+            .iter()
+            .filter_map(|m| match m {
+                Mark::Shape {
+                    path,
+                    fill: Some(_),
+                    ..
+                } => Some(points(path)),
+                _ => None,
+            })
+            .flatten()
+            .collect();
+        let (x0, x1) = all
+            .iter()
+            .fold((f32::MAX, f32::MIN), |a, p| (a.0.min(p.0), a.1.max(p.0)));
+        let (y0, y1) = all
+            .iter()
+            .fold((f32::MAX, f32::MIN), |a, p| (a.0.min(p.1), a.1.max(p.1)));
+        let (cx0, cy0, r) = ((x0 + x1) / 2.0, (y0 + y1) / 2.0, (x1 - x0) / 2.0);
+        let dist = ((label.0 - cx0).powi(2) + (label.1 - cy0).powi(2)).sqrt();
+        assert!(dist > r * 0.85, "{dist} {r}");
+        // A column under a fixed minimum grows down, rounded at its end.
+        let mut column = Chart::new(ChartKind::Column);
+        column.legend = false;
+        column.corner_radius = 30;
+        column.outside_corners_only = true;
+        column.value_axis.min = Some(desk_table::Num(50.0));
+        column.data.set(0, 0, Some(30.0));
+        let d = draw(&column, 300.0, 200.0, &rough_width, ',', '.');
+        let bar = &filled_with(&d, column.style(0).color())[0];
+        let pts = points(bar);
+        let top = pts.iter().map(|p| p.1).fold(f32::MAX, f32::min);
+        let bottom = pts.iter().map(|p| p.1).fold(f32::MIN, f32::max);
+        let curves: Vec<f32> = bar
+            .iter()
+            .filter_map(|op| match *op {
+                PathOp::Curve(.., y) => Some(y),
+                _ => None,
+            })
+            .collect();
+        assert!(!curves.is_empty());
+        assert!(curves.iter().all(|y| *y >= (top + bottom) / 2.0 - 0.01));
+        // A missing value breaks the line of a radar, which is not filled.
+        let mut radar = Chart::new(ChartKind::Radar);
+        radar.legend = false;
+        radar.data.set(0, 1, None);
+        let d = draw(&radar, 300.0, 300.0, &rough_width, ',', '.');
+        // Only its marks, which are circles, are filled.
+        assert!(
+            filled_with(&d, radar.style(0).color())
+                .iter()
+                .all(|p| p.iter().any(|op| matches!(op, PathOp::Curve(..))))
+        );
+    }
+
+    #[test]
+    fn w145_3d_bars_and_pies_are_beveled() {
+        for kind in [ChartKind::Column, ChartKind::Pie] {
+            let mut chart = Chart::new(kind);
+            chart.three_d = true;
+            let plain = draw(&chart, 300.0, 200.0, &rough_width, ',', '.')
+                .marks
+                .len();
+            chart.scene.bevel = true;
+            let beveled = draw(&chart, 300.0, 200.0, &rough_width, ',', '.')
+                .marks
+                .len();
+            assert!(beveled > plain, "{kind:?}");
+        }
     }
 
     #[test]

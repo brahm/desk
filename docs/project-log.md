@@ -3338,6 +3338,33 @@ paragraph, and objects on a second page.
   and the rest stay; Undo brings the file back.
 - W118 and W119 are done. No task moved to another phase.
 
+### 28 November: Donut, radar and bubble charts (step 10 of W4, #273)
+
+- Insert > Chart and the Chart Type of the Chart tab gain Donut, Bubble
+  and Radar, in 2D only, as Pages 15.4 has them. The donut is the pie
+  with a hole whose Inner Radius the Chart tab sets; the radar has a
+  spoke for each category and each series as a closed line, lightly
+  filled, on a grid of polygons or of circles; a bubble is placed by its
+  x and y and is as big as its size, by area unless Size by Diameter is
+  on, with a Bubble Size scale and negative sizes shown as rings when
+  asked.
+- Share X Values, in the Data Editor and in the Chart tab of scatter and
+  bubble charts, makes the first series the x of all the others; without
+  it each series has its own x, as before. The look of a plotted series
+  is that of its y values everywhere: the drawing took that of its pair
+  until now, while the inspector and ODT took that of the y.
+- Columns and bars take Rounded Corners, a part of their width, on all
+  four corners or, with Outside Corners Only, on the end away from the
+  axis and at the outer end of a stack. Bevel Edges, a switch of the 3D
+  scene that drew nothing, now lights the edges of 3D bars and the rim
+  of 3D pies.
+- ODT keeps all of it in `desk:chart`, whose new fields take their
+  defaults in older files. Other programs read the donut as a ring, the
+  radar as a radar and the bubble as the scatter of its x and y.
+- W145 is done. W141 waits for the interactive chart (step 12) and W142
+  for a look at the rest of the Data Editor of 15.4 in the validation on
+  the Mac (step 13); both stay in W4. No task moved to another phase.
+
 ## Decisions, with their reasons and consequences
 
 Ids `D-nnn` and `R-nnn` are those of [decisions.md](decisions.md).

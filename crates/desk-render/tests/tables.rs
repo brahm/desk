@@ -150,7 +150,7 @@ fn grf_01_grf_20_every_kind_of_chart_draws_in_2d_and_3d() {
         .edit("Charts", |edit| {
             edit.set_page_setup(PageSetup {
                 width: desk_model::Length::from_points(900),
-                height: desk_model::Length::from_points(1000),
+                height: desk_model::Length::from_points(1200),
                 ..PageSetup::default()
             })?;
             for (i, kind) in ChartKind::ALL.iter().enumerate() {
@@ -185,7 +185,10 @@ fn grf_01_grf_20_every_kind_of_chart_draws_in_2d_and_3d() {
         .iter()
         .filter(|o| o.chart.is_some())
         .count();
-    assert_eq!(charts, 19);
+    // Each kind in 2D, and in 3D those that have it.
+    let kinds = ChartKind::ALL.len() + ChartKind::ALL.iter().filter(|k| k.has_3d()).count();
+    assert_eq!(charts, kinds);
+    assert_eq!(kinds, 22);
     if let Ok(dir) = std::env::var("DESK_SNAPSHOTS") {
         let png = Painter::new()
             .unwrap()
