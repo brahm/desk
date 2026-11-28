@@ -3526,7 +3526,7 @@ paragraph, and objects on a second page.
 - Left in step 11, in W4: U3D (D-033), whose specification (ECMA-363)
   and sample files this container cannot reach.
 
-### 28 November: reference lines of charts (step 12 of W4, #PRNUM)
+### 28 November: reference lines of charts (step 12 of W4, #280)
 
 - A value axis keeps reference lines, as Reference Lines of the Axis tab
   of Pages 15.4 offers them: at the average, the median, the minimum or

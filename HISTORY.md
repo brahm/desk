@@ -9,7 +9,7 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
 ## Changes since 0.7.0 (unreleased)
 
 * Added: reference lines in charts, at the average, median, minimum,
-  maximum or a value, with their name and value (#PRNUM).
+  maximum or a value, with their name and value (#280).
 * Added: 3D objects from PRC, the 3D of PDF documents, by their
   tessellations (#279).
 * Added: 3D objects from FBX files, with their materials, pictures and
