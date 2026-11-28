@@ -10,7 +10,7 @@ SPDX-License-Identifier = "GPL-3.0-or-later"
 # The file format libraries are MPL-2.0, so that other programs can use
 # them to read and write the same formats. The last matching table wins.
 [[annotations]]
-path = ["crates/desk-odf/**", "crates/desk-iwork/**", "crates/desk-formula/**"]
+path = ["crates/desk-odf/**", "crates/desk-iwork/**", "crates/desk-formula/**", "crates/desk-3d/**"]
 SPDX-FileCopyrightText = "2026 Desk contributors"
 SPDX-License-Identifier = "MPL-2.0"
 

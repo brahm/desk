@@ -254,6 +254,7 @@ fn object_name(document: &Document, id: NodeId) -> String {
         Some(ObjectKind::Equation(_)) => "Equation",
         Some(ObjectKind::Gallery(_)) => "Image Gallery",
         Some(ObjectKind::Drawing(_)) => "Drawing",
+        Some(ObjectKind::Model(_)) => "3D Object",
         _ => "Shape",
     })
 }

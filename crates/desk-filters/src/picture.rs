@@ -150,6 +150,67 @@ pub fn png_fallback(picture: &Picture) -> Option<Picture> {
     png
 }
 
+/// A PNG of a 3D model as it is turned, for the programs that cannot
+/// draw it (W116): at two pixels a point of its frame, within
+/// [`FALLBACK_MAX_SIDE`]. None when the model cannot be read.
+pub fn model_poster(model: &desk_model::Model3d, width: f32, height: f32) -> Option<Picture> {
+    use std::sync::Mutex;
+    /// The pictures made, by the hash and length of the file, the turn
+    /// and the size, newest last.
+    #[allow(clippy::type_complexity)]
+    static MADE: Mutex<Vec<((usize, usize, i32, i32, u32, u32), Option<Picture>)>> =
+        Mutex::new(Vec::new());
+    let scale = (f64::from(FALLBACK_MAX_SIDE) / f64::from(width.max(height).max(1.0))).min(2.0);
+    let w = (f64::from(width) * scale)
+        .round()
+        .clamp(1.0, f64::from(FALLBACK_MAX_SIDE)) as u32;
+    let h = (f64::from(height) * scale)
+        .round()
+        .clamp(1.0, f64::from(FALLBACK_MAX_SIDE)) as u32;
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    std::hash::Hash::hash(model.data(), &mut hasher);
+    let key = (
+        std::hash::Hasher::finish(&hasher) as usize,
+        model.data().len(),
+        model.yaw,
+        model.pitch,
+        w,
+        h,
+    );
+    if let Ok(made) = MADE.lock()
+        && let Some((_, png)) = made.iter().find(|(k, _)| *k == key)
+    {
+        return png.clone();
+    }
+    let png = desk_3d::read(model.data()).ok().and_then(|scene| {
+        let mut rgba = desk_3d::render(&scene, model.view(), w, h)?;
+        // PNG keeps colors not premultiplied.
+        for [r, g, b, a] in rgba.as_chunks_mut::<4>().0 {
+            if *a > 0 && *a < 255 {
+                for c in [r, g, b] {
+                    *c = (u32::from(*c) * 255 / u32::from(*a)).min(255) as u8;
+                }
+            }
+        }
+        let mut out = Vec::new();
+        {
+            let mut encoder = png::Encoder::new(&mut out, w, h);
+            encoder.set_color(png::ColorType::Rgba);
+            encoder.set_depth(png::BitDepth::Eight);
+            let mut writer = encoder.write_header().ok()?;
+            writer.write_image_data(&rgba).ok()?;
+        }
+        Picture::from_png(out)
+    });
+    if let Ok(mut made) = MADE.lock() {
+        if made.len() >= 16 {
+            made.remove(0);
+        }
+        made.push((key, png.clone()));
+    }
+    png
+}
+
 fn svg_png(picture: &Picture) -> Option<Picture> {
     use librsvg_rebind::prelude::*;
     let handle = librsvg_rebind::Handle::from_data(picture.data()).ok()?;

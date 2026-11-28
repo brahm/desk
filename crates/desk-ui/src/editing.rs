@@ -36,6 +36,7 @@ pub use changes::ChangeBubble;
 pub use comments::{CommentTarget, ReviewItem};
 pub use drawing::{DRAWING_WIDTHS, DrawingPick, DrawingTools};
 pub(crate) use gallery::ARROW_RADIUS as GALLERY_ARROW_RADIUS;
+pub(crate) use model3d::HANDLE_RADIUS as MODEL_HANDLE_RADIUS;
 mod connections;
 mod copies;
 mod custom_formats;
@@ -45,6 +46,7 @@ mod gallery;
 mod guides;
 mod media;
 mod merge;
+mod model3d;
 mod navigate;
 mod objects;
 mod outline;
@@ -505,6 +507,8 @@ struct State {
     objects: Vec<desk_model::NodeId>,
     /// A drag of objects in progress.
     object_drag: Option<objects::ObjectDrag>,
+    /// A drag of the handle that turns a 3D object (W116).
+    model_turn: Option<model3d::ModelTurn>,
     /// A drag that selects the objects in a rectangle (OBJ-21).
     marquee: Option<copies::MarqueeDrag>,
     /// Whether the layout view is on (INT-09).
@@ -721,6 +725,7 @@ impl TextEditor {
                 story: None,
                 objects: Vec::new(),
                 object_drag: None,
+                model_turn: None,
                 marquee: None,
                 show_layout: false,
                 guide_drag: None,
@@ -4446,6 +4451,7 @@ impl TextEditor {
             };
             let copying = cell_drag::copying(gesture.current_event_state());
             if this.drag_cells(dx, dy, copying)
+                || this.drag_model(x + dx, y + dy)
                 || this.drag_alpha(dx, dy)
                 || this.drag_drawing(dx, dy)
                 || this.drag_pen(dx, dy)
@@ -4488,6 +4494,7 @@ impl TextEditor {
                 this.end_cell_drag(x + dx, y + dy, copying);
             }
             this.end_object_drag();
+            this.end_model_drag();
             this.end_marquee();
             this.end_guide_drag();
             this.end_alpha_drag();

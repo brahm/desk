@@ -85,6 +85,7 @@ desk-lang = { path = "crates/desk-lang" }
 desk-math = { path = "crates/desk-math" }
 desk-layout = { path = "crates/desk-layout" }
 desk-model = { path = "crates/desk-model" }
+desk-3d = { path = "crates/desk-3d" }
 desk-odf = { path = "crates/desk-odf" }
 desk-render = { path = "crates/desk-render" }
 desk-table = { path = "crates/desk-table" }

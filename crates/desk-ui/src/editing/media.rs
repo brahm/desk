@@ -123,6 +123,11 @@ impl TextEditor {
     /// `at` or in the middle of the page shown (OBJ-01, OBJ-18). Returns
     /// false when the file is none that Desk reads.
     pub fn insert_file(&self, file: &gio::File, at: Option<(usize, f64, f64)>) -> bool {
+        // A 3D model is a zip, which no movie or picture is (W116).
+        if let Some(model) = crate::bullet_pictures::model_from_file(file) {
+            self.insert_model(model, at);
+            return true;
+        }
         if let Some(media) = crate::bullet_pictures::media_from_file(file) {
             // A movie stands for itself with its first frame.
             let weak = self.downgrade();

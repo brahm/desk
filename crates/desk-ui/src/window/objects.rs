@@ -17,8 +17,10 @@ use crate::i18n::{tr, trc};
 use crate::shape_library;
 
 /// The actions of these menus, which need a document.
-pub(super) const OBJECT_ACTIONS: [&str; 44] = [
+pub(super) const OBJECT_ACTIONS: [&str; 46] = [
     "insert-equation",
+    "insert-model",
+    "reset-model-rotation",
     "record-audio",
     "insert-drawing",
     "edit-drawing",
@@ -91,10 +93,11 @@ type ChoiceAction = fn(&TextEditor, &str);
 
 impl DocumentWindow {
     pub(super) fn add_object_actions(self: &Rc<Self>) {
-        let simple: [(&str, EditorAction); 31] = [
+        let simple: [(&str, EditorAction); 32] = [
             // Insert > Drawing of Pages 15.4, and Edit Drawing, Done and
             // Play of the Drawing tab (W117).
             ("insert-drawing", TextEditor::start_drawing),
+            ("reset-model-rotation", TextEditor::reset_model_rotation),
             ("edit-drawing", |e| {
                 e.edit_drawing();
             }),
@@ -160,6 +163,15 @@ impl DocumentWindow {
         action.connect_activate(move |_, _| {
             if let Some(this) = weak.upgrade() {
                 this.choose_picture();
+            }
+        });
+        self.actions.add_action(&action);
+        // Insert > 3D Object (W116).
+        let weak = Rc::downgrade(self);
+        let action = gio::SimpleAction::new("insert-model", None);
+        action.connect_activate(move |_, _| {
+            if let Some(this) = weak.upgrade() {
+                this.choose_model();
             }
         });
         self.actions.add_action(&action);
@@ -246,10 +258,44 @@ impl DocumentWindow {
 
     /// Asks for an image, a PDF, a movie or a sound, and puts it on the
     /// page (OBJ-01, OBJ-18).
+    /// Asks for a 3D model to put on the page (W116).
+    fn choose_model(self: &Rc<Self>) {
+        let filters = gio::ListStore::new::<gtk::FileFilter>();
+        filters.append(&crate::bullet_pictures::model_filter());
+        let dialog = gtk::FileDialog::builder()
+            .title(tr("Choose a 3D Object"))
+            .modal(true)
+            .filters(&filters)
+            .build();
+        let weak = Rc::downgrade(self);
+        dialog.open(
+            Some(&self.window()),
+            gio::Cancellable::NONE,
+            move |result| {
+                let (Some(this), Ok(file)) = (weak.upgrade(), result) else {
+                    return;
+                };
+                let Some(editor) = this.editor() else { return };
+                match crate::bullet_pictures::model_from_file(&file) {
+                    Some(model) => editor.insert_model(model, None),
+                    None => this.alert(
+                        &tr("Cannot open {name}").replace(
+                            "{name}",
+                            &file
+                                .basename()
+                                .map_or_else(String::new, |n| n.to_string_lossy().into_owned()),
+                        ),
+                        &tr("The file is not a 3D object that Desk can read."),
+                    ),
+                }
+            },
+        );
+    }
+
     fn choose_picture(self: &Rc<Self>) {
         let filters = crate::bullet_pictures::document_picture_filters(true);
         let dialog = gtk::FileDialog::builder()
-            .title(tr("Choose an Image, Movie or Sound"))
+            .title(tr("Choose an Image, Movie, Sound or 3D Object"))
             .modal(true)
             .filters(&filters)
             .build();
@@ -270,7 +316,7 @@ impl DocumentWindow {
                                 .basename()
                                 .map_or_else(String::new, |n| n.to_string_lossy().into_owned()),
                         ),
-                        &tr("The file is not an image, movie or sound that Desk can read."),
+                        &tr("The file is not an image, movie, sound or 3D object that Desk can read."),
                     );
                 }
             },

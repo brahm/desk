@@ -18,6 +18,7 @@ libheif-rs.workspace = true
 desk-chart.workspace = true
 desk-formula.workspace = true
 desk-iwork.workspace = true
+desk-3d.workspace = true
 desk-model.workspace = true
 desk-odf.workspace = true
 desk-table.workspace = true

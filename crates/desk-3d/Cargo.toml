@@ -1,0 +1,17 @@
+[package]
+name = "desk-3d"
+description = "Readers of 3D models (USDZ) and a software renderer of them"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license = "MPL-2.0"
+repository.workspace = true
+publish.workspace = true
+
+[dependencies]
+png.workspace = true
+zip.workspace = true
+zune-jpeg.workspace = true
+
+[lints]
+workspace = true

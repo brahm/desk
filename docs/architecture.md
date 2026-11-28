@@ -65,8 +65,8 @@ flowchart TB
 
 Today. One Cargo workspace; an arrow means "depends on". The CI enforces
 two rules (`ci/check-deps.sh`): only `desk-ui` and the three apps use GTK,
-and the MPL-2.0 libraries (`desk-odf`, `desk-iwork`, `desk-formula`) use no
-other Desk crate, so that other programs can reuse them.
+and the MPL-2.0 libraries (`desk-odf`, `desk-iwork`, `desk-formula`,
+`desk-3d`) use no other Desk crate, so that other programs can reuse them.
 
 ```mermaid
 flowchart TB
@@ -95,6 +95,7 @@ flowchart TB
         odf[desk-odf · MPL]
         iwork[desk-iwork · MPL]
         formula[desk-formula · MPL]
+        three[desk-3d · MPL<br>3D models, drawn on the CPU]
     end
     writer & tables & slides --> ui & filters
     contacts --> model & odf
@@ -105,10 +106,11 @@ flowchart TB
     render --> layout --> text --> model
     render & layout --> math
     text --> lang
-    model --> chart & table
+    model --> chart & table & three
+    render --> three
     chart --> table --> formula
     anim --> model
-    filters --> model & odf & iwork & anim & chart & table & formula
+    filters --> model & odf & iwork & anim & chart & table & formula & three
 ```
 
 | Layer | Rule |

@@ -14,6 +14,7 @@ librsvg-rebind.workspace = true
 libheif-rs.workspace = true
 zune-jpeg.workspace = true
 cairo-rs.workspace = true
+desk-3d.workspace = true
 desk-layout.workspace = true
 desk-math.workspace = true
 desk-model.workspace = true

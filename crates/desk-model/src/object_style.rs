@@ -56,6 +56,7 @@ impl ObjectStyleKind {
             ObjectKind::TextBox(_) => Some(Self::TextBox),
             ObjectKind::Image(_) => Some(Self::Image),
             ObjectKind::Media(_)
+            | ObjectKind::Model(_)
             | ObjectKind::Group(_)
             | ObjectKind::Table(_)
             | ObjectKind::Chart(_)

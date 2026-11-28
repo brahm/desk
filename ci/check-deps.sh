@@ -13,7 +13,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-mpl_crates=(desk-odf desk-iwork desk-formula)
+mpl_crates=(desk-odf desk-iwork desk-formula desk-3d)
 gtk_crates=(desk-ui desk-writer desk-tables desk-slides)
 gtk_packages='^(gdk4|gdk4-sys|gsk4|gsk4-sys|gtk4|gtk4-sys|libadwaita|libadwaita-sys)$'
 

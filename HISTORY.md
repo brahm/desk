@@ -8,6 +8,8 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
 
 ## Changes since 0.7.0 (unreleased)
 
+* Added: 3D objects from USDZ files, drawn on the page and turned by
+  dragging the handle in their middle or in the Object tab (#274).
 * Added: donut, radar and bubble charts, shared X values, rounded
   corners of columns and bars, and the bevel of 3D charts (#273).
 * Added: Insert > Record Audio records from the microphone, the Movie and

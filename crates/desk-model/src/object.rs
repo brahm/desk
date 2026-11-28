@@ -578,6 +578,8 @@ pub enum ObjectKind {
     Image(Picture),
     /// A movie or a sound (OBJ-18).
     Media(crate::Media),
+    /// A 3D model, drawn in its frame (W116).
+    Model(crate::Model3d),
     /// Objects grouped into one, with frames on the same page as the
     /// group's, from back to front.
     Group(Arc<[Object]>),

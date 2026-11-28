@@ -68,7 +68,27 @@ pub struct Painter {
     adjusted: Vec<(AdjustedKey, cairo::ImageSurface)>,
     /// The SVG pictures read so far, newest last (W108).
     svgs: Vec<(desk_model::Picture, librsvg_rebind::Handle)>,
+    /// The scenes of the 3D models read so far, newest last, none for a
+    /// file that could not be read (W116).
+    scenes: Vec<(std::sync::Arc<[u8]>, Option<SharedScene>)>,
+    /// The 3D models drawn so far, by the file, the turn and the pixels.
+    models: Vec<(ModelKey, cairo::ImageSurface)>,
 }
+
+/// A scene of a 3D model, read once and shared.
+type SharedScene = std::sync::Arc<desk_3d::Scene>;
+
+/// A 3D model as drawn: its file, by where its bytes are, its turn, and
+/// the pixels of the picture.
+#[derive(Clone, Copy, PartialEq, Eq)]
+struct ModelKey {
+    data: usize,
+    turn: (i32, i32),
+    size: (u32, u32),
+}
+
+/// The longest side, in pixels, that a 3D model is drawn at.
+const MAX_MODEL_SIDE: f64 = 2048.0;
 
 impl Painter {
     /// A painter with no fonts open yet.
@@ -79,7 +99,53 @@ impl Painter {
             pictures: Vec::new(),
             adjusted: Vec::new(),
             svgs: Vec::new(),
+            scenes: Vec::new(),
+            models: Vec::new(),
         })
+    }
+
+    /// The scene of a 3D model, read once.
+    fn scene(&mut self, model: &desk_model::Model3d) -> Option<std::sync::Arc<desk_3d::Scene>> {
+        let data = model.shared_data();
+        if let Some(at) = self
+            .scenes
+            .iter()
+            .position(|(d, _)| std::sync::Arc::ptr_eq(d, &data))
+        {
+            let entry = self.scenes.remove(at);
+            let scene = entry.1.clone();
+            self.scenes.push(entry);
+            return scene;
+        }
+        let scene = desk_3d::read(&data).ok().map(std::sync::Arc::new);
+        if self.scenes.len() >= 8 {
+            self.scenes.remove(0);
+        }
+        self.scenes.push((data, scene.clone()));
+        scene
+    }
+
+    /// The picture of a 3D model, turned as it says, of so many pixels;
+    /// none when its file cannot be read.
+    fn model(
+        &mut self,
+        model: &desk_model::Model3d,
+        width: u32,
+        height: u32,
+    ) -> Option<cairo::ImageSurface> {
+        let key = ModelKey {
+            data: model.data().as_ptr() as usize,
+            turn: (model.yaw, model.pitch),
+            size: (width, height),
+        };
+        if let Some(at) = self.models.iter().position(|(k, _)| *k == key) {
+            return Some(used(&mut self.models, at));
+        }
+        let scene = self.scene(model)?;
+        let surface = model_surface(&scene, model.view(), width, height)?;
+        evict(&mut self.models, 16, surface_bytes(&surface));
+        self.models.push((key, surface.clone()));
+        Some(surface)
     }
 
     /// The SVG picture read by librsvg, kept so that it is not read
@@ -365,6 +431,63 @@ impl Painter {
                     cr.set_source_surface(&surface, 0.0, 0.0)?;
                     cr.source().set_filter(cairo::Filter::Good);
                     cr.paint()?;
+                    cr.restore()?;
+                }
+                Item::Model { model, rect } => {
+                    let (x, y, width, height) = *rect;
+                    if !drawn_rect(width, height) {
+                        continue;
+                    }
+                    // As many pixels as the device shows, or at 300 dots
+                    // an inch for print.
+                    let device = |dx: f64, dy: f64| {
+                        cr.user_to_device_distance(dx, dy)
+                            .map_or(1.0, |(a, b)| a.hypot(b))
+                    };
+                    let print = if matches!(
+                        cr.target().type_(),
+                        cairo::SurfaceType::Pdf | cairo::SurfaceType::Svg | cairo::SurfaceType::Ps
+                    ) {
+                        300.0 / 72.0
+                    } else {
+                        1.0
+                    };
+                    let mut pw = f64::from(width) * device(1.0, 0.0) * print;
+                    let mut ph = f64::from(height) * device(0.0, 1.0) * print;
+                    let fit = (MAX_MODEL_SIDE / pw.max(ph)).min(1.0);
+                    pw = (pw * fit).ceil().max(1.0);
+                    ph = (ph * fit).ceil().max(1.0);
+                    cr.save()?;
+                    match self.model(model, pw as u32, ph as u32) {
+                        Some(surface) => {
+                            cr.translate(f64::from(x), f64::from(y));
+                            cr.scale(f64::from(width) / pw, f64::from(height) / ph);
+                            cr.set_source_surface(&surface, 0.0, 0.0)?;
+                            cr.source().set_filter(cairo::Filter::Good);
+                            cr.paint()?;
+                        }
+                        None => {
+                            // A model that cannot be read shows as a gray
+                            // frame with a cross.
+                            let (x, y, w, h) = (
+                                f64::from(x),
+                                f64::from(y),
+                                f64::from(width),
+                                f64::from(height),
+                            );
+                            cr.set_source_rgba(0.5, 0.5, 0.5, 0.15);
+                            cr.rectangle(x, y, w, h);
+                            cr.fill()?;
+                            cr.set_source_rgba(0.5, 0.5, 0.5, 0.6);
+                            cr.set_line_width(1.0);
+                            cr.rectangle(x, y, w, h);
+                            cr.move_to(x, y);
+                            cr.line_to(x + w, y + h);
+                            cr.move_to(x + w, y);
+                            cr.line_to(x, y + h);
+                            cr.stroke()?;
+                        }
+                    }
                     cr.restore()?;
                 }
                 Item::Rect {
@@ -1302,6 +1425,41 @@ fn used<K>(kept: &mut Vec<(K, cairo::ImageSurface)>, at: usize) -> cairo::ImageS
     let surface = entry.1.clone();
     kept.push(entry);
     surface
+}
+
+/// The picture of a 3D scene, drawn by `desk-3d`, as a surface of Cairo.
+fn model_surface(
+    scene: &desk_3d::Scene,
+    view: desk_3d::View,
+    width: u32,
+    height: u32,
+) -> Option<cairo::ImageSurface> {
+    let rgba = desk_3d::render(scene, view, width, height)?;
+    let mut surface = cairo::ImageSurface::create(
+        cairo::Format::ARgb32,
+        i32::try_from(width).ok()?,
+        i32::try_from(height).ok()?,
+    )
+    .ok()?;
+    let stride = usize::try_from(surface.stride()).ok()?;
+    {
+        let mut out = surface.data().ok()?;
+        for (row, pixels) in rgba.chunks_exact(width as usize * 4).enumerate() {
+            let Some(line) = out.get_mut(row * stride..row * stride + width as usize * 4) else {
+                break;
+            };
+            // Premultiplied both, but Cairo keeps a pixel as one word of
+            // alpha, red, green and blue, in the order of the machine.
+            let pixels = pixels.as_chunks::<4>().0;
+            for (to, &[r, g, b, a]) in line.as_chunks_mut::<4>().0.iter_mut().zip(pixels) {
+                let word =
+                    u32::from(a) << 24 | u32::from(r) << 16 | u32::from(g) << 8 | u32::from(b);
+                *to = word.to_ne_bytes();
+            }
+        }
+    }
+    surface.mark_dirty();
+    Some(surface)
 }
 
 /// The bytes of the pixels of a surface.
