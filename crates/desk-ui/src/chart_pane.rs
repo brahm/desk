@@ -521,7 +521,7 @@ impl ChartGroups {
             (&self.share_x, "Share X Values", |this, c| {
                 c.share_x = this.share_x.is_active();
             }),
-            (&self.radar_circular, "Radar Grid", |this, c| {
+            (&self.radar_circular, "Circular Grid", |this, c| {
                 c.radar_circular = this.radar_circular.is_active();
             }),
             (&self.by_diameter, "Bubble Size", |this, c| {

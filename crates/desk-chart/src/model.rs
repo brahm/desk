@@ -1175,6 +1175,27 @@ impl Chart {
         if !kind.has_3d() {
             self.three_d = false;
         }
+        // A bubble chart with too few series for one bubble gets sizes:
+        // those of its last series, so that its points show as bubbles.
+        if kind == ChartKind::Bubble && self.point_series().is_empty() && self.series_count() > 0 {
+            let last = self.series_count() - 1;
+            let sizes: Vec<Option<f64>> = (0..self.category_count())
+                .map(|c| self.value(last, c).map(f64::abs))
+                .collect();
+            let at = self.series_count();
+            if self.series_in_rows {
+                self.data.insert_row(at, "Tamanho".into());
+            } else {
+                self.data.insert_col(at, "Tamanho".into());
+            }
+            for (c, v) in sizes.into_iter().enumerate() {
+                if self.series_in_rows {
+                    self.data.set(at, c, v);
+                } else {
+                    self.data.set(c, at, v);
+                }
+            }
+        }
         for (i, s) in self.series.iter_mut().enumerate() {
             let fresh = SeriesStyle::nth(i);
             s.labels = fresh.labels;
@@ -1235,6 +1256,11 @@ mod tests {
         assert_eq!(chart.point_series(), [ps(0, 1, Some(2))]);
         chart.kind = ChartKind::Radar;
         assert!(chart.point_series().is_empty());
+        // A chart of two series made a bubble chart gets their sizes.
+        let mut chart = Chart::new(ChartKind::Column);
+        chart.set_kind(ChartKind::Bubble);
+        assert_eq!(chart.point_series(), [ps(0, 1, Some(2))]);
+        assert_eq!(chart.value(2, 3), Some(58.0));
         // A new bubble chart has its three series.
         assert_eq!(Chart::new(ChartKind::Bubble).point_series().len(), 1);
     }
