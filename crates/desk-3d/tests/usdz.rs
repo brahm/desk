@@ -135,6 +135,18 @@ fn w116_compressed_arrays_quaternions_and_samples_in_time() {
         "{lo:?} {hi:?}"
     );
     assert!(grid.normals.iter().all(|n| close(*n, [0.0, 0.0, 1.0])));
+    // The move plays over its ten time codes, at 24 a second, and the
+    // grid ends 100 further in Z.
+    let animation = scene.animation.as_ref().unwrap();
+    assert!((animation.duration() - 10.0 / 24.0).abs() < 1e-6);
+    let view = desk_3d::View {
+        yaw: 45.0,
+        pitch: 0.0,
+    };
+    let start = desk_3d::render_at(&scene, view, 0.0, 48, 48).unwrap();
+    let end = desk_3d::render_at(&scene, view, animation.duration(), 48, 48).unwrap();
+    assert_eq!(desk_3d::render(&scene, view, 48, 48).unwrap(), start);
+    assert!(start != end && start.iter().any(|v| *v > 0));
     let sphere = scene
         .meshes
         .iter()

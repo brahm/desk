@@ -20,7 +20,7 @@ use std::collections::HashMap;
 
 use serde_json::{Map, Value as Json};
 
-use crate::animation::{Animation, Interpolation, Joint, Local, MeshJoint, Path, Track, trs};
+use crate::animation::{Animation, Interpolation, Joint, Local, MeshJoint, Path, Track};
 use crate::matrix::{IDENTITY, Matrix, invert, mul, normal, point};
 use crate::{Error, Material, Mesh, Result, Scene, Texture, limits, malformed, texture};
 
@@ -607,10 +607,7 @@ impl Builder<'_> {
                 s: numbers(&node, "scale", [1.0; 3]),
             }
         };
-        let local = match &rest {
-            Local::Matrix(m) => *m,
-            Local::Trs { t, r, s } => trs(*t, *r, *s),
-        };
+        let local = rest.matrix(None);
         let world = mul(&local, above);
         let joint = self.joints.len();
         self.joints.push(Joint { parent, rest });

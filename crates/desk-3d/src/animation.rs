@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: MPL-2.0
 
 //! The animation of a model: the parts of a scene that move over time,
-//! as the nodes of glTF move by their translation, rotation and scale.
+//! as the nodes of glTF move by their translation, rotation and scale,
+//! and the prims of USD by the samples in time of their transform ops.
 //!
 //! The meshes of a [`Scene`](crate::Scene) stay where they rest. A part
 //! that moves keeps the node it hangs from and the inverse of where that
@@ -11,7 +12,9 @@
 //! has no inverse: the corners of its meshes are kept in its own space
 //! instead, and placed where the node is even at rest.
 
-use crate::matrix::{IDENTITY, Matrix, invert, mul, point, quaternion, scale, translate};
+use crate::matrix::{
+    IDENTITY, Matrix, invert, mul, orient, point, quaternion, rotate, scale, translate,
+};
 
 /// The animation of a scene, read with it: see
 /// [`Scene::animation`](crate::Scene::animation).
@@ -63,6 +66,108 @@ pub(crate) enum Local {
         r: [f64; 4],
         s: [f64; 3],
     },
+    /// The transform ops of a prim of USD, the last applied first, each
+    /// with its samples in time.
+    Ops(Vec<Op>),
+}
+
+/// What a transform op of USD does with its value.
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) enum OpKind {
+    /// A matrix of 16 numbers, by rows.
+    Transform,
+    Translate,
+    Scale,
+    /// A quaternion: the real part, then the imaginary ones.
+    Orient,
+    /// A turn about one axis, by an angle in degrees.
+    Rotate(usize),
+    /// Turns about the three axes, the first of these turning first, by
+    /// the angles about X, Y and Z.
+    RotateAxes(Vec<usize>),
+}
+
+impl OpKind {
+    /// The matrix of the op for a value.
+    pub(crate) fn matrix(&self, v: &[f64]) -> Option<Matrix> {
+        Some(match self {
+            Self::Transform => {
+                let mut m = [0.0; 16];
+                if v.len() != 16 {
+                    return None;
+                }
+                m.copy_from_slice(v);
+                m
+            }
+            Self::Translate => translate(v),
+            Self::Scale => scale(v),
+            Self::Orient => orient(v),
+            Self::Rotate(axis) => rotate(*axis, *v.first()?),
+            Self::RotateAxes(axes) => {
+                let mut m = IDENTITY;
+                for &axis in axes {
+                    m = mul(&m, &rotate(axis, v.get(axis).copied().unwrap_or(0.0)));
+                }
+                m
+            }
+        })
+    }
+}
+
+/// A transform op of USD, with its value at rest and its samples.
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct Op {
+    pub(crate) kind: OpKind,
+    /// Whether it is the inverse that applies.
+    pub(crate) inverse: bool,
+    pub(crate) rest: Vec<f64>,
+    /// The times of the samples, in seconds, each after the one before.
+    pub(crate) times: Vec<f32>,
+    /// The values at those times, as many numbers each as `rest` has.
+    pub(crate) values: Vec<Vec<f64>>,
+}
+
+impl Op {
+    /// The matrix of the op at a time, or at rest.
+    fn matrix(&self, time: Option<f32>) -> Option<Matrix> {
+        let value = match time {
+            Some(time) => self.value(time),
+            None => self.rest.clone(),
+        };
+        let m = self.kind.matrix(&value)?;
+        if self.inverse { invert(&m) } else { Some(m) }
+    }
+
+    /// The value at a time, held before the first sample and after the
+    /// last, and in line between two; a quaternion turns the short way.
+    fn value(&self, time: f32) -> Vec<f64> {
+        let next = self.times.partition_point(|t| *t <= time);
+        let Some(k) = next.checked_sub(1) else {
+            return self.values.first().unwrap_or(&self.rest).clone();
+        };
+        let (Some(a), Some(b), Some(t0), Some(t1)) = (
+            self.values.get(k),
+            self.values.get(next),
+            self.times.get(k),
+            self.times.get(next),
+        ) else {
+            return self.values.last().unwrap_or(&self.rest).clone();
+        };
+        let s = if t1 > t0 {
+            f64::from((time - t0) / (t1 - t0))
+        } else {
+            0.0
+        };
+        if self.kind == OpKind::Orient
+            && let (Ok(a4), Ok(b4)) = (
+                <[f64; 4]>::try_from(a.as_slice()),
+                <[f64; 4]>::try_from(b.as_slice()),
+            )
+        {
+            return slerp(a4, b4, s).to_vec();
+        }
+        a.iter().zip(b).map(|(a, b)| a + (b - a) * s).collect()
+    }
 }
 
 /// What a track moves.
@@ -207,10 +312,45 @@ fn slerp(a: [f64; 4], b: [f64; 4], s: f64) -> [f64; 4] {
 }
 
 impl Local {
-    fn matrix(&self) -> Matrix {
+    /// The matrix, at a time for the ops of USD, or at rest.
+    pub(crate) fn matrix(&self, time: Option<f32>) -> Matrix {
         match self {
             Self::Matrix(m) => *m,
             Self::Trs { t, r, s } => trs(*t, *r, *s),
+            Self::Ops(ops) => {
+                let mut m = IDENTITY;
+                for op in ops {
+                    if let Some(o) = op.matrix(time) {
+                        // The last op turns the point first, so it goes
+                        // leftmost.
+                        m = mul(&o, &m);
+                    }
+                }
+                if m.iter().all(|v| v.is_finite()) {
+                    m
+                } else {
+                    IDENTITY
+                }
+            }
+        }
+    }
+
+    /// The times of the samples of the ops of USD.
+    fn times(&self) -> impl Iterator<Item = f32> + '_ {
+        let ops: &[Op] = match self {
+            Self::Ops(ops) => ops,
+            _ => &[],
+        };
+        ops.iter().flat_map(|op| op.times.iter().copied())
+    }
+
+    /// Whether the ops of USD change in time.
+    fn changes(&self) -> bool {
+        match self {
+            Self::Ops(ops) => ops
+                .iter()
+                .any(|op| op.values.array_windows::<2>().any(|[a, b]| a != b)),
+            _ => false,
         }
     }
 }
@@ -250,7 +390,7 @@ impl Animation {
                 .and_then(|p| worlds.get(p))
                 .copied()
                 .unwrap_or(IDENTITY);
-            worlds.push(mul(&local.matrix(), &parent));
+            worlds.push(mul(&local.matrix(time), &parent));
         }
         worlds
     }
@@ -286,16 +426,21 @@ impl Animation {
         let duration = tracks
             .iter()
             .filter_map(|t| t.times.last().copied())
+            .chain(joints.iter().flat_map(|j| j.rest.times()))
             .fold(0.0f32, f32::max);
-        if tracks.is_empty() || !(duration > 0.0 && duration.is_finite()) {
+        if !(duration > 0.0 && duration.is_finite()) {
             return None;
         }
-        // A node moves when a track moves it or its parent moves.
-        let mut moves = vec![false; joints.len()];
+        // A node moves when a track moves it, its ops change, or its
+        // parent moves.
+        let mut moves: Vec<bool> = joints.iter().map(|j| j.rest.changes()).collect();
         for track in &tracks {
             if let Some(m) = moves.get_mut(track.joint) {
                 *m = true;
             }
+        }
+        if !moves.contains(&true) {
+            return None;
         }
         for (i, joint) in joints.iter().enumerate() {
             if joint.parent.and_then(|p| moves.get(p).copied()) == Some(true)
@@ -355,6 +500,7 @@ impl Animation {
             .tracks
             .iter()
             .flat_map(|t| t.times.iter().copied())
+            .chain(animation.joints.iter().flat_map(|j| j.rest.times()))
             .collect();
         let every = keys.len().div_ceil(KEYS).max(1);
         times.extend(keys.iter().step_by(every).map(|t| Some(*t)));
