@@ -3534,7 +3534,8 @@ paragraph, and objects on a second page.
   with a name and its value that can show at its end. They are drawn
   dashed over the series, across the plot of columns, lines and areas,
   up the plot of bars, and on both axes of scatter and bubble charts; a
-  line whose value is off the axis is not drawn.
+  line whose value is off the axis is not drawn. Of stacked series, the
+  values are the tops of the stacks, which the axis shows.
 - The Axis tab gets a Reference Lines group: Add Reference Line, then the
   line chosen with its type, value, name and switches, and a button to
   remove it. A name that is still that of its type follows a new type.

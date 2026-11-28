@@ -201,8 +201,9 @@ pub struct ChartGroups {
     reference_show_name: compact::SwitchRow,
     reference_show_value: compact::SwitchRow,
     /// The reference line the group shows, by its place on the value
-    /// axis.
+    /// axis, and the chart it is of: another chart shows its first.
     reference: Cell<usize>,
+    reference_of: std::cell::RefCell<Vec<desk_model::NodeId>>,
     which: compact::ComboRow,
     color: gtk::ColorDialogButton,
     labels: compact::SwitchRow,
@@ -498,6 +499,7 @@ impl ChartGroups {
             reference_show_name,
             reference_show_value,
             reference: Cell::new(0),
+            reference_of: std::cell::RefCell::new(Vec::new()),
             which,
             color,
             labels,
@@ -570,14 +572,19 @@ impl ChartGroups {
         });
         self.reference_remove.connect_clicked(move |_| f());
         let f = make(self, |this, c| {
-            let value = this.reference_value.value();
+            let shown = desk_model::chart::value_axis_values(c);
+            let spin = this.reference_value.value();
             if let Some(line) = this.reference_line(c) {
-                // A name that was that of its kind follows the new kind.
-                let old = REFERENCES
-                    .get(reference_index(line.kind) as usize)
-                    .map(|n| tr(n));
+                // A line made custom keeps the value it marked.
+                let value = match line.kind {
+                    ReferenceKind::Custom(v) => v.0,
+                    old => old.value(&shown).unwrap_or(spin),
+                };
                 let kind = reference_kind(this.reference_kind.selected(), value);
-                if old.as_deref() == Some(line.name.as_str())
+                // A name that was that of its kind, in this language or
+                // in English, follows the new kind.
+                let old = REFERENCES.get(reference_index(line.kind) as usize);
+                if old.is_some_and(|n| line.name == *n || line.name == tr(n))
                     && let Some(new) = REFERENCES.get(reference_index(kind) as usize)
                 {
                     line.name = tr(new);
@@ -961,6 +968,11 @@ impl ChartGroups {
         set_switch(&self.bevel, chart.scene.bevel);
         self.value_axis.set_visible(!pie);
         self.category_axis.set_visible(!pie);
+        let selected = editor.selected_objects();
+        if *self.reference_of.borrow() != selected {
+            self.reference.set(0);
+            *self.reference_of.borrow_mut() = selected;
+        }
         self.show_references(&chart);
         let axis = &chart.value_axis;
         set_switch(&self.min_on, axis.min.is_some());
