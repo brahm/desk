@@ -8,6 +8,7 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
 
 ## Changes since 0.7.0 (unreleased)
 
+* Added: the animation of USDZ models plays in the Object tab (#277).
 * Added: 3D objects from OBJ files, with their materials and pictures
   (#276).
 * Added: 3D objects from glTF and GLB, whose animation plays in the

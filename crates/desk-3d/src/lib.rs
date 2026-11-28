@@ -10,8 +10,8 @@
 //!
 //! It reads USDZ, the format of the 3D objects of Pages 15.4: the package
 //! of Universal Scene Description, with its layers in the text form
-//! (`usda`) or the binary one (`usdc`) and the pictures of its textures;
-//! and glTF 2.0, as text (`.gltf`) or binary (`.glb`), with the animation
+//! (`usda`) or the binary one (`usdc`), the pictures of its textures and
+//! the samples in time that move its prims; and glTF 2.0, as text (`.gltf`) or binary (`.glb`), with the animation
 //! of its nodes. A model of a format that a document does not keep, as
 //! Wavefront OBJ with its MTL materials, is turned into a GLB by
 //! [`import`]. A reader takes the meshes of the model with their

@@ -3450,6 +3450,25 @@ paragraph, and objects on a second page.
   pull request, then U3D and PRC (D-033). No task moved to another
   phase.
 
+### 28 November: the animation of USDZ (step 11 of W4, #277)
+
+- The readers of USD, text and binary, keep every sample in time of the
+  transform ops of prims (`xformOp:`), where they kept only the first.
+  A prim whose ops change in time moves, with what it holds: in the
+  order of its `xformOpOrder`, a translation, a scale or the angles of a
+  turn go in line from sample to sample, a quaternion turns the short
+  way, and the value is held before the first sample and after the
+  last. Time codes become seconds by the `startTimeCode` and the
+  `timeCodesPerSecond` of the stage, or its `framesPerSecond`, 24 by
+  default. A stage with Z up moves as it is drawn, turned to Y up.
+- The Object tab plays and pauses it as it does the animation of a glTF.
+  A prim that resets the transforms of its parents does not move.
+- Only the clock of the root layer counts: a layer brought by a
+  reference or a sublayer with a clock of its own, or an offset in time,
+  plays by that of the root layer.
+- Left in step 11, in W4: FBX, then U3D and PRC (D-033). No task moved
+  to another phase.
+
 ## Decisions, with their reasons and consequences
 
 Ids `D-nnn` and `R-nnn` are those of [decisions.md](decisions.md).

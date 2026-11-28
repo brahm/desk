@@ -9,7 +9,7 @@
 //! `defaultPrim`, `upAxis`, `active`, `references`, `payload` or the
 //! `interpolation` of a primvar.
 
-use super::{Attribute, Layer, Prim, Reference, Value};
+use super::{Attribute, Layer, Prim, Reference, Value, keeps_samples};
 use crate::{Error, Result, limits, malformed};
 
 /// A token of the text.
@@ -282,6 +282,20 @@ impl Parser {
                                         layer.z_up = t == "Z";
                                     }
                                 }
+                                (
+                                    name @ ("startTimeCode" | "timeCodesPerSecond"
+                                    | "framesPerSecond"),
+                                    Some(v),
+                                ) => {
+                                    if let Some(layer) = layer.as_deref_mut() {
+                                        let n = v.number();
+                                        match name {
+                                            "startTimeCode" => layer.start = n,
+                                            "timeCodesPerSecond" => layer.rate = n,
+                                            _ => layer.frames = n,
+                                        }
+                                    }
+                                }
                                 _ => {}
                             }
                         }
@@ -466,7 +480,7 @@ impl Parser {
             _ => (full, ""),
         };
         let ty = word;
-        let attribute = prim.attributes.entry(name).or_default();
+        let attribute = prim.attributes.entry(name.clone()).or_default();
         if self.eat(b'=') {
             match suffix {
                 "connect" => match self.value(0)? {
@@ -475,10 +489,19 @@ impl Parser {
                     _ => {}
                 },
                 "timeSamples" => {
-                    // The first sample, when there is no default.
-                    let first = self.first_sample()?;
+                    // The first sample, when there is no default; all of
+                    // those of a transform op.
+                    let keep = keeps_samples(&name);
+                    let samples = self.samples(keep)?;
+                    let first = samples.first().map(|(_, v)| v.clone());
                     if attribute.value.is_none() {
                         attribute.value = first.map(|v| typed(&ty, v));
+                    }
+                    if keep {
+                        attribute.samples = samples
+                            .into_iter()
+                            .map(|(t, v)| (t, typed(&ty, v)))
+                            .collect();
                     }
                 }
                 "spline" => self.skip_value()?,
@@ -491,24 +514,33 @@ impl Parser {
         Ok(())
     }
 
-    /// The first sample of a dictionary of time samples, the rest skipped.
-    fn first_sample(&mut self) -> Result<Option<Value>> {
+    /// The samples of a dictionary of time samples, by their times, in
+    /// order: all of them when `all`, else the first, the rest skipped. A
+    /// sample of `None` is left out.
+    fn samples(&mut self, all: bool) -> Result<Vec<(f64, Value)>> {
         self.expect(b'{')?;
-        let mut first = None;
+        let mut samples = Vec::new();
         let mut taken = false;
         while !self.eat(b'}') {
             // The time, then its value.
-            self.next()?;
+            let time = match self.next()? {
+                Token::Word(w) => w.parse::<f64>().ok().filter(|t| t.is_finite()),
+                _ => None,
+            };
+            // When only the first value is wanted, its time does not
+            // matter.
+            let time = if all { time } else { time.or(Some(0.0)) };
             self.expect(b':')?;
-            if taken {
+            if (taken && !all) || samples.len() >= limits::ANIMATION_KEYS {
                 self.skip_value_or_word()?;
-            } else {
-                first = self.value(0)?;
+            } else if let (Some(t), Some(v)) = (time, self.value(0)?) {
+                samples.push((t, v));
                 taken = true;
             }
             self.eat(b',');
         }
-        Ok(first)
+        samples.sort_by(|a, b| a.0.total_cmp(&b.0));
+        Ok(samples)
     }
 
     fn skip_value_or_word(&mut self) -> Result<()> {

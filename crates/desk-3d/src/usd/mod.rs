@@ -8,8 +8,10 @@
 //! Only what drawing a model needs is kept: the prims, their transforms,
 //! the meshes with their primvars and the `UsdPreviewSurface` materials
 //! bound to them, and the references that bring other layers of the same
-//! package. Variants, inherits, specializes, instancing and time are left
-//! out; a value that changes in time is taken at its first sample.
+//! package. Variants, inherits, specializes and instancing are left out.
+//! A value that changes in time is taken at its first sample, but for
+//! the transform ops of prims, whose samples move them (see
+//! [`Animation`](crate::Animation)).
 
 mod scene;
 pub(crate) mod usda;
@@ -95,6 +97,16 @@ pub(crate) struct Attribute {
     /// The attribute it is connected to, by its path, as
     /// `/Looks/Wood/Texture.outputs:rgb`.
     pub(crate) connection: Option<String>,
+    /// Its samples in time, by their time codes, for a transform op
+    /// (`xformOp:`); empty for other attributes, whose first sample alone
+    /// is kept.
+    pub(crate) samples: Vec<(f64, Value)>,
+}
+
+/// Whether the samples of an attribute are kept: those of transform ops,
+/// which move the prims.
+pub(crate) fn keeps_samples(name: &str) -> bool {
+    name.starts_with("xformOp:")
 }
 
 /// A reference or a payload: another layer, or a prim of one, brought
@@ -195,6 +207,13 @@ pub(crate) struct Layer {
     pub(crate) default_prim: Option<String>,
     /// The `upAxis`: whether Z is up, rather than Y.
     pub(crate) z_up: bool,
+    /// The `startTimeCode`: the time code where the animation starts.
+    pub(crate) start: Option<f64>,
+    /// The `timeCodesPerSecond`.
+    pub(crate) rate: Option<f64>,
+    /// The `framesPerSecond`, which stands for the rate when there is
+    /// none.
+    pub(crate) frames: Option<f64>,
 }
 
 impl Layer {
@@ -204,6 +223,9 @@ impl Layer {
             root: Prim::new(""),
             default_prim: None,
             z_up: false,
+            start: None,
+            rate: None,
+            frames: None,
         }
     }
 }

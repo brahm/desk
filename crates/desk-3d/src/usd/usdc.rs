@@ -15,7 +15,7 @@
 
 use std::collections::HashMap;
 
-use super::{Attribute, Layer, Prim, Reference, Value, split_property};
+use super::{Attribute, Layer, Prim, Reference, Value, keeps_samples, split_property};
 use crate::{Error, Result, limits, lz4, malformed};
 
 /// A place in the bytes of the file, read forward.
@@ -220,6 +220,9 @@ struct Crate<'a> {
     fields: Vec<(u32, u64)>,
     fieldsets: Vec<u32>,
     paths: Vec<String>,
+    /// The time samples read so far, against
+    /// [`limits::ANIMATION_KEYS`].
+    samples_read: std::cell::Cell<usize>,
 }
 
 /// A value rep: where and how a value is kept.
@@ -579,12 +582,13 @@ impl Crate<'_> {
         })
     }
 
-    /// The first sample of the time samples of an attribute: the times
-    /// and the values each sit after an offset to them, and the values
-    /// are reps.
-    fn first_sample(&self, rep: Rep) -> Result<Option<Value>> {
+    /// The time samples of an attribute, by their times, in order: all of
+    /// them when `all`, else the first. The times and the values each sit
+    /// after an offset to them, the times as a rep of doubles and the
+    /// values as reps.
+    fn samples(&self, rep: Rep, all: bool) -> Result<Vec<(f64, Value)>> {
         let mut cursor = self.at(rep)?;
-        // An offset, from where it is, to the rep of the times.
+        // An offset, from where it is, to what follows.
         let jump = |cursor: &mut Cursor<'_>| -> Result<()> {
             let start = cursor.at;
             let offset = cursor.u64()? as i64;
@@ -598,17 +602,48 @@ impl Crate<'_> {
         };
         jump(&mut cursor)?;
         // The rep of the times, then an offset to the values.
-        cursor.u64()?;
+        let times = Rep(cursor.u64()?);
         jump(&mut cursor)?;
         let n = cursor.count(8)?;
-        if n == 0 {
-            return Ok(None);
+        let times: Vec<f64> = if times.ty() == kind::DOUBLE_VECTOR && !times.is_inlined() {
+            let mut at = self.at(times)?;
+            let count = at.count(8)?;
+            (0..count).map(|_| at.f64()).collect::<Result<_>>()?
+        } else {
+            Vec::new()
+        };
+        // With no times to go by, the first value alone, at time 0.
+        let take = if all && !times.is_empty() {
+            n.min(times.len())
+        } else {
+            n.min(1)
+        };
+        let mut out = Vec::with_capacity(take.min(1024));
+        for k in 0..take {
+            // The samples of a layer in all, against the limit: reps may
+            // be shared, so that a small file names many.
+            let read = self.samples_read.get() + 1;
+            if read > limits::ANIMATION_KEYS {
+                break;
+            }
+            self.samples_read.set(read);
+            // A sample that cannot be read ends the samples, and those
+            // before it are kept.
+            let Ok(value) = cursor.u64().map(Rep) else {
+                break;
+            };
+            if value.ty() == kind::TIME_SAMPLES {
+                continue;
+            }
+            let time = times.get(k).copied().unwrap_or(0.0);
+            match self.value(value) {
+                Ok(Some(v)) if time.is_finite() => out.push((time, v)),
+                Ok(_) => {}
+                Err(_) => break,
+            }
         }
-        let first = Rep(cursor.u64()?);
-        if first.ty() == kind::TIME_SAMPLES {
-            return Ok(None);
-        }
-        self.value(first)
+        out.sort_by(|a, b| a.0.total_cmp(&b.0));
+        Ok(out)
     }
 
     /// The fields of a set, by name, from its index.
@@ -845,6 +880,7 @@ pub(crate) fn read(bytes: &[u8]) -> Result<Layer> {
         fields,
         fieldsets,
         paths,
+        samples_read: std::cell::Cell::new(0),
     };
 
     let mut c = section(&toc, bytes, "SPECS")?;
@@ -874,6 +910,9 @@ pub(crate) fn read(bytes: &[u8]) -> Result<Layer> {
                     match (name, file.value(rep)?) {
                         ("defaultPrim", Some(Value::Text(t))) => layer.default_prim = Some(t),
                         ("upAxis", Some(Value::Text(t))) => layer.z_up = t == "Z",
+                        ("startTimeCode", Some(v)) => layer.start = v.number(),
+                        ("timeCodesPerSecond", Some(v)) => layer.rate = v.number(),
+                        ("framesPerSecond", Some(v)) => layer.frames = v.number(),
                         _ => {}
                     }
                 }
@@ -928,8 +967,15 @@ pub(crate) fn read(bytes: &[u8]) -> Result<Layer> {
                     match name {
                         "default" => attribute.value = file.value(rep)?,
                         "timeSamples" if rep.ty() == kind::TIME_SAMPLES => {
+                            // All the samples of a transform op, the first
+                            // of the others.
+                            let keep = keeps_samples(property);
+                            let samples = file.samples(rep, keep).unwrap_or_default();
                             if attribute.value.is_none() {
-                                attribute.value = file.first_sample(rep).unwrap_or(None);
+                                attribute.value = samples.first().map(|(_, v)| v.clone());
+                            }
+                            if keep {
+                                attribute.samples = samples;
                             }
                         }
                         "interpolation" => {
