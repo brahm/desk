@@ -3469,6 +3469,26 @@ paragraph, and objects on a second page.
 - Left in step 11, in W4: FBX, then U3D and PRC (D-033). No task moved
   to another phase.
 
+### 28 November: 3D objects from FBX (step 11 of W4, #278)
+
+- A reader of FBX of version 7, in its binary form (with the 64-bit
+  offsets of 7500 and the arrays packed with zlib) and in its text one,
+  takes the models with their places, in the order of the transforms of
+  FBX (offsets, pivots, pre- and post-rotations and the order of the
+  angles), the meshes with their normals, texture coordinates, colors
+  and materials by polygon, and the diffuse color, opacity and picture
+  of the materials, inside the file or beside it. A file with Z up is
+  turned to Y up.
+- The first animation stack moves the models by the curves of their
+  translation, rotation and scale. As with OBJ, the model is turned into
+  a GLB when it is inserted, its animation sampled at 30 frames a second
+  into the tracks of its nodes, and plays in the Object tab.
+- Moved to W5 (B-082): the skins, blend shapes, cameras and lights of
+  FBX. A skin bends a mesh by its joints, and needs the joints and
+  weights written into the GLB and a renderer that draws them, which
+  desk-3d does not do for glTF either.
+- Left in step 11, in W4: U3D and PRC (D-033).
+
 ## Decisions, with their reasons and consequences
 
 Ids `D-nnn` and `R-nnn` are those of [decisions.md](decisions.md).

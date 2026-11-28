@@ -6,8 +6,9 @@
 //!
 //! Each mesh is a node of its own, its corners already in the space of
 //! the scene, with its normals, texture coordinates and colors, and a
-//! material of its color and texture. Read again, the GLB draws as the
-//! scene does.
+//! material of its color and texture. A mesh that moves is moved by its
+//! node, sampled through the animation as a translation, a rotation and
+//! a scale. Read again, the GLB draws as the scene does.
 
 use serde_json::{Map, Value as Json, json};
 
@@ -45,6 +46,7 @@ impl Writer {
             .collect();
         let view = self.view(&data)?;
         let kind = match N {
+            1 => "SCALAR",
             2 => "VEC2",
             3 => "VEC3",
             _ => "VEC4",
@@ -86,7 +88,12 @@ impl Writer {
     }
 }
 
-/// Writes the meshes of a scene, as they rest, as a GLB. `pictures` are
+/// How many times a second the animation of a scene is sampled, and the
+/// most samples.
+const RATE: f32 = 30.0;
+const MOST_SAMPLES: usize = 3600;
+
+/// Writes the meshes of a scene, and how they move, as a GLB. `pictures` are
 /// the files of its textures, by their indices, where they are kept as
 /// they were; the others are written as PNG.
 pub(crate) fn write(scene: &Scene, pictures: &[Option<Vec<u8>>]) -> Result<Vec<u8>> {
@@ -107,9 +114,25 @@ pub(crate) fn write(scene: &Scene, pictures: &[Option<Vec<u8>>]) -> Result<Vec<u
     }
     let textures: Vec<Json> = (0..images.len()).map(|i| json!({"source": i})).collect();
     let mut nodes = Vec::new();
+    // The poses of the meshes at rest, and at times through the
+    // animation.
+    let (rest, times, poses) = match &scene.animation {
+        Some(a) => {
+            let steps = ((a.duration() * RATE).ceil() as usize).clamp(1, MOST_SAMPLES);
+            let times: Vec<f32> = (0..=steps)
+                .map(|k| a.duration() * k as f32 / steps as f32)
+                .collect();
+            let poses: Vec<_> = times.iter().map(|t| a.poses(Some(*t))).collect();
+            (a.poses(None), times, poses)
+        }
+        None => (Vec::new(), Vec::new(), Vec::new()),
+    };
+    let mut channels = Vec::new();
+    let mut samplers = Vec::new();
+    let mut time_accessor = None;
     let mut meshes = Vec::new();
     let mut materials = Vec::new();
-    for mesh in &scene.meshes {
+    for (index, mesh) in scene.meshes.iter().enumerate() {
         let count = mesh.positions.len();
         if mesh.triangles.is_empty() || count == 0 {
             continue;
@@ -164,7 +187,63 @@ pub(crate) fn write(scene: &Scene, pictures: &[Option<Vec<u8>>]) -> Result<Vec<u
             "indices": indices,
             "material": materials.len() - 1,
         }]}));
-        nodes.push(json!({"mesh": meshes.len() - 1}));
+        let mut node = Map::new();
+        node.insert("mesh".into(), (meshes.len() - 1).into());
+        let moves = poses
+            .iter()
+            .any(|p| p.get(index).copied().flatten().is_some());
+        if moves {
+            let trs = |m: Option<crate::matrix::Matrix>| match m {
+                Some(m) => crate::matrix::decompose(&m).unwrap_or((
+                    [0, 1, 2].map(|c| crate::matrix::at(&m, 3, c)),
+                    [0.0, 0.0, 0.0, 1.0],
+                    [0.0; 3],
+                )),
+                None => ([0.0; 3], [0.0, 0.0, 0.0, 1.0], [1.0; 3]),
+            };
+            let (t, r, s) = trs(rest.get(index).copied().flatten());
+            node.insert("translation".into(), json!(t.as_slice()));
+            node.insert("rotation".into(), json!(r.as_slice()));
+            node.insert("scale".into(), json!(s.as_slice()));
+            let input = match time_accessor {
+                Some(a) => a,
+                None => {
+                    let flat: Vec<[f32; 1]> = times.iter().map(|t| [*t]).collect();
+                    let a = w.floats(&flat, true)?;
+                    time_accessor = Some(a);
+                    a
+                }
+            };
+            let mut ts = Vec::new();
+            let mut rs: Vec<[f32; 4]> = Vec::new();
+            let mut ss = Vec::new();
+            for pose in &poses {
+                let (t, r, s) = trs(pose.get(index).copied().flatten());
+                let mut r = r.map(|v| v as f32);
+                // The short way from the turn before.
+                if let Some(last) = rs.last()
+                    && last.iter().zip(&r).map(|(a, b)| a * b).sum::<f32>() < 0.0
+                {
+                    r = r.map(|v| -v);
+                }
+                ts.push(t.map(|v| v as f32));
+                rs.push(r);
+                ss.push(s.map(|v| v as f32));
+            }
+            let target = nodes.len();
+            for (path, output) in [
+                ("translation", w.floats(&ts, false)?),
+                ("rotation", w.floats(&rs, false)?),
+                ("scale", w.floats(&ss, false)?),
+            ] {
+                samplers.push(json!({"input": input, "output": output}));
+                channels.push(json!({
+                    "sampler": samplers.len() - 1,
+                    "target": {"node": target, "path": path},
+                }));
+            }
+        }
+        nodes.push(Json::Object(node));
     }
     if nodes.is_empty() {
         return Err(Error::Empty);
@@ -181,6 +260,14 @@ pub(crate) fn write(scene: &Scene, pictures: &[Option<Vec<u8>>]) -> Result<Vec<u
         "bufferViews": w.views,
         "accessors": w.accessors,
     });
+    if !channels.is_empty()
+        && let Some(d) = document.as_object_mut()
+    {
+        d.insert(
+            "animations".into(),
+            json!([{"channels": channels, "samplers": samplers}]),
+        );
+    }
     if !images.is_empty()
         && let Some(d) = document.as_object_mut()
     {
@@ -218,6 +305,24 @@ mod tests {
                     "{name}"
                 );
             }
+        }
+        // A scene that moves moves as it did, at the times it is sampled.
+        let scene = crate::gltf::read(include_bytes!("../tests/data/animated.glb")).unwrap();
+        let again = crate::gltf::read(&write(&scene, &[]).unwrap()).unwrap();
+        let animation = again.animation.as_ref().unwrap();
+        assert!((animation.duration() - 2.0).abs() < 1e-6);
+        for time in [0.0, 0.5, 1.0, 1.5, 2.0] {
+            let view = View::default();
+            let a = crate::render_at(&scene, view, time, 48, 48).unwrap();
+            let b = crate::render_at(&again, view, time, 48, 48).unwrap();
+            let apart = a
+                .as_chunks::<4>()
+                .0
+                .iter()
+                .zip(b.as_chunks::<4>().0)
+                .filter(|(a, b)| a.iter().zip(*b).any(|(a, b)| a.abs_diff(*b) > 8))
+                .count();
+            assert!(apart < 48 * 48 / 100, "{time}: {apart}");
         }
         // A texture with no file is written as a PNG, and one that cuts
         // out keeps its alpha.

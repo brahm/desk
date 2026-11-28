@@ -160,8 +160,90 @@ pub(crate) fn normal(inverse: &Matrix, n: [f32; 3]) -> [f32; 3] {
     })
 }
 
+/// A matrix as a translation, a rotation (as a quaternion of glTF: x, y,
+/// z, then w) and a scale, which make it again as glTF makes a node's;
+/// a shear is lost. None when it has a scale of 0.
+pub(crate) fn decompose(m: &Matrix) -> Option<([f64; 3], [f64; 4], [f64; 3])> {
+    let t = [at(m, 3, 0), at(m, 3, 1), at(m, 3, 2)];
+    let row = |r: usize| [at(m, r, 0), at(m, r, 1), at(m, r, 2)];
+    let length = |v: [f64; 3]| (v[0] * v[0] + v[1] * v[1] + v[2] * v[2]).sqrt();
+    let mut s = [length(row(0)), length(row(1)), length(row(2))];
+    if s.iter().any(|v| !(*v > 1e-12 && v.is_finite())) {
+        return None;
+    }
+    let [a, b, c] = [row(0), row(1), row(2)];
+    let det = a[0] * (b[1] * c[2] - b[2] * c[1]) - a[1] * (b[0] * c[2] - b[2] * c[0])
+        + a[2] * (b[0] * c[1] - b[1] * c[0]);
+    if det < 0.0 {
+        s[0] = -s[0];
+    }
+    // The rows of the turn alone; as columns, the matrix of the turn.
+    let mut r = IDENTITY;
+    for (i, scale) in s.iter().enumerate() {
+        for (j, v) in row(i).iter().enumerate() {
+            put(&mut r, i, j, v / scale);
+        }
+    }
+    let col = |i: usize, j: usize| at(&r, j, i);
+    let trace = col(0, 0) + col(1, 1) + col(2, 2);
+    let q = if trace > 0.0 {
+        let k = 0.5 / (trace + 1.0).sqrt();
+        [
+            (col(2, 1) - col(1, 2)) * k,
+            (col(0, 2) - col(2, 0)) * k,
+            (col(1, 0) - col(0, 1)) * k,
+            0.25 / k,
+        ]
+    } else if col(0, 0) > col(1, 1) && col(0, 0) > col(2, 2) {
+        let k = 2.0 * (1.0 + col(0, 0) - col(1, 1) - col(2, 2)).sqrt();
+        [
+            0.25 * k,
+            (col(0, 1) + col(1, 0)) / k,
+            (col(0, 2) + col(2, 0)) / k,
+            (col(2, 1) - col(1, 2)) / k,
+        ]
+    } else if col(1, 1) > col(2, 2) {
+        let k = 2.0 * (1.0 + col(1, 1) - col(0, 0) - col(2, 2)).sqrt();
+        [
+            (col(0, 1) + col(1, 0)) / k,
+            0.25 * k,
+            (col(1, 2) + col(2, 1)) / k,
+            (col(0, 2) - col(2, 0)) / k,
+        ]
+    } else {
+        let k = 2.0 * (1.0 + col(2, 2) - col(0, 0) - col(1, 1)).sqrt();
+        [
+            (col(0, 2) + col(2, 0)) / k,
+            (col(1, 2) + col(2, 1)) / k,
+            0.25 * k,
+            (col(1, 0) - col(0, 1)) / k,
+        ]
+    };
+    q.iter().all(|v| v.is_finite()).then_some((t, q, s))
+}
+
 /// The turn of a quaternion of glTF: its imaginary parts, then its real
 /// one.
 pub(crate) fn quaternion([x, y, z, w]: [f64; 4]) -> Matrix {
     orient(&[w, x, y, z])
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn w116_a_matrix_comes_apart_and_back_together() {
+        let m = mul(
+            &mul(&scale(&[2.0, 3.0, 0.5]), &rotate(1, 30.0)),
+            &mul(&rotate(0, -70.0), &translate(&[1.0, -2.0, 4.0])),
+        );
+        let (t, r, s) = decompose(&m).unwrap();
+        let again = mul(&mul(&scale(&s), &quaternion(r)), &translate(&t));
+        assert!(
+            m.iter().zip(&again).all(|(a, b)| (a - b).abs() < 1e-9),
+            "{m:?} {again:?}"
+        );
+        assert!(decompose(&scale(&[0.0, 1.0, 1.0])).is_none());
+    }
 }
