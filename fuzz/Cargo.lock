@@ -148,6 +148,7 @@ name = "desk-filters"
 version = "0.1.0"
 dependencies = [
  "cairo-rs",
+ "desk-3d",
  "desk-chart",
  "desk-formula",
  "desk-iwork",
@@ -200,6 +201,7 @@ version = "0.1.0"
 name = "desk-model"
 version = "0.1.0"
 dependencies = [
+ "desk-3d",
  "desk-chart",
  "desk-table",
  "i_overlay",

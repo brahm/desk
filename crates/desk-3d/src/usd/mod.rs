@@ -16,6 +16,7 @@ pub(crate) mod usda;
 pub(crate) mod usdc;
 
 use std::collections::BTreeMap;
+use std::sync::Arc;
 
 pub(crate) use scene::{Files, build};
 
@@ -37,15 +38,16 @@ pub(crate) enum Value {
     Tuple(Vec<f64>),
     /// A 4×4 matrix, by rows, with the translation in the last row.
     Matrix(Box<[f64; 16]>),
-    /// An array of integers.
-    Ints(Vec<i32>),
+    /// An array of integers, shared, as a reference may bring it to
+    /// many prims.
+    Ints(Arc<[i32]>),
     /// An array of numbers or of vectors of `dim` numbers each, one
     /// vector after another.
     Floats {
         /// How many numbers each element has.
         dim: usize,
-        /// The numbers.
-        data: Vec<f32>,
+        /// The numbers, shared.
+        data: Arc<[f32]>,
     },
     /// An array of tokens or strings.
     Texts(Vec<String>),

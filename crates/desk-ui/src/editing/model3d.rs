@@ -147,7 +147,8 @@ impl TextEditor {
         // In pixels, so that the model turns as fast at any zoom.
         let dx = x - ox - f64::from(turn.start.0) * scale;
         let dy = y - oy - f64::from(turn.start.1) * scale;
-        let yaw = f64::from(turn.model.yaw) + dx * TURN_PER_PIXEL;
+        // Dragged right, the front goes right and the left side comes forward.
+        let yaw = f64::from(turn.model.yaw) - dx * TURN_PER_PIXEL;
         let pitch = f64::from(turn.model.pitch) + dy * TURN_PER_PIXEL;
         let turned = turn.model.turned(yaw.round() as i32, pitch.round() as i32);
         if turned == turn.turned {
@@ -232,12 +233,12 @@ mod tests {
                     .model()
                     .map(|m| (m.yaw, m.pitch))
             };
-            assert_eq!(shown(&editor), Some((4500, -1000)));
+            assert_eq!(shown(&editor), Some((-4500, -1000)));
             assert_eq!(editor.selected_model().unwrap().1.yaw, 0);
             editor.end_model_drag();
             assert_eq!(
                 editor.selected_model().map(|(_, m)| (m.yaw, m.pitch)),
-                Some((4500, -1000))
+                Some((-4500, -1000))
             );
             editor.reset_model_rotation();
             assert_eq!(editor.selected_model().map(|(_, m)| m.yaw), Some(0));
@@ -245,7 +246,7 @@ mod tests {
             editor.undo();
             assert_eq!(editor.selected_model().map(|(_, m)| m.yaw), Some(0));
             editor.redo();
-            assert_eq!(editor.selected_model().map(|(_, m)| m.yaw), Some(4500));
+            assert_eq!(editor.selected_model().map(|(_, m)| m.yaw), Some(-4500));
         });
     }
 }

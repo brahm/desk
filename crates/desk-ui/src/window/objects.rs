@@ -256,8 +256,6 @@ impl DocumentWindow {
         }
     }
 
-    /// Asks for an image, a PDF, a movie or a sound, and puts it on the
-    /// page (OBJ-01, OBJ-18).
     /// Asks for a 3D model to put on the page (W116).
     fn choose_model(self: &Rc<Self>) {
         let filters = gio::ListStore::new::<gtk::FileFilter>();
@@ -292,6 +290,8 @@ impl DocumentWindow {
         );
     }
 
+    /// Asks for an image, a PDF, a movie or a sound, and puts it on the
+    /// page (OBJ-01, OBJ-18).
     fn choose_picture(self: &Rc<Self>) {
         let filters = crate::bullet_pictures::document_picture_filters(true);
         let dialog = gtk::FileDialog::builder()

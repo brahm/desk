@@ -13,7 +13,9 @@
 //! compressed. Versions from 0.4.0, which every OpenUSD of the last years
 //! writes, are read.
 
-use super::{Attribute, Layer, Reference, Value, split_property};
+use std::collections::HashMap;
+
+use super::{Attribute, Layer, Prim, Reference, Value, split_property};
 use crate::{Error, Result, limits, lz4, malformed};
 
 /// A place in the bytes of the file, read forward.
@@ -430,15 +432,15 @@ impl Crate<'_> {
                 ),
                 kind::FLOAT => Value::Floats {
                     dim: 1,
-                    data: self.float_array(rep, Scalar::Float)?,
+                    data: self.float_array(rep, Scalar::Float)?.into(),
                 },
                 kind::DOUBLE => Value::Floats {
                     dim: 1,
-                    data: self.float_array(rep, Scalar::Double)?,
+                    data: self.float_array(rep, Scalar::Double)?.into(),
                 },
                 kind::HALF => Value::Floats {
                     dim: 1,
-                    data: self.float_array(rep, Scalar::Half)?,
+                    data: self.float_array(rep, Scalar::Half)?.into(),
                 },
                 kind::TOKEN | kind::ASSET | kind::STRING => {
                     let mut cursor = self.at(rep)?;
@@ -482,7 +484,10 @@ impl Crate<'_> {
                         for _ in 0..n * dim {
                             data.push(scalar(&mut cursor, s)? as f32);
                         }
-                        Value::Floats { dim, data }
+                        Value::Floats {
+                            dim,
+                            data: data.into(),
+                        }
                     }
                     None => return Ok(None),
                 },
@@ -548,7 +553,10 @@ impl Crate<'_> {
                 let data = (0..n)
                     .map(|_| cursor.f64().map(|v| v as f32))
                     .collect::<Result<Vec<f32>>>()?;
-                Some(Value::Floats { dim: 1, data })
+                Some(Value::Floats {
+                    dim: 1,
+                    data: data.into(),
+                })
             }
             _ => match vector_of(ty) {
                 Some((dim, s)) => {
@@ -634,7 +642,11 @@ fn section<'a>(toc: &[(String, usize, usize)], bytes: &'a [u8], name: &str) -> R
     Ok(Cursor::new(bytes.get(..end).unwrap_or_default(), *start))
 }
 
-/// The paths of the file, from the tree of its compressed paths.
+/// The most bytes of all the paths of a binary layer.
+const MAX_PATH_BYTES: usize = 256 << 20;
+
+/// The paths of the file, from the tree of its compressed paths, none
+/// deeper than [`limits::DEPTH`].
 fn paths(cursor: &mut Cursor<'_>, tokens: &[String]) -> Result<Vec<String>> {
     let count = cursor.count(0)?;
     let n = cursor.count(0)?;
@@ -648,6 +660,9 @@ fn paths(cursor: &mut Cursor<'_>, tokens: &[String]) -> Result<Vec<String>> {
     // Siblings left for later, with the path of their parent.
     let mut pending: Vec<(usize, Option<String>)> = vec![(0, None)];
     let mut visited = 0usize;
+    // The bytes of the paths made, which a long chain of one name
+    // compressed to nothing would make huge.
+    let mut text = 0usize;
     while let Some((mut i, mut parent)) = pending.pop() {
         loop {
             visited += 1;
@@ -674,6 +689,10 @@ fn paths(cursor: &mut Cursor<'_>, tokens: &[String]) -> Result<Vec<String>> {
                     }
                 }
             };
+            text = text.saturating_add(path.len());
+            if text > MAX_PATH_BYTES || path.matches('/').count() > limits::DEPTH {
+                return Err(Error::TooLarge);
+            }
             let slot = indexes
                 .get(this)
                 .and_then(|at| paths.get_mut(*at as usize))
@@ -702,6 +721,59 @@ fn paths(cursor: &mut Cursor<'_>, tokens: &[String]) -> Result<Vec<String>> {
         }
     }
     Ok(paths)
+}
+
+/// Where each prim of a layer being read is, as the indices of the
+/// children down to it, so that a spec finds its prim without looking
+/// through all the children of each of its parents.
+#[derive(Default)]
+struct Places(HashMap<String, Vec<usize>>);
+
+impl Places {
+    /// The prim at a path, made with its parents when it is not there.
+    fn prim<'a>(&mut self, root: &'a mut Prim, path: &str) -> &'a mut Prim {
+        let path = path.trim_end_matches('/');
+        if path.is_empty() {
+            return root;
+        }
+        if !self.0.contains_key(path) {
+            let (parent, name) = path.rsplit_once('/').unwrap_or(("", path));
+            let mut place = self.place(root, parent);
+            let holder = Self::follow(root, &place);
+            place.push(holder.children.len());
+            holder.children.push(Prim::new(name));
+            self.0.insert(path.to_owned(), place);
+        }
+        let place = self.0.get(path).cloned().unwrap_or_default();
+        Self::follow(root, &place)
+    }
+
+    /// The indices down to the prim at a path, made when it is not there.
+    fn place(&mut self, root: &mut Prim, path: &str) -> Vec<usize> {
+        if path.trim_end_matches('/').is_empty() {
+            return Vec::new();
+        }
+        self.prim(root, path);
+        self.0
+            .get(path.trim_end_matches('/'))
+            .cloned()
+            .unwrap_or_default()
+    }
+
+    /// The prim at the end of indices of children.
+    fn follow<'a>(root: &'a mut Prim, place: &[usize]) -> &'a mut Prim {
+        let mut prim = root;
+        for &i in place {
+            if i >= prim.children.len() {
+                break;
+            }
+            prim = match prim.children.get_mut(i) {
+                Some(child) => child,
+                None => unreachable!("checked against the length"),
+            };
+        }
+        prim
+    }
 }
 
 /// Reads a binary layer.
@@ -785,6 +857,7 @@ pub(crate) fn read(bytes: &[u8]) -> Result<Layer> {
     let spec_types = compressed_u32s(&mut c, n)?;
 
     let mut layer = Layer::new();
+    let mut places = Places::default();
     let mut classes = Vec::new();
     let mut prims = 0usize;
     for ((path, set), ty) in spec_paths.iter().zip(&spec_sets).zip(&spec_types) {
@@ -811,7 +884,7 @@ pub(crate) fn read(bytes: &[u8]) -> Result<Layer> {
                 if prims > limits::PRIMS || path.split('/').count() > limits::DEPTH {
                     return Err(Error::TooLarge);
                 }
-                let prim = layer.root.find_mut(path);
+                let prim = places.prim(&mut layer.root, path);
                 for (name, rep) in fields {
                     match name {
                         "typeName" => {
@@ -877,7 +950,7 @@ pub(crate) fn read(bytes: &[u8]) -> Result<Layer> {
                         _ => {}
                     }
                 }
-                let prim = layer.root.find_mut(prim_path);
+                let prim = places.prim(&mut layer.root, prim_path);
                 if *ty == 8 {
                     prim.relationships.insert(property.to_owned(), targets);
                 } else {

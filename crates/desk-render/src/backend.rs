@@ -78,13 +78,21 @@ pub struct Painter {
 /// A scene of a 3D model, read once and shared.
 type SharedScene = std::sync::Arc<desk_3d::Scene>;
 
-/// A 3D model as drawn: its file, by where its bytes are, its turn, and
-/// the pixels of the picture.
-#[derive(Clone, Copy, PartialEq, Eq)]
+/// A 3D model as drawn: its file, held so that its bytes stay where they
+/// are, its turn, and the pixels of the picture.
+#[derive(Clone)]
 struct ModelKey {
-    data: usize,
+    data: std::sync::Arc<[u8]>,
     turn: (i32, i32),
     size: (u32, u32),
+}
+
+impl PartialEq for ModelKey {
+    fn eq(&self, other: &Self) -> bool {
+        std::sync::Arc::ptr_eq(&self.data, &other.data)
+            && self.turn == other.turn
+            && self.size == other.size
+    }
 }
 
 /// The longest side, in pixels, that a 3D model is drawn at.
@@ -134,7 +142,7 @@ impl Painter {
         height: u32,
     ) -> Option<cairo::ImageSurface> {
         let key = ModelKey {
-            data: model.data().as_ptr() as usize,
+            data: model.shared_data(),
             turn: (model.yaw, model.pitch),
             size: (width, height),
         };

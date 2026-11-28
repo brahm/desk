@@ -465,6 +465,7 @@ impl Parser {
             Some((n, s @ ("connect" | "timeSamples" | "spline"))) => (n.to_owned(), s),
             _ => (full, ""),
         };
+        let ty = word;
         let attribute = prim.attributes.entry(name).or_default();
         if self.eat(b'=') {
             match suffix {
@@ -477,11 +478,11 @@ impl Parser {
                     // The first sample, when there is no default.
                     let first = self.first_sample()?;
                     if attribute.value.is_none() {
-                        attribute.value = first;
+                        attribute.value = first.map(|v| typed(&ty, v));
                     }
                 }
                 "spline" => self.skip_value()?,
-                _ => attribute.value = self.value(0)?,
+                _ => attribute.value = self.value(0)?.map(|v| typed(&ty, v)),
             }
         }
         if self.is_punct(b'(') {
@@ -567,6 +568,20 @@ fn tuple_of(items: Vec<Option<Value>>) -> Value {
 }
 
 /// An array of the values of a list.
+/// A value as its declared type makes it: an array of whole numbers
+/// written for a type of numbers that are not, as `float[] a = [0, 1]`,
+/// is an array of numbers.
+fn typed(ty: &str, value: Value) -> Value {
+    let integer = matches!(ty, "int" | "uint" | "int64" | "uint64" | "uchar" | "bool");
+    match value {
+        Value::Ints(ints) if !integer && !ty.is_empty() => Value::Floats {
+            dim: 1,
+            data: ints.iter().map(|i| *i as f32).collect(),
+        },
+        other => other,
+    }
+}
+
 fn list_of(items: Vec<Option<Value>>) -> Option<Value> {
     let first = items.iter().flatten().next();
     Some(match first {
@@ -600,7 +615,10 @@ fn list_of(items: Vec<Option<Value>>) -> Option<Value> {
                 tuple.resize(dim, 0.0);
                 data.extend(tuple);
             }
-            Value::Floats { dim, data }
+            Value::Floats {
+                dim,
+                data: data.into(),
+            }
         }
         Some(Value::Matrix(_)) => Value::Matrices(
             items
@@ -622,7 +640,7 @@ fn list_of(items: Vec<Option<Value>>) -> Option<Value> {
 
 /// Reads a text layer.
 pub(crate) fn read(text: &str) -> Result<Layer> {
-    if !text.starts_with("#usda") {
+    if !text.trim_start().starts_with("#usda") {
         return Err(Error::Unknown);
     }
     let mut parser = Parser {
@@ -696,7 +714,10 @@ def Xform "Root" (
         assert!(layer.z_up);
         let cube = layer.root.find("/Root/Cube").unwrap();
         assert_eq!(cube.type_name, "Mesh");
-        assert_eq!(cube.value("faceVertexCounts"), Some(&Value::Ints(vec![3])));
+        assert_eq!(
+            cube.value("faceVertexCounts"),
+            Some(&Value::Ints(vec![3].into()))
+        );
         let Some(Value::Floats { dim, data }) = cube.value("points") else {
             panic!("points")
         };

@@ -231,10 +231,23 @@ fn merge(strong: &mut Prim, weak: Prim) {
     for (name, targets) in weak.relationships {
         strong.relationships.entry(name).or_insert(targets);
     }
+    // By name, so that many children merge in one pass.
+    let mut mine: std::collections::HashMap<String, usize> = strong
+        .children
+        .iter()
+        .enumerate()
+        .map(|(i, c)| (c.name.clone(), i))
+        .collect();
     for child in weak.children {
-        match strong.children.iter_mut().find(|c| c.name == child.name) {
-            Some(mine) => merge(mine, child),
-            None => strong.children.push(child),
+        match mine
+            .get(&child.name)
+            .and_then(|&i| strong.children.get_mut(i))
+        {
+            Some(own) => merge(own, child),
+            None => {
+                mine.insert(child.name.clone(), strong.children.len());
+                strong.children.push(child);
+            }
         }
     }
 }
@@ -509,7 +522,7 @@ fn primvar<'a>(
         return None;
     }
     let indices = match prim.value(&format!("{name}:indices")) {
-        Some(Value::Ints(i)) if !i.is_empty() => Some(i.as_slice()),
+        Some(Value::Ints(i)) if !i.is_empty() => Some(i.as_ref()),
         _ => None,
     };
     let values = data.len() / dim;
@@ -772,7 +785,7 @@ impl Builder<'_> {
         // The faces, as the face-vertex where each starts and its count.
         let mut faces = Vec::with_capacity(counts.len());
         let mut start = 0usize;
-        for &c in counts {
+        for &c in counts.iter() {
             let Ok(c) = usize::try_from(c) else { break };
             let Some(end) = start.checked_add(c).filter(|e| *e <= indices.len()) else {
                 break;
@@ -804,7 +817,7 @@ impl Builder<'_> {
                 continue;
             };
             groups.push(Some(target));
-            for m in members {
+            for m in members.iter() {
                 if let Some(slot) = usize::try_from(*m).ok().and_then(|m| group_of.get_mut(m)) {
                     *slot = groups.len() - 1;
                 }

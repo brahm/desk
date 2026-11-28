@@ -182,10 +182,16 @@ fn draw(
         let y0 = a[1].min(b[1]).min(c[1]).floor().max(0.0) as usize;
         let x1 = (a[0].max(b[0]).max(c[0]).ceil().max(0.0) as usize).min(target.width);
         let y1 = (a[1].max(b[1]).max(c[1]).ceil().max(0.0) as usize).min(target.height);
-        // A flat normal for corners that have none.
+        // A flat normal for corners that have none, from the corners
+        // turned as the normals are, before they are put on the screen.
         let flat = {
-            let e1 = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
-            let e2 = [c[0] - a[0], c[1] - a[1], c[2] - a[2]];
+            let [Some(ta), Some(tb), Some(tc)] =
+                idx.map(|i| mesh.positions.get(i).map(|p| apply(&camera.turn, *p)))
+            else {
+                continue;
+            };
+            let e1 = [tb[0] - ta[0], tb[1] - ta[1], tb[2] - ta[2]];
+            let e2 = [tc[0] - ta[0], tc[1] - ta[1], tc[2] - ta[2]];
             let n = [
                 e1[1] * e2[2] - e1[2] * e2[1],
                 e1[2] * e2[0] - e1[0] * e2[2],
