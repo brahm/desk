@@ -147,3 +147,15 @@ fn w116_a_text_fbx_holds_its_picture_and_slots_with_no_material_share_one() {
     // material, in each of the two models.
     assert_eq!(scene.meshes.len(), 6);
 }
+
+#[test]
+fn w116_a_corner_of_an_fbx_not_finite_leaves_its_polygon_out() {
+    // A binary FBX whose vertices the fuzzer spoiled: some are not a
+    // number. What is left still reads.
+    let glb = import(&data("not-finite.fbx"), &mut |_| None).unwrap();
+    let scene = read(&glb).unwrap();
+    assert!(scene.triangle_count() > 0);
+    for mesh in &scene.meshes {
+        assert!(mesh.positions.iter().flatten().all(|c| c.is_finite()));
+    }
+}

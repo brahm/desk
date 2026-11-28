@@ -3519,6 +3519,10 @@ paragraph, and objects on a second page.
 - Moved to W5 (B-083): the exact geometry of PRC (a model of B-rep
   surfaces with no tessellation shows nothing, and says so), the
   textures of its materials, and its markups and views.
+- The fuzzer found an FBX whose corners are not numbers, which turned
+  into a GLB that read as empty: a polygon of FBX with a corner, and a
+  face of PRC with a corner or a normal, that is not finite are now left
+  out, as OBJ does.
 - Left in step 11, in W4: U3D (D-033), whose specification (ECMA-363)
   and sample files this container cannot reach.
 
