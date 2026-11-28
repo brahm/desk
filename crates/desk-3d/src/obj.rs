@@ -75,9 +75,16 @@ fn lines(text: &str) -> impl Iterator<Item = String> + '_ {
     let mut raw = text.lines();
     std::iter::from_fn(move || {
         let mut line = String::new();
+        let mut any = false;
         loop {
-            let next = raw.next()?;
-            match next.strip_suffix('\\') {
+            let Some(next) = raw.next() else {
+                // A line that goes on past the end of the file ends there.
+                return any.then_some(line);
+            };
+            any = true;
+            // A comment goes on to no line after it.
+            let comment = line.trim_start().is_empty() && next.trim_start().starts_with('#');
+            match next.strip_suffix('\\').filter(|_| !comment) {
                 Some(part) => {
                     line.push_str(part);
                     line.push(' ');
@@ -90,10 +97,31 @@ fn lines(text: &str) -> impl Iterator<Item = String> + '_ {
         }
         Some(line)
     })
-    .filter(|l| {
-        let l = l.trim_start();
-        !l.is_empty() && !l.starts_with('#')
+    .filter_map(|l| {
+        let trimmed = l.trim_start();
+        if trimmed.is_empty() || trimmed.starts_with('#') {
+            return None;
+        }
+        // A comment after the data, after a space.
+        let end = l
+            .char_indices()
+            .find(|&(i, c)| {
+                c == '#'
+                    && l.get(..i)
+                        .and_then(|b| b.chars().next_back())
+                        .is_some_and(|b| b.is_ascii_whitespace())
+            })
+            .map_or(l.len(), |(i, _)| i);
+        Some(l.get(..end).unwrap_or(&l).to_owned())
     })
+}
+
+/// A path of a file beside the OBJ as it is asked for: backslashes as
+/// slashes and `.` folders left out, then checked to stay in its folder.
+fn clean(path: &str) -> Option<String> {
+    let path = path.replace('\\', "/");
+    let parts: Vec<&str> = path.split('/').filter(|p| *p != ".").collect();
+    safe_path(parts.join("/"))
 }
 
 /// The first word of a line, and the rest after it with no space around.
@@ -417,15 +445,16 @@ pub(crate) fn read(bytes: &[u8], files: &mut dyn FnMut(&str) -> Option<Vec<u8>>)
         }
     }
     // The libraries, each from the folder of the OBJ.
-    let mut fetch = |path: &str| -> Option<Vec<u8>> { files(&safe_path(path.replace('\\', "/"))?) };
+    let mut fetch = |path: &str| -> Option<Vec<u8>> { files(&clean(path)?) };
     let mut materials: HashMap<String, Mtl> = HashMap::new();
     for name in &libraries {
-        if let Some(bytes) = fetch(name) {
-            library(&bytes, folder(name), &mut materials);
+        let name = name.replace('\\', "/");
+        if let Some(bytes) = fetch(&name) {
+            library(&bytes, folder(&name), &mut materials);
             continue;
         }
         // Names with no space in them, several on one line.
-        for one in name.split_ascii_whitespace().filter(|n| n != name) {
+        for one in name.split_ascii_whitespace().filter(|n| *n != name) {
             if let Some(bytes) = fetch(one) {
                 library(&bytes, folder(one), &mut materials);
             }
@@ -435,10 +464,10 @@ pub(crate) fn read(bytes: &[u8], files: &mut dyn FnMut(&str) -> Option<Vec<u8>>)
     let mut pictures: Vec<Option<Vec<u8>>> = Vec::new();
     let mut made: HashMap<(String, bool), Option<usize>> = HashMap::new();
     let mut picture = |path: &str, alpha: bool| -> Option<usize> {
-        if let Some(m) = made.get(&(path.to_owned(), alpha)) {
+        let path = clean(path).unwrap_or_else(|| path.replace('\\', "/"));
+        if let Some(m) = made.get(&(path.clone(), alpha)) {
             return *m;
         }
-        let path = path.replace('\\', "/");
         // A whole path, as exporters write, is looked for by its name in
         // the folder of the OBJ.
         let name = path.rsplit('/').next().unwrap_or(&path);
@@ -447,12 +476,16 @@ pub(crate) fn read(bytes: &[u8], files: &mut dyn FnMut(&str) -> Option<Vec<u8>>)
                 .or_else(|| fetch(name))
                 .and_then(|bytes| {
                     let (mut t, shrunk) = texture::decode_shrunk(&bytes)?;
+                    // The file is kept as it was only when its alpha is
+                    // what the material shows.
+                    let mut keep = !shrunk;
                     if !alpha {
                         for [_, _, _, a] in t.rgba.as_chunks_mut::<4>().0 {
+                            keep &= *a == 255;
                             *a = 255;
                         }
                     }
-                    Some((t, (!shrunk).then_some(bytes)))
+                    Some((t, keep.then_some(bytes)))
                 })
                 .map(|(t, bytes)| {
                     textures.push(t);
@@ -539,6 +572,54 @@ mod tests {
         assert!(!is_obj(b"v 0 0 0\nhello there\n"));
         assert!(!is_obj(b"{\"asset\": {}}"));
         assert!(!is_obj(b"v 0 0 0\0"));
+    }
+
+    #[test]
+    fn w116_comments_continued_lines_and_paths_as_exporters_write_them() {
+        let all: Vec<String> =
+            lines("# from C:\\work\\\nmtllib a.mtl\nv 1 2 3 # top\nf 1 2 \\").collect();
+        assert_eq!(all, ["mtllib a.mtl", "v 1 2 3 ", "f 1 2  "]);
+        assert_eq!(
+            clean("./pictures/./a.png").as_deref(),
+            Some("pictures/a.png")
+        );
+        assert_eq!(clean("mats\\b.mtl").as_deref(), Some("mats/b.mtl"));
+        for bad in ["../a.png", ".\\..\\a.png", ".hidden.png", "/a.png"] {
+            assert_eq!(clean(bad), None, "{bad}");
+        }
+        // A library in a folder named with backslashes finds the pictures
+        // beside it, each read once however many materials use it; a
+        // picture whose alpha the material does not show is written
+        // again, opaque.
+        let leaf = texture::encode(&Texture {
+            width: 1,
+            height: 1,
+            rgba: vec![0, 200, 0, 0],
+        })
+        .unwrap();
+        let mtl = b"newmtl a\nd 0.5\nmap_Kd ./leaf.png\nnewmtl b\nmap_Kd sub\\..\\leaf.png\nmap_Kd leaf.png\n";
+        let obj = b"mtllib ./mats\\leaf.mtl\nv 0 0 0\nv 1 0 0\nv 0 1 0\nvt 0 0\nusemtl a\nf 1/1 2/1 3/1\nusemtl b\nf 1/1 3/1 2/1\n";
+        let mut asked = Vec::new();
+        let read = read(obj, &mut |path| {
+            asked.push(path.to_owned());
+            match path {
+                "mats/leaf.mtl" => Some(mtl.to_vec()),
+                "mats/leaf.png" => Some(leaf.clone()),
+                _ => None,
+            }
+        })
+        .unwrap();
+        assert_eq!(asked, ["mats/leaf.mtl", "mats/leaf.png"]);
+        assert_eq!(read.scene.textures.len(), 1);
+        assert_eq!(read.scene.textures[0].rgba, [0, 200, 0, 255]);
+        assert_eq!(read.pictures, [None]);
+        let textures: Vec<_> = read
+            .scene
+            .meshes
+            .iter()
+            .map(|m| m.material.texture)
+            .collect();
+        assert_eq!(textures, [Some(0), Some(0)]);
     }
 
     #[test]

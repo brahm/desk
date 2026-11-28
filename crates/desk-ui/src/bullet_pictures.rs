@@ -352,6 +352,7 @@ mod tests {
     fn w116_an_obj_comes_with_its_files_and_none_from_outside() {
         let dir = std::env::temp_dir().join(format!("desk-obj-{}", std::process::id()));
         let inside = dir.join("model");
+        let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(inside.join("pictures")).unwrap();
         let data = concat!(env!("CARGO_MANIFEST_DIR"), "/../desk-3d/tests/data/obj");
         for name in ["box.obj", "box materials.mtl", "pictures/wood.png"] {
