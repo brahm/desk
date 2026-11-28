@@ -370,8 +370,8 @@ impl Animation {
         self.duration
     }
 
-    /// Where each node is in the scene at a time, or at rest.
-    fn worlds(&self, time: Option<f32>) -> Vec<Matrix> {
+    /// Where each node is in its parent at a time, or at rest.
+    pub(crate) fn locals(&self, time: Option<f32>) -> Vec<Matrix> {
         // Only the places of glTF, which tracks change, are copied: the
         // ops of USD hold all their samples, and are read where they are.
         let mut moved: HashMap<usize, Local> = HashMap::new();
@@ -393,17 +393,34 @@ impl Animation {
                 }
             }
         }
+        self.joints
+            .iter()
+            .enumerate()
+            .map(|(i, joint)| moved.get(&i).unwrap_or(&joint.rest).matrix(time))
+            .collect()
+    }
+
+    /// Where each node is in the scene at a time, or at rest.
+    pub(crate) fn worlds(&self, time: Option<f32>) -> Vec<Matrix> {
+        let locals = self.locals(time);
         let mut worlds: Vec<Matrix> = Vec::with_capacity(self.joints.len());
-        for (i, joint) in self.joints.iter().enumerate() {
-            let local = moved.get(&i).unwrap_or(&joint.rest);
+        for (joint, local) in self.joints.iter().zip(&locals) {
             let parent = joint
                 .parent
                 .and_then(|p| worlds.get(p))
                 .copied()
                 .unwrap_or(IDENTITY);
-            worlds.push(mul(&local.matrix(time), &parent));
+            worlds.push(mul(local, &parent));
         }
         worlds
+    }
+
+    /// The node a mesh hangs from, and what takes its corners to the
+    /// space of that node: none when they are there already. None for a
+    /// mesh that does not move.
+    pub(crate) fn binding(&self, mesh: usize) -> Option<(usize, Option<&Matrix>)> {
+        let b = self.bindings.get(mesh)?.as_ref()?;
+        Some((b.joint, b.inverse.as_ref()))
     }
 
     /// For each mesh of the scene, what takes its corners from where they

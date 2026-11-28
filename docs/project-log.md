@@ -3482,7 +3482,13 @@ paragraph, and objects on a second page.
 - The first animation stack moves the models by the curves of their
   translation, rotation and scale. As with OBJ, the model is turned into
   a GLB when it is inserted, its animation sampled at 30 frames a second
-  into the tracks of its nodes, and plays in the Object tab.
+  into the tracks of its nodes, and plays in the Object tab. The GLB
+  keeps the nodes of the models as FBX nests them, so that what turns
+  under a parent scaled more on one axis than another bends as it does
+  in Desk.
+- The keys of FBX go from one to the next in a line, as their cubic and
+  constant keys are taken too, and of the axes of `GlobalSettings` only
+  Z up is read.
 - Moved to W5 (B-082): the skins, blend shapes, cameras and lights of
   FBX. A skin bends a mesh by its joints, and needs the joints and
   weights written into the GLB and a renderer that draws them, which

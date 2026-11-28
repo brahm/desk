@@ -12,8 +12,10 @@
 //! corners, the diffuse color and opacity of the materials and the
 //! picture of their diffuse color, inside the file or beside it. The
 //! first animation stack moves the models by curves of their
-//! translation, rotation and scale. Skins, blend shapes, cameras and
-//! lights are left out.
+//! translation, rotation and scale, from key to key in a line, as the
+//! cubic and constant keys of FBX are taken too. A file with Z up is
+//! turned to Y up; other axes of `GlobalSettings` are not read. Skins,
+//! blend shapes, cameras and lights are left out (B-082).
 
 use std::collections::{HashMap, HashSet};
 use std::io::Read as _;
@@ -684,7 +686,7 @@ impl Layer {
             None => i,
         };
         let from = i.checked_mul(self.width)?;
-        self.values.get(from..from + self.width)
+        self.values.get(from..from.checked_add(self.width)?)
     }
 }
 
@@ -717,6 +719,10 @@ struct Builder<'a> {
     objects: HashMap<i64, &'a Node>,
     /// The objects connected to each, in order: what hangs from it.
     under: HashMap<i64, Vec<(i64, Option<String>)>>,
+    /// What each object hangs from, with the property it is connected to.
+    over: HashMap<i64, Vec<(i64, Option<String>)>>,
+    /// The first animation stack of the file.
+    stack: Option<i64>,
     files: &'a mut dyn FnMut(&str) -> Option<Vec<u8>>,
     scene: Scene,
     pictures: Vec<Option<Vec<u8>>>,
@@ -757,10 +763,19 @@ impl Builder<'_> {
         let node = *self.objects.get(&id)?;
         let mut bytes = None;
         for (video, _) in self.under(id, "Video") {
-            if let Some(Prop::Bytes(b)) = self.objects.get(&video).and_then(|v| v.value("Content"))
-                && !b.is_empty()
-            {
-                bytes = Some(b.clone());
+            // Bytes in a binary file; base 64 in a text one, in as many
+            // strings as it takes.
+            let content = self.objects.get(&video).and_then(|v| v.child("Content"));
+            let data = match content.map(|c| c.props.as_slice()) {
+                Some([Prop::Bytes(b), ..]) => Some(b.clone()),
+                Some(props @ [Prop::Text(_), ..]) => {
+                    let text: String = props.iter().filter_map(Prop::text).collect();
+                    crate::gltf::base64(&text)
+                }
+                _ => None,
+            };
+            if let Some(b) = data.filter(|b| !b.is_empty()) {
+                bytes = Some(b);
                 break;
             }
         }
@@ -889,7 +904,11 @@ impl Builder<'_> {
                 Mapping::Polygon => which.get(p).copied().unwrap_or(0),
                 _ => which.first().copied().unwrap_or(0),
             };
-            let slot = usize::try_from(slot).unwrap_or(0);
+            // A slot with no material shares one mesh of the default.
+            let slot = usize::try_from(slot)
+                .ok()
+                .filter(|s| *s < materials.len())
+                .unwrap_or(materials.len());
             let corners: Option<Vec<usize>> = (s..s + n).map(vertex).collect();
             let Some(corners) = corners else { continue };
             if corners.len() < 3 {
@@ -1014,11 +1033,8 @@ impl Builder<'_> {
     /// joints of the models they move.
     fn animate(&mut self) {
         let Some((stack, node)) = self
-            .objects
-            .iter()
-            .filter(|(_, n)| n.name == "AnimationStack")
-            .min_by_key(|(id, _)| **id)
-            .map(|(id, n)| (*id, *n))
+            .stack
+            .and_then(|id| Some((id, *self.objects.get(&id)?)))
         else {
             return;
         };
@@ -1130,15 +1146,7 @@ impl Builder<'_> {
 
     /// What an object hangs from, with the property it is connected to.
     fn parents(&self, id: i64) -> Vec<(i64, Option<String>)> {
-        let mut out = Vec::new();
-        for (parent, children) in &self.under {
-            for (child, property) in children {
-                if *child == id {
-                    out.push((*parent, property.clone()));
-                }
-            }
-        }
-        out
+        self.over.get(&id).cloned().unwrap_or_default()
     }
 }
 
@@ -1158,14 +1166,19 @@ pub(crate) fn read(bytes: &[u8], files: &mut dyn FnMut(&str) -> Option<Vec<u8>>)
         read_text(bytes)?
     };
     let mut objects = HashMap::new();
+    let mut stack = None;
     if let Some(o) = root.child("Objects") {
         for node in &o.children {
             if let Some(id) = node.prop(0).and_then(Prop::int) {
                 objects.insert(id, node);
+                if node.name == "AnimationStack" && stack.is_none() {
+                    stack = Some(id);
+                }
             }
         }
     }
     let mut under: HashMap<i64, Vec<(i64, Option<String>)>> = HashMap::new();
+    let mut over: HashMap<i64, Vec<(i64, Option<String>)>> = HashMap::new();
     if let Some(c) = root.child("Connections") {
         for link in c.all("C") {
             let (Some(child), Some(parent)) = (
@@ -1175,6 +1188,9 @@ pub(crate) fn read(bytes: &[u8], files: &mut dyn FnMut(&str) -> Option<Vec<u8>>)
                 continue;
             };
             let property = link.prop(3).and_then(Prop::text).map(str::to_owned);
+            over.entry(child)
+                .or_default()
+                .push((parent, property.clone()));
             under.entry(parent).or_default().push((child, property));
         }
     }
@@ -1198,6 +1214,8 @@ pub(crate) fn read(bytes: &[u8], files: &mut dyn FnMut(&str) -> Option<Vec<u8>>)
     let mut builder = Builder {
         objects,
         under,
+        over,
+        stack,
         files,
         scene: Scene::default(),
         pictures: Vec::new(),
@@ -1228,4 +1246,21 @@ pub(crate) fn read(bytes: &[u8], files: &mut dyn FnMut(&str) -> Option<Vec<u8>>)
         scene,
         pictures: builder.pictures,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn w116_an_index_past_any_array_is_none() {
+        let layer = Layer {
+            values: vec![0.0; 4],
+            width: 2,
+            indices: Some(vec![i64::MAX, 1]),
+            mapping: Mapping::PolygonVertex,
+        };
+        assert_eq!(layer.at(0, 0, 0), None);
+        assert_eq!(layer.at(1, 0, 0), Some(&[0.0, 0.0][..]));
+    }
 }

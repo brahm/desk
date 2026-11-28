@@ -104,3 +104,46 @@ fn w116_what_is_not_an_fbx_is_refused() {
         Err(Error::Unknown)
     );
 }
+
+/// Base 64, with padding.
+fn base64(bytes: &[u8]) -> String {
+    const ABC: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let mut out = String::new();
+    for chunk in bytes.chunks(3) {
+        let n = chunk
+            .iter()
+            .enumerate()
+            .fold(0u32, |n, (i, b)| n | u32::from(*b) << (16 - 8 * i));
+        for i in 0..4 {
+            out.push(if i <= chunk.len() {
+                char::from(ABC[(n >> (18 - 6 * i) & 63) as usize])
+            } else {
+                '='
+            });
+        }
+    }
+    out
+}
+
+#[test]
+fn w116_a_text_fbx_holds_its_picture_and_slots_with_no_material_share_one() {
+    let text = String::from_utf8(data("box.fbx")).unwrap();
+    // The picture inside the file, in two strings of base 64.
+    let picture = base64(&data("missing.png"));
+    let (a, b) = picture.split_at(picture.len() / 2);
+    let video =
+        format!("\tVideo: 500, \"Top::Video\", \"Clip\" {{\n\t\tContent: \"{a}\", \"{b}\"\n\t}}\n");
+    let text = text.replace(
+        "\tAnimationStack: 600",
+        &format!("{video}\tAnimationStack: 600"),
+    );
+    // Slots with no material, one of them out of any array.
+    let text = text.replace("a: 0,0,0,1,0,0", "a: 0,0,0,1,7,1000000000000");
+    let glb = import(text.as_bytes(), &mut |_| None).unwrap();
+    let scene = read(&glb).unwrap();
+    assert_eq!(scene.textures.len(), 1);
+    assert_eq!(scene.triangle_count(), 24);
+    // Red, the top, and one mesh of the default for both slots with no
+    // material, in each of the two models.
+    assert_eq!(scene.meshes.len(), 6);
+}

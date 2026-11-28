@@ -100,7 +100,7 @@ fn data_uri(uri: &str) -> Option<(Vec<u8>, &str)> {
 }
 
 /// Base 64, with or without padding; none when it is broken.
-fn base64(text: &str) -> Option<Vec<u8>> {
+pub(crate) fn base64(text: &str) -> Option<Vec<u8>> {
     let mut out = Vec::with_capacity(text.len() / 4 * 3);
     let mut acc = 0u32;
     let mut bits = 0;
