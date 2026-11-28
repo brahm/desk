@@ -914,6 +914,18 @@ impl Builder<'_> {
             if corners.len() < 3 {
                 continue;
             }
+            // Its corners placed; a polygon with one that is not finite
+            // there is left out.
+            let placed: Vec<[f32; 3]> = corners
+                .iter()
+                .map(|&v| {
+                    let at = |i: usize| points.get(v * 3 + i).copied().unwrap_or(0.0) as f32;
+                    point(world, [at(0), at(1), at(2)])
+                })
+                .collect();
+            if placed.iter().flatten().any(|c| !c.is_finite()) {
+                continue;
+            }
             if let std::collections::hash_map::Entry::Vacant(entry) = meshes.entry(slot) {
                 let material = match materials.get(slot) {
                     Some(&id) => self.material(id),
@@ -934,28 +946,38 @@ impl Builder<'_> {
             if self.corners > limits::CORNERS || self.triangles > limits::TRIANGLES {
                 return Err(Error::TooLarge);
             }
-            for (j, &v) in corners.iter().enumerate() {
+            for ((j, &v), position) in corners.iter().enumerate().zip(placed) {
                 let k = s + j;
-                let at = |i: usize| points.get(v * 3 + i).copied().unwrap_or(0.0) as f32;
-                mesh.positions.push(point(world, [at(0), at(1), at(2)]));
+                mesh.positions.push(position);
                 if let Some(layer) = &normals
                     && let (Some(nv), Some(inv)) = (layer.at(k, p, v), inverse.as_ref())
                 {
                     let get = |i: usize| nv.get(i).copied().unwrap_or(0.0) as f32;
-                    mesh.normals
-                        .push(unit(normal(inv, [get(0), get(1), get(2)])));
+                    let n = unit(normal(inv, [get(0), get(1), get(2)]));
+                    // One normal not finite leaves the mesh with none.
+                    if n.iter().all(|c| c.is_finite()) {
+                        mesh.normals.push(n);
+                    }
                 }
                 if let Some(layer) = &uvs {
                     let uv = layer.at(k, p, v).unwrap_or(&[0.0, 0.0]);
-                    let get = |i: usize| uv.get(i).copied().unwrap_or(0.0) as f32;
+                    let get = |i: usize| {
+                        Some(uv.get(i).copied().unwrap_or(0.0) as f32)
+                            .filter(|c| c.is_finite())
+                            .unwrap_or(0.0)
+                    };
                     mesh.uvs.push([get(0), get(1)]);
                 }
                 if let Some(layer) = &colors {
                     let c = layer.at(k, p, v).unwrap_or(&[1.0, 1.0, 1.0]);
-                    mesh.colors.push(
-                        [0, 1, 2]
-                            .map(|i| (c.get(i).copied().unwrap_or(1.0) as f32).clamp(0.0, 1.0)),
-                    );
+                    mesh.colors.push([0, 1, 2].map(|i| {
+                        let c = c.get(i).copied().unwrap_or(1.0) as f32;
+                        if c.is_finite() {
+                            c.clamp(0.0, 1.0)
+                        } else {
+                            1.0
+                        }
+                    }));
                 }
             }
             for j in 1..n as u32 - 1 {

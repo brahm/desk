@@ -13,8 +13,9 @@
 //! (`usda`) or the binary one (`usdc`), the pictures of its textures and
 //! the samples in time that move its prims; and glTF 2.0, as text (`.gltf`) or binary (`.glb`), with the animation
 //! of its nodes. A model of a format that a document does not keep,
-//! Wavefront OBJ with its MTL materials or FBX with its animation, is
-//! turned into a GLB by [`import`]. A reader takes the meshes of the model with their
+//! Wavefront OBJ with its MTL materials, FBX with its animation or PRC,
+//! the 3D of PDF documents, as its tessellations draw it, is turned into
+//! a GLB by [`import`]. A reader takes the meshes of the model with their
 //! places, the colors and textures of their materials, and leaves the
 //! rest: lights, cameras and skeletons.
 //!
@@ -34,6 +35,7 @@ mod gltf;
 mod lz4;
 mod matrix;
 mod obj;
+mod prc;
 mod raster;
 mod texture;
 mod usd;
@@ -169,16 +171,21 @@ pub enum Import {
     /// FBX, binary or text, of version 7, with the pictures inside it or
     /// beside it.
     Fbx,
+    /// PRC, the 3D of PDF documents made by CAD programs, as its
+    /// tessellations draw it.
+    Prc,
 }
 
 impl Import {
     /// All of them, as file dialogs list them.
-    pub const ALL: [Self; 2] = [Self::Obj, Self::Fbx];
+    pub const ALL: [Self; 3] = [Self::Obj, Self::Fbx, Self::Prc];
 
     /// The format of the bytes of a file, from its start.
     pub fn sniff(bytes: &[u8]) -> Option<Self> {
         if fbx::is_fbx(bytes) {
             Some(Self::Fbx)
+        } else if prc::is_prc(bytes) {
+            Some(Self::Prc)
         } else if obj::is_obj(bytes) {
             Some(Self::Obj)
         } else {
@@ -191,6 +198,7 @@ impl Import {
         match self {
             Self::Obj => "model/obj",
             Self::Fbx => "application/vnd.autodesk.fbx",
+            Self::Prc => "model/prc",
         }
     }
 
@@ -199,6 +207,7 @@ impl Import {
         match self {
             Self::Obj => "obj",
             Self::Fbx => "fbx",
+            Self::Prc => "prc",
         }
     }
 }
@@ -225,6 +234,13 @@ pub fn import(bytes: &[u8], files: &mut dyn FnMut(&str) -> Option<Vec<u8>>) -> R
                 return Err(Error::Empty);
             }
             glb::write(&read.scene, &read.pictures)
+        }
+        (None, Some(Import::Prc)) => {
+            let scene = prc::read(bytes)?;
+            if scene.triangle_count() == 0 {
+                return Err(Error::Empty);
+            }
+            glb::write(&scene, &[])
         }
         (None, None) => Err(Error::Unknown),
     }
