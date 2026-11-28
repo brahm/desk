@@ -751,6 +751,59 @@ pub struct ValueAxis {
     pub scale: Scale,
     /// How the labels are written.
     pub number: NumberStyle,
+    /// The reference lines across the plot at values of this axis (W144).
+    /// New in W4: files written before take none.
+    #[serde(default)]
+    pub reference_lines: Vec<ReferenceLine>,
+}
+
+/// The value a reference line marks (W144), as Pages 15.4 offers them in
+/// Reference Lines of the Axis tab.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub enum ReferenceKind {
+    /// The average of the values the axis shows.
+    Average,
+    /// Their median.
+    Median,
+    /// The least of them.
+    Minimum,
+    /// The greatest of them.
+    Maximum,
+    /// A value given.
+    Custom(Num),
+}
+
+impl ReferenceKind {
+    /// The value it marks among the values the axis shows; none when
+    /// there are none.
+    pub fn value(self, values: &[f64]) -> Option<f64> {
+        let mut values: Vec<f64> = values.iter().copied().filter(|v| v.is_finite()).collect();
+        values.sort_by(f64::total_cmp);
+        let n = values.len();
+        match self {
+            Self::Custom(v) => v.0.is_finite().then_some(v.0),
+            _ if n == 0 => None,
+            Self::Average => Some(values.iter().sum::<f64>() / n as f64),
+            Self::Median if n % 2 == 1 => Some(values[n / 2]),
+            Self::Median => Some((values[n / 2 - 1] + values[n / 2]) / 2.0),
+            Self::Minimum => values.first().copied(),
+            Self::Maximum => values.last().copied(),
+        }
+    }
+}
+
+/// A line across the plot at a value of an axis, with its name and its
+/// value beside it (W144).
+#[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub struct ReferenceLine {
+    /// What it marks.
+    pub kind: ReferenceKind,
+    /// Its name, written beside it when `show_name`.
+    pub name: String,
+    /// Whether the name shows.
+    pub show_name: bool,
+    /// Whether the value shows, as the labels of the axis write it.
+    pub show_value: bool,
 }
 
 impl Default for ValueAxis {
@@ -768,6 +821,7 @@ impl Default for ValueAxis {
             title: None,
             scale: Scale::Linear,
             number: NumberStyle::default(),
+            reference_lines: Vec::new(),
         }
     }
 }
@@ -1309,5 +1363,27 @@ mod tests {
         let mut data = ChartData::sample();
         data.rows.push("Região 3".into());
         assert!(!data.is_consistent());
+    }
+
+    #[test]
+    fn w144_reference_lines_are_kept_and_older_charts_have_none() {
+        let mut chart = Chart::new(ChartKind::Column);
+        chart.value_axis.reference_lines.push(ReferenceLine {
+            kind: ReferenceKind::Custom(Num(42.0)),
+            name: "Goal".into(),
+            show_name: true,
+            show_value: false,
+        });
+        let json = serde_json::to_value(&chart).unwrap();
+        let back: Chart = serde_json::from_value(json.clone()).unwrap();
+        assert_eq!(back, chart);
+        // A chart written before W4 has no field for them.
+        let mut old = json;
+        old["value_axis"]
+            .as_object_mut()
+            .unwrap()
+            .remove("reference_lines");
+        let back: Chart = serde_json::from_value(old).unwrap();
+        assert!(back.value_axis.reference_lines.is_empty());
     }
 }

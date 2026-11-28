@@ -12,11 +12,13 @@ mod draw;
 mod model;
 mod stats;
 
-pub use draw::{Align, Drawing, Hit, Mark, Measure, Paint, PathOp, draw, rough_width};
+pub use draw::{
+    Align, Drawing, Hit, Mark, Measure, Paint, PathOp, draw, rough_width, value_axis_values,
+};
 pub use model::{
     CategoryAxis, Chart, ChartData, ChartKind, ChartText, Collection, DataLink, ErrorAmount,
-    ErrorBars, ErrorDirection, LabelPosition, Lighting, NumberStyle, PieOptions, Scale, Scene,
-    SeriesFill, SeriesKind, SeriesStyle, Symbol, Texture, TrendKind, Trendline, ValueAxis,
-    ValueLabels, darker, lighter,
+    ErrorBars, ErrorDirection, LabelPosition, Lighting, NumberStyle, PieOptions, ReferenceKind,
+    ReferenceLine, Scale, Scene, SeriesFill, SeriesKind, SeriesStyle, Symbol, Texture, TrendKind,
+    Trendline, ValueAxis, ValueLabels, darker, lighter,
 };
 pub use stats::{Fit, error_lengths, fit, moving_average};

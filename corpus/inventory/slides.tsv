@@ -132,7 +132,7 @@ S128	3.10 Tables	Table title, lock table, bidi direction	Only 15	15.4	D-001	In	M
 S129	3.11 Charts	Types	Different	15.4	D-001	In	Engine ready	the window changes (D-008)	S5	Eleven types of Writer; donut, radar and bubble are missing
 S130	3.11 Charts	Interactive chart	Only 15	15.4	D-001	In	Missing	the window changes (D-008)	S5	Interactive chart
 S131	3.11 Charts	Data	Different	15.4	D-001	In	Engine ready	the window changes (D-008)	S5	Data editor of Writer
-S132	3.11 Charts	Axes, labels, legends, error bars, trendline	Different	15.4	D-001	In	Engine ready	the window changes (D-008)	S5	Axes, error bars and trendline of Writer; reference lines are missing
+S132	3.11 Charts	Axes, labels, legends, error bars, trendline	Different	15.4	D-001	In	Engine ready	the window changes (D-008)	S5	Axes, error bars, trendline and reference lines of Writer
 S133	3.11 Charts	Chart styles	Only 15	15.4	D-001	In	Missing	the window changes (D-008)	S5	Chart styles
 S134	3.11 Charts	3D scene (light, angle)	Different	15.4, plus what the '09 did	D-001, D-003	In	Engine ready	the target changed; the window changes (D-008)	S5	3D scene of Writer
 S135	3.12 Animation: transitions, builds and actions	Where it is set up	Different	15.4	D-001	In	Partial	the window changes (D-008)	S3	The Animation level of the Inspector exists (phase 2); the animations belong to phases 4 and 5

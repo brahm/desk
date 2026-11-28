@@ -349,7 +349,8 @@ These sit on the `style:graphic-properties` of the graphic style of a
 #### `desk:chart`
 
 - **Feature:** everything Desk keeps of a chart: its type, data, series,
-  axes, labels and styles (the GRF rows).
+  axes with their reference lines (W144), labels and styles (the GRF
+  rows).
 - **On:** the `draw:object` of a frame that holds a chart.
 - **Value:** the chart of `desk-model` (`desk_model::Chart`) as JSON,
   written with `serde_json`. Desk reads it back first; when it is absent

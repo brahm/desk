@@ -3526,6 +3526,26 @@ paragraph, and objects on a second page.
 - Left in step 11, in W4: U3D (D-033), whose specification (ECMA-363)
   and sample files this container cannot reach.
 
+### 28 November: reference lines of charts (step 12 of W4, #280)
+
+- A value axis keeps reference lines, as Reference Lines of the Axis tab
+  of Pages 15.4 offers them: at the average, the median, the minimum or
+  the maximum of the values the axis shows, or at a value given, each
+  with a name and its value that can show at its end. They are drawn
+  dashed over the series, across the plot of columns, lines and areas,
+  up the plot of bars, and on both axes of scatter and bubble charts; a
+  line whose value is off the axis is not drawn. Of stacked series, the
+  values are the tops of the stacks, which the axis shows.
+- The Axis tab gets a Reference Lines group: Add Reference Line, then the
+  line chosen with its type, value, name and switches, and a button to
+  remove it. A name that is still that of its type follows a new type.
+  The tab edits the lines of the value axis; those of the x axis of a
+  scatter chart and of the second axis of a 2-axis chart are drawn when
+  a file has them, and the tab does not edit them yet.
+- They are kept in `desk:chart` with the rest of the chart; a chart of
+  an older file has none. The ODF chart that other programs draw has no
+  reference lines.
+
 ## Decisions, with their reasons and consequences
 
 Ids `D-nnn` and `R-nnn` are those of [decisions.md](decisions.md).

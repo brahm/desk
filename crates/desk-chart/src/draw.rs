@@ -1512,8 +1512,123 @@ fn cartesian(cx: &mut Ctx<'_>, area: (f32, f32, f32, f32)) {
             }
         }
     }
+    // The reference lines of the value axes, over the series (W144).
+    let right = x0 + w + d.0;
+    for (r, axis, on) in [
+        (Some(&r1), &chart.value_axis, false),
+        (r2.as_ref(), &chart.value_axis2, true),
+    ] {
+        let Some(r) = r else { continue };
+        let shown = shown_values(chart, &values, |s| on_y2(s) == on);
+        reference_lines(cx, axis, r, &shown, right, &|v| {
+            let p = pos(r, v);
+            if horizontal {
+                ((p + d.0, y0 + h + d.1), (p + d.0, y0 + d.1))
+            } else {
+                ((x0 + d.0, p + d.1), (x0 + w + d.0, p + d.1))
+            }
+        });
+    }
     for (x, y, text, align) in labels {
         cx.text(x, y, text, size * 0.9, align, 0.0, false);
+    }
+}
+
+/// The values a value axis shows, which its reference lines are of
+/// (W144): those of its series, or the total of each category when they
+/// are stacked, as the axis then shows the tops of the stacks.
+fn shown_values(
+    chart: &Chart,
+    values: &[Vec<Option<f64>>],
+    series: impl Fn(usize) -> bool,
+) -> Vec<f64> {
+    let on: Vec<&Vec<Option<f64>>> = values
+        .iter()
+        .enumerate()
+        .filter(|(s, _)| series(*s))
+        .map(|(_, row)| row)
+        .collect();
+    if !chart.kind.is_stacked() {
+        return on
+            .iter()
+            .flat_map(|row| row.iter().flatten().copied())
+            .collect();
+    }
+    (0..chart.category_count())
+        .filter_map(|c| {
+            let cell: Vec<f64> = on
+                .iter()
+                .filter_map(|row| row.get(c).copied().flatten())
+                .collect();
+            (!cell.is_empty()).then(|| cell.iter().sum())
+        })
+        .collect()
+}
+
+/// The values the value axis of a chart shows, which its reference lines
+/// are of (W144); the Inspector takes one of them as the value of a line
+/// made custom.
+pub fn value_axis_values(chart: &Chart) -> Vec<f64> {
+    if chart.kind.has_x_values() {
+        return chart_points(chart).iter().flatten().map(|p| p.1).collect();
+    }
+    let values = series_values(chart);
+    let two_axes = chart.kind == ChartKind::TwoAxis;
+    shown_values(chart, &values, |s| !(two_axes && s % 2 == 1))
+}
+
+/// The reference lines of an axis across the plot (W144): dashed, from
+/// the start to the end that `ends` gives for a value, with the name and
+/// the value they show written at the end. A line whose value is outside
+/// the axis is not drawn.
+fn reference_lines(
+    cx: &mut Ctx<'_>,
+    axis: &ValueAxis,
+    range: &Range,
+    shown: &[f64],
+    right: f32,
+    ends: &dyn Fn(f64) -> ((f32, f32), (f32, f32)),
+) {
+    let color = Color::rgb(0x5e, 0x5c, 0x64);
+    let size = cx.size;
+    // A little past the ends, for the rounding of the steps.
+    let slack = (range.max - range.min).abs() * 1e-9;
+    for line in &axis.reference_lines {
+        let Some(v) = line.kind.value(shown) else {
+            continue;
+        };
+        if v < range.min - slack || v > range.max + slack {
+            continue;
+        }
+        let (a, b) = ends(v);
+        cx.shape(
+            vec![PathOp::Move(a.0, a.1), PathOp::Line(b.0, b.1)],
+            None,
+            Some((1.0, color, vec![4.0, 3.0])),
+            1.0,
+            false,
+        );
+        let mut caption = Vec::new();
+        if line.show_name && !line.name.is_empty() {
+            caption.push(line.name.clone());
+        }
+        if line.show_value {
+            caption.push(axis_text(cx, axis, v));
+        }
+        if caption.is_empty() {
+            continue;
+        }
+        // Above the end of a line across, beside the top of one up: on
+        // its right, or on its left when that would run past the plot.
+        let caption = caption.join(": ");
+        let (x, y, align) = if (a.1 - b.1).abs() < f32::EPSILON {
+            (b.0, b.1 - 3.0, Align::End)
+        } else if b.0 + 3.0 + cx.width(&caption, size * 0.9) > right {
+            (b.0 - 3.0, b.1 + size, Align::End)
+        } else {
+            (b.0 + 3.0, b.1 + size, Align::Start)
+        };
+        cx.text(x, y, caption, size * 0.9, align, 0.0, false);
     }
 }
 
@@ -1945,6 +2060,15 @@ fn scatter(cx: &mut Ctx<'_>, area: (f32, f32, f32, f32)) {
             trendline(cx, trend, &style, &xs, &ys, &|x, y| (px(x), py(y)));
         }
     }
+    // The reference lines of both axes, over the points (W144).
+    let ys: Vec<f64> = all.iter().map(|p| p.1).collect();
+    reference_lines(cx, &chart.value_axis, &ry, &ys, x0 + w, &|v| {
+        ((x0, py(v)), (x0 + w, py(v)))
+    });
+    let xs: Vec<f64> = all.iter().map(|p| p.0).collect();
+    reference_lines(cx, &chart.x_axis, &rx, &xs, x0 + w, &|v| {
+        ((px(v), y0 + h), (px(v), y0))
+    });
 }
 
 /// A radar chart: a spoke for each category from the center, the grid
@@ -2277,7 +2401,9 @@ fn pie(cx: &mut Ctx<'_>, area: (f32, f32, f32, f32)) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::{ChartText, ErrorAmount, ErrorBars, Trendline};
+    use crate::model::{
+        ChartText, ErrorAmount, ErrorBars, ReferenceKind, ReferenceLine, Trendline,
+    };
     use desk_table::Num;
 
     fn texts(d: &Drawing) -> Vec<String> {
@@ -2530,6 +2656,114 @@ mod tests {
         let t = texts(&d);
         assert!(t.iter().any(|s| s.starts_with("y = ")), "{t:?}");
         assert!(t.iter().any(|s| s.starts_with("R² = 0,")), "{t:?}");
+    }
+
+    /// The dashed lines of the reference lines: their ends.
+    fn reference_marks(d: &Drawing) -> Vec<((f32, f32), (f32, f32))> {
+        d.marks
+            .iter()
+            .filter_map(|m| match m {
+                Mark::Shape {
+                    path,
+                    fill: None,
+                    stroke: Some((_, color, dashes)),
+                    ..
+                } if *color == Color::rgb(0x5e, 0x5c, 0x64) && !dashes.is_empty() => {
+                    match path.as_slice() {
+                        [PathOp::Move(x0, y0), PathOp::Line(x1, y1)] => {
+                            Some(((*x0, *y0), (*x1, *y1)))
+                        }
+                        _ => None,
+                    }
+                }
+                _ => None,
+            })
+            .collect()
+    }
+
+    fn reference(kind: ReferenceKind, name: &str) -> ReferenceLine {
+        ReferenceLine {
+            kind,
+            name: name.to_owned(),
+            show_name: true,
+            show_value: true,
+        }
+    }
+
+    #[test]
+    fn w144_reference_lines_mark_a_value_of_the_axis() {
+        let values = [17.0, 26.0, 53.0, 96.0, 55.0, 43.0, 70.0, 58.0];
+        assert_eq!(ReferenceKind::Average.value(&values), Some(52.25));
+        assert_eq!(ReferenceKind::Median.value(&values), Some(54.0));
+        assert_eq!(ReferenceKind::Minimum.value(&values), Some(17.0));
+        assert_eq!(ReferenceKind::Maximum.value(&values), Some(96.0));
+        assert_eq!(ReferenceKind::Median.value(&[3.0, 1.0, 2.0]), Some(2.0));
+        assert_eq!(ReferenceKind::Average.value(&[]), None);
+        assert_eq!(ReferenceKind::Custom(Num(f64::NAN)).value(&values), None);
+
+        let mut chart = Chart::new(ChartKind::Column);
+        chart.value_axis.reference_lines = vec![
+            reference(ReferenceKind::Maximum, "Maximum"),
+            reference(ReferenceKind::Minimum, "Minimum"),
+            // Past the top of the axis, which ends at 100.
+            reference(ReferenceKind::Custom(Num(1000.0)), "Far"),
+        ];
+        let d = draw(&chart, 300.0, 200.0, &rough_width, ',', '.');
+        let lines = reference_marks(&d);
+        assert_eq!(lines.len(), 2, "{lines:?}");
+        // Across the plot, the greatest value above the least.
+        for (a, b) in &lines {
+            assert_eq!(a.1, b.1);
+            assert!(b.0 > a.0 + 100.0);
+        }
+        assert!(lines[0].0.1 < lines[1].0.1);
+        let t = texts(&d);
+        assert!(t.contains(&"Maximum: 96".to_owned()), "{t:?}");
+        assert!(t.contains(&"Minimum: 17".to_owned()), "{t:?}");
+        assert!(!t.iter().any(|s| s.starts_with("Far")), "{t:?}");
+
+        // Bars lie, so their lines stand; a scatter has lines on both axes.
+        let mut bars = chart.clone();
+        bars.set_kind(ChartKind::Bar);
+        bars.value_axis = chart.value_axis.clone();
+        for (a, b) in reference_marks(&draw(&bars, 300.0, 200.0, &rough_width, ',', '.')) {
+            assert_eq!(a.0, b.0);
+        }
+        let mut scatter = Chart::new(ChartKind::Scatter);
+        scatter.value_axis.reference_lines = vec![reference(ReferenceKind::Average, "")];
+        scatter.x_axis.reference_lines = vec![ReferenceLine {
+            show_value: false,
+            ..reference(ReferenceKind::Average, "x")
+        }];
+        let d = draw(&scatter, 300.0, 200.0, &rough_width, ',', '.');
+        assert_eq!(reference_marks(&d).len(), 2);
+        assert!(texts(&d).contains(&"x".to_owned()));
+
+        // Review of #280: below a logarithmic axis is off it.
+        let mut log = Chart::new(ChartKind::Column);
+        log.value_axis.scale = Scale::Logarithmic;
+        log.value_axis.reference_lines = vec![reference(ReferenceKind::Custom(Num(0.0)), "Zero")];
+        let d = draw(&log, 300.0, 200.0, &rough_width, ',', '.');
+        assert!(reference_marks(&d).is_empty());
+        // Stacked, a line is of the tops of the stacks: 17 + 55 at most
+        // of the first year, 96 + 58 of the last.
+        let mut stacked = Chart::new(ChartKind::StackedColumn);
+        stacked.value_axis.reference_lines = vec![reference(ReferenceKind::Maximum, "Top")];
+        assert!(
+            texts(&draw(&stacked, 300.0, 200.0, &rough_width, ',', '.'))
+                .contains(&"Top: 154".to_owned())
+        );
+        assert_eq!(value_axis_values(&stacked), [72.0, 69.0, 123.0, 154.0]);
+        // The caption of a line up near the right end goes on its left.
+        let mut bars = Chart::new(ChartKind::Bar);
+        bars.value_axis.max = Some(Num(96.0));
+        bars.value_axis.reference_lines = vec![reference(ReferenceKind::Maximum, "Maximum")];
+        let d = draw(&bars, 300.0, 200.0, &rough_width, ',', '.');
+        let align = d.marks.iter().find_map(|m| match m {
+            Mark::Text { text, align, .. } if text == "Maximum: 96" => Some(*align),
+            _ => None,
+        });
+        assert_eq!(align, Some(Align::End));
     }
 
     #[test]
