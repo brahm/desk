@@ -379,6 +379,8 @@ pub(super) fn insert_menu(objects: bool) -> gio::Menu {
             Some(&tr("_Image, Movie or Sound…")),
             Some("win.insert-picture"),
         );
+        // Insert > Record Audio of Pages 15.4 (W118).
+        items.append(Some(&tr("Record _Audio…")), Some("win.record-audio"));
         items.append(
             Some(&tr("Image _Gallery")),
             Some("win.insert-image-gallery"),
@@ -458,6 +460,7 @@ pub(super) fn insert_menu(objects: bool) -> gio::Menu {
         Some("win.add-linked-text-box"),
     );
     other.append(Some(&tr("C_hoose…")), Some("win.insert-picture"));
+    other.append(Some(&tr("Record _Audio…")), Some("win.record-audio"));
     // Insert > Image Gallery of Pages 15.4 (W111).
     other.append(
         Some(&tr("Image _Gallery")),

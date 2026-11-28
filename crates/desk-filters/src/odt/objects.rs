@@ -974,6 +974,7 @@ fn kind(
             poster_time,
             repeat,
             duration,
+            description,
             ..
         } => {
             let file = |href: &str| {
@@ -1025,6 +1026,7 @@ fn kind(
                 }
                 _ => 100,
             };
+            media.description = description.as_deref().map(Arc::from);
             ObjectKind::Media(media)
         }
         odf::DrawKind::TextBox {
@@ -2794,6 +2796,7 @@ impl Exporter<'_> {
                         Repeat::BackAndForth => Some("back-and-forth".into()),
                     },
                     duration: media.duration.map(seconds),
+                    description: media.description.as_deref().map(str::to_owned),
                 }
             }
             ObjectKind::TextBox(text) => {

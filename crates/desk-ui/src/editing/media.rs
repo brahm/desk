@@ -51,8 +51,71 @@ impl TextEditor {
             Ok(id)
         });
         match result {
-            Ok(id) => self.select_new_object(selection, id),
+            Ok(id) => {
+                self.select_new_object(selection, id);
+                // Made smaller once it is in, as the preference asks (W119).
+                if crate::preferences::get().optimize_media {
+                    self.optimize_media(id, |_| {});
+                }
+            }
             Err(error) => gtk::glib::g_warning!("desk", "cannot insert: {error}"),
+        }
+    }
+
+    /// Optimizes the movie or sound `id`, as Optimize for iPhone and iPad
+    /// of Pages 15.4 (W119): its file is replaced by a smaller one once
+    /// that is made, unless it was changed meanwhile. `done` is told
+    /// whether it was.
+    fn optimize_media(&self, id: NodeId, done: impl FnOnce(bool) + 'static) {
+        let Some(Object {
+            kind: ObjectKind::Media(media),
+            ..
+        }) = self
+            .state
+            .borrow()
+            .editor
+            .document()
+            .objects()
+            .get(id)
+            .cloned()
+        else {
+            done(false);
+            return;
+        };
+        let weak = self.downgrade();
+        crate::optimize::optimize(&media.clone(), move |optimized| {
+            let (Some(this), Some(optimized)) = (weak.upgrade(), optimized) else {
+                done(false);
+                return;
+            };
+            // Not when the file was changed or the object went meanwhile.
+            let unchanged = matches!(
+                this.state.borrow().editor.document().objects().get(id),
+                Some(Object { kind: ObjectKind::Media(now), .. }) if now.same_file(&media)
+            );
+            if !unchanged {
+                done(false);
+                return;
+            }
+            let mut replaced = false;
+            this.change_objects("Optimize Media", &[id], |object, _| {
+                if let ObjectKind::Media(now) = &mut object.kind
+                    && let Some(new) = now.with_data(optimized.shared_data())
+                {
+                    *now = new;
+                    replaced = true;
+                }
+            });
+            done(replaced);
+        });
+    }
+
+    /// Optimizes the selected movie or sound, as the Movie tab does
+    /// (W119).
+    pub fn optimize_selected_media(&self, done: impl FnOnce(bool) + 'static) {
+        match self.selected_objects()[..] {
+            [id] => self.optimize_media(id, done),
+            _ => done(false),
         }
     }
 

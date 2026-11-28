@@ -4,7 +4,9 @@
 //! The QuickTime inspector of Pages, for a selected movie or sound
 //! (OBJ-19): where it starts and stops, its poster frame, how it repeats,
 //! how loud it plays, and a button to play it. Reduce Media takes out the
-//! parts before the start and after the stop (OBJ-20).
+//! parts before the start and after the stop (OBJ-20). As in the Movie
+//! tab of Pages 15.4, a bar shows the part that plays between two handles
+//! and the poster frame, and the Description says what it shows (W118).
 
 use crate::compact;
 use std::cell::Cell;
@@ -12,10 +14,12 @@ use std::rc::Rc;
 
 use adw::prelude::*;
 use desk_model::{Media, ObjectKind, Repeat};
+use std::sync::Arc;
 
 use crate::editing::ObjectInfo;
 use crate::formatting::EditorOf;
 use crate::i18n::tr;
+use crate::trim_bar::{Mark, Times, TrimBar};
 
 /// The longest a movie is taken to last when its length is not known, in
 /// seconds.
@@ -24,12 +28,16 @@ const LONGEST: f64 = 24.0 * 3600.0;
 /// The Media group of the Inspector.
 pub struct MediaGroup {
     group: compact::Group,
+    trim: Rc<TrimBar>,
     start: compact::SpinRow,
     stop: compact::SpinRow,
     poster: compact::SpinRow,
+    poster_picture: gtk::Picture,
     repeat: compact::ComboRow,
     volume: compact::SpinRow,
+    description: compact::EntryRow,
     reduce: compact::ActionRow,
+    optimize: compact::ActionRow,
     updating: Cell<bool>,
 }
 
@@ -104,11 +112,27 @@ impl MediaGroup {
             .title(tr("Movie and Sound"))
             .header_suffix(&play)
             .build();
+        let trim = TrimBar::new();
+        group.add_widget(trim.widget());
+        let poster_picture = gtk::Picture::builder()
+            .content_fit(gtk::ContentFit::Contain)
+            .width_request(48)
+            .height_request(32)
+            .can_shrink(true)
+            .build();
+        poster.add_suffix(&poster_picture);
         for row in [&start, &stop, &poster] {
             group.add(row);
         }
         group.add(&repeat);
         group.add(&volume);
+        let description = compact::EntryRow::builder()
+            .title(tr("Description"))
+            .build();
+        description.set_subtitle(&tr(
+            "Says what it shows or plays, for those who cannot see or hear it",
+        ));
+        group.add(&description);
         let reduce_button = gtk::Button::builder()
             .label(tr("Reduce"))
             .valign(gtk::Align::Center)
@@ -120,14 +144,29 @@ impl MediaGroup {
             .build();
         reduce.add_suffix(&reduce_button);
         group.add(&reduce);
+        let optimize_button = gtk::Button::builder()
+            .label(tr("Optimize"))
+            .valign(gtk::Align::Center)
+            .build();
+        let optimize = compact::ActionRow::builder()
+            .title(tr("Optimize for Phones and Tablets"))
+            .subtitle(tr("Makes the file smaller, in a format they play"))
+            .activatable_widget(&optimize_button)
+            .build();
+        optimize.add_suffix(&optimize_button);
+        group.add(&optimize);
         let this = Rc::new(Self {
             group,
+            trim,
             start,
             stop,
             poster,
+            poster_picture,
             repeat,
             volume,
+            description,
             reduce,
+            optimize,
             updating: Cell::new(false),
         });
         this.show(None);
@@ -163,6 +202,50 @@ impl MediaGroup {
             });
         }
         {
+            let set = set.clone();
+            let editor = editor.clone();
+            this.trim.connect_moved(move |mark, at| {
+                let seconds = f64::from(at) / 1000.0;
+                match mark {
+                    Mark::Start => set(Setting::Start, seconds),
+                    Mark::Stop => set(Setting::Stop, seconds),
+                    Mark::Poster => {
+                        if let Some(editor) = editor() {
+                            editor.set_poster_time(at);
+                        }
+                    }
+                }
+            });
+        }
+        {
+            let editor = editor.clone();
+            let weak = Rc::downgrade(&this);
+            this.description.connect_apply(move |row| {
+                let Some(this) = weak.upgrade() else { return };
+                if this.updating.get() {
+                    return;
+                }
+                let Some(editor) = editor() else { return };
+                let text = row.text();
+                let text = text.trim();
+                let described = editor
+                    .object_info()
+                    .and_then(|info| match &info.object.kind {
+                        ObjectKind::Media(media) => Some(media.description.clone()),
+                        _ => None,
+                    });
+                let Some(described) = described else { return };
+                let new = (!text.is_empty()).then(|| Arc::<str>::from(text));
+                if described != new {
+                    editor.set_object("Description", move |object| {
+                        if let ObjectKind::Media(media) = &mut object.kind {
+                            media.description = new;
+                        }
+                    });
+                }
+            });
+        }
+        {
             let editor = editor.clone();
             let weak = Rc::downgrade(&this);
             this.poster.connect_value_notify(move |row| {
@@ -194,6 +277,25 @@ impl MediaGroup {
                     }),
                     None => this.reduce.set_subtitle(&tr("This file cannot be reduced")),
                 }
+            });
+        }
+        {
+            let editor = editor.clone();
+            let weak = Rc::downgrade(&this);
+            optimize_button.connect_clicked(move |_| {
+                let (Some(this), Some(editor)) = (weak.upgrade(), editor()) else {
+                    return;
+                };
+                this.optimize.set_sensitive(false);
+                this.optimize.set_subtitle(&tr("Optimizing…"));
+                let weak = Rc::downgrade(&this);
+                editor.optimize_selected_media(move |optimized| {
+                    let Some(this) = weak.upgrade() else { return };
+                    if !optimized {
+                        this.optimize.set_sensitive(true);
+                        this.optimize.set_subtitle(&tr("It cannot be made smaller"));
+                    }
+                });
             });
         }
         play.connect_clicked(move |_| {
@@ -233,12 +335,37 @@ impl MediaGroup {
         self.poster.set_value(seconds(media.poster_time));
         // A sound has no frame to show.
         self.poster.set_visible(!media.is_sound());
+        self.poster_picture.set_paintable(
+            media
+                .poster
+                .as_ref()
+                .and_then(crate::bullet_pictures::texture)
+                .as_ref(),
+        );
+        // The bar needs the length, which the player finds.
+        self.trim.widget().set_visible(media.duration.is_some());
+        if let Some(length) = media.duration {
+            self.trim.show(Times {
+                length,
+                start: media.start,
+                stop: media.end().unwrap_or(length),
+                poster: (!media.is_sound()).then_some(media.poster_time),
+            });
+        }
+        let description = media.description.as_deref().unwrap_or_default();
+        if self.description.text() != description {
+            self.description.set_text(description);
+        }
         let repeat = REPEATS.iter().position(|r| *r == media.repeat).unwrap_or(0);
         self.repeat.set_selected(repeat as u32);
         self.volume.set_value(f64::from(media.volume));
         self.reduce.set_sensitive(media.reducible());
         self.reduce
             .set_subtitle(&tr("Removes the parts outside the start and stop"));
+        self.optimize
+            .set_sensitive(crate::optimize::optimizable(media));
+        self.optimize
+            .set_subtitle(&tr("Makes the file smaller, in a format they play"));
         self.updating.set(false);
     }
 }

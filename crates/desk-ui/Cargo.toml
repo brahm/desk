@@ -19,6 +19,7 @@ desk-render.workspace = true
 desk-text.workspace = true
 unicode-segmentation.workspace = true
 gtk.workspace = true
+gstreamer.workspace = true
 
 [build-dependencies]
 glib-build-tools.workspace = true

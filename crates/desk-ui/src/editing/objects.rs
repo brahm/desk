@@ -1569,7 +1569,7 @@ impl TextEditor {
         self.change_objects(name, &ids, change);
     }
 
-    fn change_objects(
+    pub(super) fn change_objects(
         &self,
         name: &str,
         ids: &[NodeId],

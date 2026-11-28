@@ -28,6 +28,8 @@ const NAMES: &[&str] = &[
     n_("Create Chart Style"),
     n_("Create Table Style"),
     n_("Data Format"),
+    n_("Description"),
+    n_("Optimize Media"),
     n_("Delete"),
     n_("Delete Column"),
     n_("Delete Row"),

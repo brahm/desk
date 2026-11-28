@@ -3314,6 +3314,30 @@ paragraph, and objects on a second page.
   (docs/odf-extensions.md).
 - W117 is done. No task moved to another phase.
 
+### 28 November: Sound and video (step 9 of W4, #272)
+
+- Insert > Record Audio opens a panel that records from the microphone,
+  with the time, how loud it is and Preview; Insert puts the sound on the
+  page as a speaker. The recording goes through GStreamer, which plays
+  media through GTK already, as the plan chose. The owner allowed adding
+  its development files to the build machine and to CI; the Flatpak
+  gains the sound socket, which recording and playing need.
+- The Movie and Sound group of the Format pane has a bar of the length
+  of the movie or sound, with the part that plays between two handles
+  and the poster frame above it, all dragged; the rows of seconds stay
+  under it for the keyboard, and the poster frame row shows the frame
+  taken.
+- The Description says what the movie or sound shows, for those who
+  cannot see or hear it, kept as the `svg:desc` of its frame in ODT,
+  which is ODF of its own and needs no extension.
+- Optimize for Phones and Tablets, and the preference Optimize Movies
+  and Sounds, which works on insert and is off unless turned on, code a
+  movie again into MPEG-4 at most 1280 × 720 with the best encoder the
+  computer has, and a sound of samples into MP3. The file is kept only
+  when it comes out smaller, and the start, the stop, the poster frame
+  and the rest stay; Undo brings the file back.
+- W118 and W119 are done. No task moved to another phase.
+
 ## Decisions, with their reasons and consequences
 
 Ids `D-nnn` and `R-nnn` are those of [decisions.md](decisions.md).
