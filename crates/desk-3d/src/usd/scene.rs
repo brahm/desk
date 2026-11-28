@@ -302,7 +302,19 @@ fn op_numbers(kind: &OpKind, value: &Value) -> Option<Vec<f64>> {
         OpKind::Rotate(_) => 1,
         _ => 3,
     };
-    (numbers.len() >= width).then(|| numbers.into_iter().take(width).collect())
+    // As short values were taken before: one number scales evenly, and
+    // what is missing is 0, or 1 for a scale.
+    let mut numbers = match (kind, numbers.as_slice()) {
+        (_, []) => return None,
+        (OpKind::Scale, [v]) => vec![*v; 3],
+        _ => numbers,
+    };
+    if *kind == OpKind::Transform && numbers.len() < width {
+        return None;
+    }
+    let pad = if *kind == OpKind::Scale { 1.0 } else { 0.0 };
+    numbers.resize(width, pad);
+    Some(numbers)
 }
 
 /// The matrix of one transform op of a prim, by its name in
@@ -666,6 +678,7 @@ impl Builder<'_> {
         path: &str,
         parent: &Matrix,
         parent_joint: usize,
+        moving: bool,
         binding: Option<&'t str>,
     ) -> Result<()> {
         if !prim.active
@@ -686,13 +699,15 @@ impl Builder<'_> {
         let (m, reset) = local(prim);
         let world = if reset { m } else { mul(&m, parent) };
         let binding = bound(prim).or(binding);
-        let rest = match timed_ops(prim, self.clock, &mut self.keys) {
+        let (rest, timed) = match timed_ops(prim, self.clock, &mut self.keys) {
             Some(ops) => {
                 self.moves = true;
-                Local::Ops(ops)
+                (Local::Ops(ops), true)
             }
-            None => Local::Matrix(m),
+            None => (Local::Matrix(m), false),
         };
+        // Whether this prim moves, by itself or with those above it.
+        let moving = timed || (moving && !reset);
         let joint = self.joints.len();
         self.joints.push(Joint {
             parent: Some(if reset { 0 } else { parent_joint }),
@@ -700,13 +715,31 @@ impl Builder<'_> {
         });
         if prim.type_name == "Mesh" {
             let before = self.scene.meshes.len();
-            self.mesh(prim, &world, binding)?;
+            // A prim that moves from where it has no inverse, as from a
+            // scale of 0, keeps the corners in its own space, for its
+            // animation to place.
+            let local = moving && invert(&world).is_none();
+            if local {
+                let z_up = std::mem::replace(&mut self.z_up, false);
+                let made = self.mesh(prim, &IDENTITY, binding);
+                self.z_up = z_up;
+                made?;
+            } else {
+                self.mesh(prim, &world, binding)?;
+            }
             let made = self.scene.meshes.len() - before;
             self.mesh_joints
-                .extend(std::iter::repeat_n(Some((joint, false)), made));
+                .extend(std::iter::repeat_n(Some((joint, local)), made));
         }
         for child in &prim.children {
-            self.walk(child, &join(path, &child.name), &world, joint, binding)?;
+            self.walk(
+                child,
+                &join(path, &child.name),
+                &world,
+                joint,
+                moving,
+                binding,
+            )?;
         }
         Ok(())
     }
@@ -1017,7 +1050,7 @@ pub(crate) fn build(root: &str, files: &mut dyn Files) -> Result<Scene> {
         moves: false,
         keys: 0,
     };
-    builder.walk(&tree, "/", &IDENTITY, 0, None)?;
+    builder.walk(&tree, "/", &IDENTITY, 0, false, None)?;
     let mut scene = builder.scene;
     if builder.moves {
         scene.animation = Animation::new(
@@ -1262,6 +1295,55 @@ def Mesh "Still"
         assert!(close(at(0.5, [1.0, 0.0, 0.0]), [h, 2.0, -h]));
         // What is not under the prim does not move.
         assert!(animation.poses(Some(0.5))[1].is_none());
+    }
+
+    #[test]
+    fn w116_a_prim_that_grows_from_nothing_still_shows() {
+        let scene = br#"#usda 1.0
+(
+    timeCodesPerSecond = 10
+    startTimeCode = 0
+)
+def Xform "Grow"
+{
+    float3 xformOp:scale.timeSamples = { 0: (0, 0, 0), 10: (2, 2, 2) }
+    quatf xformOp:orient = (0, 0, 0, 0)
+    uniform token[] xformOpOrder = ["xformOp:orient", "xformOp:scale"]
+    def Mesh "Tri"
+    {
+        point3f[] points = [(1, 0, 0), (0, 1, 0), (0, 0, 1)]
+        int[] faceVertexCounts = [3]
+        int[] faceVertexIndices = [0, 1, 2]
+    }
+}
+def Xform "Twice"
+{
+    float xformOp:scale = 2
+    uniform token[] xformOpOrder = ["xformOp:scale"]
+    def Mesh "Tri"
+    {
+        point3f[] points = [(1, 0, 0), (0, 1, 0), (0, 0, 1)]
+        int[] faceVertexCounts = [3]
+        int[] faceVertexIndices = [0, 1, 2]
+    }
+}
+"#;
+        let mut files = Memory(vec![("scene.usda", scene.to_vec())]);
+        let scene = build("scene.usda", &mut files).unwrap();
+        let animation = scene.animation.as_ref().unwrap();
+        // The growing triangle keeps its own corners, and its pose grows
+        // it; a quaternion of nothing turns nothing.
+        let grow = &scene.meshes[0];
+        assert!(grow.positions.iter().any(|p| close(*p, [1.0, 0.0, 0.0])));
+        let at = |time: f32, p: [f32; 3]| match animation.poses(Some(time))[0] {
+            Some(m) => crate::matrix::point(&m, p),
+            None => p,
+        };
+        assert!(close(at(1.0, [1.0, 0.0, 0.0]), [2.0, 0.0, 0.0]));
+        assert!(close(at(0.5, [1.0, 0.0, 0.0]), [1.0, 0.0, 0.0]));
+        // One number scales all three axes.
+        let twice = &scene.meshes[1];
+        assert!(twice.positions.iter().any(|p| close(*p, [2.0, 0.0, 0.0])));
     }
 
     fn close(a: [f32; 3], b: [f32; 3]) -> bool {

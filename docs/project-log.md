@@ -3463,6 +3463,9 @@ paragraph, and objects on a second page.
   default. A stage with Z up moves as it is drawn, turned to Y up.
 - The Object tab plays and pauses it as it does the animation of a glTF.
   A prim that resets the transforms of its parents does not move.
+- Only the clock of the root layer counts: a layer brought by a
+  reference or a sublayer with a clock of its own, or an offset in time,
+  plays by that of the root layer.
 - Left in step 11, in W4: FBX, then U3D and PRC (D-033). No task moved
   to another phase.
 

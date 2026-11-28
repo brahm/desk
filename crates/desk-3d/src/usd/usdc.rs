@@ -220,6 +220,9 @@ struct Crate<'a> {
     fields: Vec<(u32, u64)>,
     fieldsets: Vec<u32>,
     paths: Vec<String>,
+    /// The time samples read so far, against
+    /// [`limits::ANIMATION_KEYS`].
+    samples_read: std::cell::Cell<usize>,
 }
 
 /// A value rep: where and how a value is kept.
@@ -609,22 +612,34 @@ impl Crate<'_> {
         } else {
             Vec::new()
         };
-        let take = if all {
-            n.min(times.len()).min(limits::ANIMATION_KEYS)
+        // With no times to go by, the first value alone, at time 0.
+        let take = if all && !times.is_empty() {
+            n.min(times.len())
         } else {
             n.min(1)
         };
-        let mut out = Vec::with_capacity(take);
+        let mut out = Vec::with_capacity(take.min(1024));
         for k in 0..take {
-            let value = Rep(cursor.u64()?);
+            // The samples of a layer in all, against the limit: reps may
+            // be shared, so that a small file names many.
+            let read = self.samples_read.get() + 1;
+            if read > limits::ANIMATION_KEYS {
+                break;
+            }
+            self.samples_read.set(read);
+            // A sample that cannot be read ends the samples, and those
+            // before it are kept.
+            let Ok(value) = cursor.u64().map(Rep) else {
+                break;
+            };
             if value.ty() == kind::TIME_SAMPLES {
                 continue;
             }
             let time = times.get(k).copied().unwrap_or(0.0);
-            if let Some(v) = self.value(value)?
-                && time.is_finite()
-            {
-                out.push((time, v));
+            match self.value(value) {
+                Ok(Some(v)) if time.is_finite() => out.push((time, v)),
+                Ok(_) => {}
+                Err(_) => break,
             }
         }
         out.sort_by(|a, b| a.0.total_cmp(&b.0));
@@ -865,6 +880,7 @@ pub(crate) fn read(bytes: &[u8]) -> Result<Layer> {
         fields,
         fieldsets,
         paths,
+        samples_read: std::cell::Cell::new(0),
     };
 
     let mut c = section(&toc, bytes, "SPECS")?;

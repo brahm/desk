@@ -12,6 +12,8 @@
 //! has no inverse: the corners of its meshes are kept in its own space
 //! instead, and placed where the node is even at rest.
 
+use std::collections::HashMap;
+
 use crate::matrix::{
     IDENTITY, Matrix, invert, mul, orient, point, quaternion, rotate, scale, translate,
 };
@@ -158,13 +160,15 @@ impl Op {
         } else {
             0.0
         };
-        if self.kind == OpKind::Orient
-            && let (Ok(a4), Ok(b4)) = (
-                <[f64; 4]>::try_from(a.as_slice()),
-                <[f64; 4]>::try_from(b.as_slice()),
-            )
-        {
-            return slerp(a4, b4, s).to_vec();
+        if self.kind == OpKind::Orient {
+            // The quaternions of USD have their real part first; slerp
+            // takes it last.
+            let xyzw = |v: &[f64]| {
+                let [w, x, y, z] = <[f64; 4]>::try_from(v).unwrap_or([1.0, 0.0, 0.0, 0.0]);
+                [x, y, z, w]
+            };
+            let [x, y, z, w] = slerp(xyzw(a), xyzw(b), s);
+            return vec![w, x, y, z];
         }
         a.iter().zip(b).map(|(a, b)| a + (b - a) * s).collect()
     }
@@ -368,12 +372,18 @@ impl Animation {
 
     /// Where each node is in the scene at a time, or at rest.
     fn worlds(&self, time: Option<f32>) -> Vec<Matrix> {
-        let mut locals: Vec<Local> = self.joints.iter().map(|j| j.rest.clone()).collect();
+        // Only the places of glTF, which tracks change, are copied: the
+        // ops of USD hold all their samples, and are read where they are.
+        let mut moved: HashMap<usize, Local> = HashMap::new();
         if let Some(time) = time {
             for track in &self.tracks {
-                let (Some(Local::Trs { t, r, s }), Some(v)) =
-                    (locals.get_mut(track.joint), track.at(time))
-                else {
+                let Some(joint) = self.joints.get(track.joint) else {
+                    continue;
+                };
+                let local = moved
+                    .entry(track.joint)
+                    .or_insert_with(|| joint.rest.clone());
+                let (Local::Trs { t, r, s }, Some(v)) = (local, track.at(time)) else {
                     continue;
                 };
                 match track.path {
@@ -383,8 +393,9 @@ impl Animation {
                 }
             }
         }
-        let mut worlds: Vec<Matrix> = Vec::with_capacity(locals.len());
-        for (joint, local) in self.joints.iter().zip(&locals) {
+        let mut worlds: Vec<Matrix> = Vec::with_capacity(self.joints.len());
+        for (i, joint) in self.joints.iter().enumerate() {
+            let local = moved.get(&i).unwrap_or(&joint.rest);
             let parent = joint
                 .parent
                 .and_then(|p| worlds.get(p))

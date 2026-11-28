@@ -527,15 +527,15 @@ impl Parser {
                 Token::Word(w) => w.parse::<f64>().ok().filter(|t| t.is_finite()),
                 _ => None,
             };
+            // When only the first value is wanted, its time does not
+            // matter.
+            let time = if all { time } else { time.or(Some(0.0)) };
             self.expect(b':')?;
             if (taken && !all) || samples.len() >= limits::ANIMATION_KEYS {
                 self.skip_value_or_word()?;
-            } else {
-                let value = self.value(0)?;
+            } else if let (Some(t), Some(v)) = (time, self.value(0)?) {
+                samples.push((t, v));
                 taken = true;
-                if let (Some(t), Some(v)) = (time, value) {
-                    samples.push((t, v));
-                }
             }
             self.eat(b',');
         }
