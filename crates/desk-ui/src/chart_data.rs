@@ -152,13 +152,14 @@ impl Grid {
     }
 }
 
-/// Opens the editor of the data of a chart; `done` gets the data and
-/// whether the rows are the series when it closes with Done.
+/// Opens the editor of the data of a chart; `done` gets the data,
+/// whether the rows are the series and whether the first series holds the
+/// x values of the others (W142) when it closes with Done.
 pub fn open(
     parent: Option<&gtk::Window>,
     chart: &Chart,
     locale: Locale,
-    done: impl Fn(ChartData, bool) + 'static,
+    done: impl Fn(ChartData, bool, bool) + 'static,
 ) {
     let grid = Rc::new(RefCell::new(Grid::new(&chart.data, &locale)));
     let scrolled = gtk::ScrolledWindow::builder()
@@ -209,6 +210,14 @@ pub fn open(
     }
     let spacer = gtk::Box::builder().hexpand(true).build();
     bar.append(&spacer);
+    // Share X Values, as the Data Editor of Pages 15.4 has it for scatter
+    // and bubble charts: the first series is the x of all the others.
+    let share_x = gtk::CheckButton::builder()
+        .label(tr("Share X Values"))
+        .active(chart.share_x)
+        .visible(chart.kind.has_x_values())
+        .build();
+    bar.append(&share_x);
     bar.append(&in_rows);
     {
         let grid = grid.clone();
@@ -255,7 +264,11 @@ pub fn open(
     let closing = dialog.downgrade();
     apply.connect_clicked(move |_| {
         let data = grid.borrow().data(&locale);
-        done(data, in_rows.active_name().as_deref() == Some("rows"));
+        done(
+            data,
+            in_rows.active_name().as_deref() == Some("rows"),
+            share_x.is_active(),
+        );
         if let Some(dialog) = closing.upgrade() {
             dialog.close();
         }

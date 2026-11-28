@@ -8,6 +8,8 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
 
 ## Changes since 0.7.0 (unreleased)
 
+* Added: donut, radar and bubble charts, shared X values, rounded
+  corners of columns and bars, and the bevel of 3D charts (#273).
 * Added: Insert > Record Audio records from the microphone, the Movie and
   Sound group trims with handles and keeps a description, and movies and
   sounds can be optimized, on insert or from the Format pane (#272).

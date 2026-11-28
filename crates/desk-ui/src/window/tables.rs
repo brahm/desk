@@ -56,7 +56,10 @@ pub(crate) fn chart_kind(name: &str) -> (ChartKind, bool) {
         "area" => ChartKind::Area,
         "stacked-area" => ChartKind::StackedArea,
         "pie" => ChartKind::Pie,
+        "donut" => ChartKind::Donut,
         "scatter" => ChartKind::Scatter,
+        "bubble" => ChartKind::Bubble,
+        "radar" => ChartKind::Radar,
         "mixed" => ChartKind::Mixed,
         "two-axis" => ChartKind::TwoAxis,
         _ => ChartKind::Column,
@@ -151,7 +154,10 @@ pub(crate) fn chart_menu() -> gio::Menu {
         ("area", tr("Area")),
         ("stacked-area", tr("Stacked Area")),
         ("pie", tr("Pie")),
+        ("donut", tr("Donut")),
         ("scatter", tr("Scatter")),
+        ("bubble", tr("Bubble")),
+        ("radar", tr("Radar")),
         ("mixed", tr("Mixed")),
         ("two-axis", tr("2-Axis")),
     ] {
@@ -187,7 +193,10 @@ mod tests {
                 "area",
                 "stacked-area",
                 "pie",
+                "donut",
                 "scatter",
+                "bubble",
+                "radar",
                 "mixed",
                 "two-axis",
             ];
@@ -195,5 +204,6 @@ mod tests {
         }
         assert_eq!(chart_kind("pie-3d"), (ChartKind::Pie, true));
         assert_eq!(chart_kind("scatter-3d"), (ChartKind::Scatter, false));
+        assert_eq!(chart_kind("donut-3d"), (ChartKind::Donut, false));
     }
 }

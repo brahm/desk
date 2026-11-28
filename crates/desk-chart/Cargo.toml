@@ -12,5 +12,8 @@ publish.workspace = true
 serde = { workspace = true, features = ["rc"] }
 desk-table.workspace = true
 
+[dev-dependencies]
+serde_json.workspace = true
+
 [lints]
 workspace = true
