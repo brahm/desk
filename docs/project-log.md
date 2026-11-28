@@ -3428,6 +3428,28 @@ paragraph, and objects on a second page.
   the first of its time samples), which comes with OBJ and FBX, then U3D
   and PRC (D-033). No task moved to another phase.
 
+### 28 November: 3D objects from OBJ (step 11 of W4, #276)
+
+- `desk-3d` reads Wavefront OBJ: its faces as fans of triangles, with
+  the normals, texture coordinates and colors of their corners, and a
+  mesh for each material that faces use. From the MTL libraries it names
+  it takes the diffuse color, how opaque it is and its picture. The
+  alpha of the picture cuts the mesh out only when the material also has
+  a map of alpha. Lines, points, curves and surfaces are left out. The
+  test files are written by the specification with Python alone
+  (`crates/desk-3d/tests/data/make_obj.py`).
+- A document keeps no OBJ. When it is inserted, the model is written as
+  a GLB, its pictures kept as they were. `desk-3d` gains `import`, which
+  gives the bytes a document keeps of any model it reads.
+- The libraries and pictures are read only from the folder of the OBJ,
+  or under it, by the same rule as for glTF. A whole path that an
+  exporter wrote is looked for by its name in that folder. A missing
+  library or picture leaves the default material, or the color alone,
+  as an OBJ is often found without them.
+- Left in step 11, in W4: the animation of USDZ and FBX, each in its own
+  pull request, then U3D and PRC (D-033). No task moved to another
+  phase.
+
 ## Decisions, with their reasons and consequences
 
 Ids `D-nnn` and `R-nnn` are those of [decisions.md](decisions.md).
