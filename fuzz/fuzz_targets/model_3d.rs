@@ -5,9 +5,9 @@
 //! USDZ package, a glTF or a GLB, or as one layer of USD, binary or text,
 //! must read as a scene or as an error, without a panic, within the
 //! limits, and a scene must draw, at rest and as it moves. A glTF packs
-//! into a GLB that reads as it does. An OBJ or an FBX, with the library and the
-//! picture of the tests for any file it names, imports as a GLB that
-//! reads.
+//! into a GLB that reads as it does. An OBJ, an FBX or a PRC, with the
+//! library and the picture of the tests for any file it names, imports
+//! as a GLB that reads.
 
 #![no_main]
 

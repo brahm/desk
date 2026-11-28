@@ -3495,6 +3495,33 @@ paragraph, and objects on a second page.
   desk-3d does not do for glTF either.
 - Left in step 11, in W4: U3D and PRC (D-033).
 
+### 28 November: 3D objects from PRC (step 11 of W4, #PRNUM)
+
+- A reader of PRC (ISO 14739-1), the 3D that CAD programs put in PDF
+  documents, unpacks the sections of each file structure and reads
+  their bits: the globals for the colors, materials and styles, the
+  tree for the parts and the product occurrences that place them, and
+  the tessellations for the triangles, fans and strips of their faces,
+  with their normals and the colors of their corners. Its doubles are
+  read by the table of codes of the format.
+- The product occurrences at the root are those no other one holds or
+  takes as its prototype, so the model file is not read. A tree that
+  holds what the reader does not know (markups, views, filters, data in
+  another file structure) is left out, and then each tessellation is
+  drawn where it is. The file is Z up, as the 3D of PDF is, and turned
+  to Y up; the model is turned into a GLB when it is inserted, as OBJ
+  and FBX are.
+- The test files are written by Asymptote, which makes PRC for PDF, from
+  the scripts beside them (`tests/data/prc/*.asy`). The table of the
+  codes of the doubles, which the standard fixes, was taken as data
+  from the sources of Asymptote (LGPL), as the standard itself is not
+  at hand; the rest of its writer and reader was only read, not copied.
+- Moved to W5 (B-083): the exact geometry of PRC (a model of B-rep
+  surfaces with no tessellation shows nothing, and says so), the
+  textures of its materials, and its markups and views.
+- Left in step 11, in W4: U3D (D-033), whose specification (ECMA-363)
+  and sample files this container cannot reach.
+
 ## Decisions, with their reasons and consequences
 
 Ids `D-nnn` and `R-nnn` are those of [decisions.md](decisions.md).
