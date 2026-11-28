@@ -194,6 +194,7 @@ pub(super) fn mark(page: usize, placed: &PlacedObject) -> ObjectMark {
         locked: placed.object.locked,
         master: placed.object.anchor.is_master(),
         arrows: Vec::new(),
+        turn: None,
     }
 }
 
@@ -789,6 +790,7 @@ fn connection_marks(
                 locked: false,
                 master: false,
                 arrows: Vec::new(),
+                turn: None,
             });
         }
     }
@@ -918,6 +920,9 @@ impl TextEditor {
                                     .into_iter()
                                     .map(|(x, y)| (f64::from(x), f64::from(y)))
                                     .collect();
+                                // The handle that turns a 3D object (W116).
+                                marked.turn = super::model3d::model_handle(placed)
+                                    .map(|(x, y)| (f64::from(x), f64::from(y)));
                             }
                             marks.push(marked);
                         }
@@ -2133,8 +2138,12 @@ impl TextEditor {
         let reach = (REACH / scale) as f32;
         let shift = modifiers.contains(gdk::ModifierType::SHIFT_MASK);
         let control = modifiers.contains(gdk::ModifierType::CONTROL_MASK);
-        // The arrows of a selected gallery come before its handles (W111).
+        // The arrows of a selected gallery come before its handles (W111),
+        // and so does the handle that turns a 3D object (W116).
         if presses >= 1 && !shift && !control && self.press_gallery_arrow(page, px, py) {
+            return true;
+        }
+        if presses == 1 && !shift && !control && self.press_model_handle(page, px, py) {
             return true;
         }
         let (mut grabbed, hit_id) = {

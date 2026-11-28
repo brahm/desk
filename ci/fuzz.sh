@@ -39,6 +39,7 @@ dict_of() {
         picture) echo picture.dict ;;
         equation) echo equation.dict ;;
         merge_source) echo merge.dict ;;
+        model_3d) echo model.dict ;;
         *) echo odf.dict ;;
     esac
 }

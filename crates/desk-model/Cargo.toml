@@ -9,6 +9,7 @@ repository.workspace = true
 publish.workspace = true
 
 [dependencies]
+desk-3d.workspace = true
 desk-chart.workspace = true
 desk-table.workspace = true
 i_overlay.workspace = true

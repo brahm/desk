@@ -15,9 +15,9 @@ use std::sync::Arc;
 
 use desk_model::{
     Anchor, Document, FIELD_CHARACTER, Field, Fill, Frame, ImageFill, Length, MAX_TEXT_BOX_COLUMNS,
-    Media, NodeId, Object, ObjectKind, Op, POLYGON_SCALE, PageSetup, PageTemplate, PageTemplates,
-    ParaAttrs, Paragraph, Placeholder, PlaceholderKind, Repeat, Shape, Stroke, TextBox,
-    VerticalAlignment, Wrap,
+    Media, Model3d, NodeId, Object, ObjectKind, Op, POLYGON_SCALE, PageSetup, PageTemplate,
+    PageTemplates, ParaAttrs, Paragraph, Placeholder, PlaceholderKind, Repeat, Shape, Stroke,
+    TextBox, VerticalAlignment, Wrap,
 };
 use desk_odf as odf;
 
@@ -985,6 +985,22 @@ fn kind(
                     .find(move |(p, _)| p.strip_prefix("./").unwrap_or(p) == path)
                     .map(|(_, bytes)| bytes)
             };
+            // A 3D model is kept as a movie is, of its own media type
+            // (W116).
+            if let Some(mut model) = file(href).and_then(|bytes| Model3d::from_bytes(bytes.clone()))
+            {
+                let param = |name: &str| {
+                    params
+                        .iter()
+                        .find(|(n, _)| n.eq_ignore_ascii_case(name))
+                        .and_then(|(_, v)| v.trim().parse::<f64>().ok())
+                        .filter(|v| v.is_finite())
+                        .map_or(0, |v| (v * 100.0).round().clamp(-1e6, 1e6) as i32)
+                };
+                model = model.turned(param("Yaw"), param("Pitch"));
+                model.description = description.as_deref().map(Arc::from);
+                return Ok(Some(ObjectKind::Model(model)));
+            }
             let Some(mut media) = file(href).and_then(|bytes| Media::from_bytes(bytes.clone()))
             else {
                 return Ok(None);
@@ -2453,6 +2469,20 @@ impl Exporter<'_> {
         href
     }
 
+    /// The path of a 3D model in the package, added when it is not there.
+    fn model(&mut self, model: &Model3d) -> String {
+        if let Some((href, _)) = self.pictures.iter().find(|(_, b)| b == model.data()) {
+            return href.clone();
+        }
+        let href = format!(
+            "Models/object{}.{}",
+            self.pictures.len() + 1,
+            model.format().extension()
+        );
+        self.pictures.push((href.clone(), model.data().to_vec()));
+        href
+    }
+
     /// The path of a picture in the package, added when it is not there.
     fn picture(&mut self, picture: &desk_model::Picture) -> String {
         if let Some((href, _)) = self.pictures.iter().find(|(_, b)| b == picture.data()) {
@@ -2768,6 +2798,26 @@ impl Exporter<'_> {
                     shown,
                     each_caption: gallery.each_caption,
                     images,
+                }
+            }
+            ObjectKind::Model(model) => {
+                let degrees = |v: i32| format!("{}", f64::from(v) / 100.0);
+                odf::DrawKind::Media {
+                    href: self.model(model),
+                    mime_type: Some(model.format().media_type().into()),
+                    params: vec![
+                        ("Yaw".to_owned(), degrees(model.yaw)),
+                        ("Pitch".to_owned(), degrees(model.pitch)),
+                    ],
+                    // A picture of it as it is turned, for other programs.
+                    poster: crate::picture::model_poster(model, w as f32, h as f32)
+                        .map(|p| self.picture(&p)),
+                    start: None,
+                    stop: None,
+                    poster_time: None,
+                    repeat: None,
+                    duration: None,
+                    description: model.description.as_deref().map(str::to_owned),
                 }
             }
             ObjectKind::Media(media) => {

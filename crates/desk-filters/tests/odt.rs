@@ -2891,6 +2891,63 @@ fn obj_18_obj_19_movies_and_sounds_are_kept_in_odt_with_how_they_play() {
 }
 
 #[test]
+fn w116_3d_objects_keep_their_file_turn_and_description_with_a_picture_for_others() {
+    use desk_model::{Anchor, Frame, Object, ObjectKind};
+    use std::io::Read;
+    let path = format!(
+        "{}/../desk-3d/tests/data/cube-usdc.usdz",
+        env!("CARGO_MANIFEST_DIR")
+    );
+    let mut model = desk_model::Model3d::from_bytes(std::fs::read(path).unwrap())
+        .unwrap()
+        .turned(3050, -1225);
+    model.description = Some("A red cube".into());
+    let mut editor = desk_model::Editor::new(Document::new_word_processing());
+    editor
+        .edit("3D Object", |edit| {
+            let mut object = Object::new(
+                edit.new_id(),
+                ObjectKind::Model(model.clone()),
+                Frame::from_pt(72.0, 72.0, 200.0, 150.0),
+            );
+            object.anchor = Anchor::Page(0);
+            edit.add_object(object)
+        })
+        .unwrap();
+    let bytes = write_odt(editor.document()).unwrap();
+    keep("obj-model.odt", &bytes);
+    let read = read_odt(&bytes).unwrap();
+    let kinds: Vec<ObjectKind> = read.objects().iter().map(|o| o.kind.clone()).collect();
+    assert_eq!(kinds, [ObjectKind::Model(model)]);
+    // Kept as a plugin of its media type, with a picture of it turned
+    // after it, which other programs show.
+    let mut archive = zip::ZipArchive::new(std::io::Cursor::new(&bytes)).unwrap();
+    let mut content = String::new();
+    archive
+        .by_name("content.xml")
+        .unwrap()
+        .read_to_string(&mut content)
+        .unwrap();
+    assert!(
+        content.contains(r#"draw:mime-type="model/vnd.usdz+zip""#),
+        "{content}"
+    );
+    assert!(content.contains(r#"draw:name="Yaw" draw:value="30.5""#));
+    assert!(content.contains(r#"draw:name="Pitch" draw:value="-12.25""#));
+    let poster = content.split("<draw:image xlink:href=\"").nth(1).unwrap();
+    let poster = &poster[..poster.find('"').unwrap()];
+    let mut png = Vec::new();
+    archive
+        .by_name(poster)
+        .unwrap()
+        .read_to_end(&mut png)
+        .unwrap();
+    let picture = desk_model::Picture::from_png(png).unwrap();
+    assert_eq!((picture.width(), picture.height()), (400, 300));
+    assert!(archive.by_name("Models/object1.usdz").is_ok());
+}
+
+#[test]
 fn obj_18_movies_of_other_programs_are_read() {
     let content = r##"<?xml version="1.0" encoding="UTF-8"?>
 <office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"

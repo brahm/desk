@@ -310,6 +310,7 @@ impl Inspector {
             media,
             gallery,
             drawing,
+            model,
             graphic,
             wrap,
             text_box,
@@ -406,6 +407,16 @@ impl Inspector {
             vec![
                 Tab::new("style", n_("Style"), &[styles, graphic]),
                 Tab::new("drawing", n_("Drawing"), &[drawing]),
+                arrange(),
+            ],
+        );
+        // The Object tab of Pages 15.4 for a 3D object: its turn and its
+        // description (W116).
+        contexts.insert(
+            Context::Model,
+            vec![
+                Tab::new("style", n_("Style"), &[graphic]),
+                Tab::new("object", n_("Object"), &[model]),
                 arrange(),
             ],
         );

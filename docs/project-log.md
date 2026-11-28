@@ -3365,6 +3365,35 @@ paragraph, and objects on a second page.
   for a look at the rest of the Data Editor of 15.4 in the validation on
   the Mac (step 13); both stay in W4. No task moved to another phase.
 
+### 28 November: 3D objects from USDZ (step 11 of W4, #274)
+
+- A new crate, `desk-3d`, under the MPL-2.0 like the other format
+  libraries, reads USDZ, the 3D of Pages 15.4: the package, its text
+  layers (`usda`) and its binary ones (`usdc`, with their LZ4 and their
+  compressed arrays), the references and payloads between the layers of
+  the package, the transforms, the meshes with their normals, texture
+  coordinates and display colors, the subsets of faces, and the
+  `UsdPreviewSurface` materials with their colors, opacity and textures
+  (PNG and JPEG). No Rust crate read USDZ, so the reader is Desk's own;
+  it is checked against files that OpenUSD itself wrote
+  (`crates/desk-3d/tests/data/make.py`, with usd-core, installed with
+  the owner's approval), and it has a fuzz target, as D-033 asks.
+- The crate also draws a scene on the CPU, with a depth buffer, light
+  from the upper left and smoothed edges, so that a page shows, prints
+  and exports the model alike without a GPU. The page draws the model at
+  the pixels of the screen, or at 300 dots an inch in a PDF.
+- Insert > 3D Object and Insert > Choose put a model on the page. A
+  selected one shows a handle in its middle that turns it as it is
+  dragged, as in Pages 15.4, in one step of Undo; the Object tab sets the
+  turn and the tip in degrees, resets them and holds the Description.
+- ODT keeps the model as a movie is kept, in a `draw:plugin` of its media
+  type with the turn in `draw:param`s and a PNG of the model as turned
+  for other programs: no extension was needed.
+- Left in step 11, in W4: the animation of models, with glTF and GLB,
+  then OBJ and FBX, then U3D and PRC (D-033). The 3D objects of `.pages`
+  files wait for a file of Pages 15.4 that holds one, in the session on
+  the Mac of step 13. No task moved to another phase.
+
 ## Decisions, with their reasons and consequences
 
 Ids `D-nnn` and `R-nnn` are those of [decisions.md](decisions.md).

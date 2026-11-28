@@ -511,6 +511,14 @@ These sit on the `style:graphic-properties` of the graphic style of a
 - **Value:** a boolean: whether the animation starts again when it ends
   (Loop). Absent is `false`.
 
+3D objects (W116, PXV-25) need no extension. Desk keeps one as a movie
+is kept: a `draw:frame` with a `draw:plugin` whose `xlink:href` is the
+file in the package (`Models/`) and whose `draw:mime-type` is that of
+the format, `model/vnd.usdz+zip` for USDZ; the `draw:param`s `Yaw` and
+`Pitch` say how far it is turned, in degrees, and the `svg:desc` of the
+frame is its description. A `draw:image` after the plugin is a PNG of
+the model as it is turned, which other programs show and print.
+
 ### Tables (`table:table`)
 
 #### `desk:table`

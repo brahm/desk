@@ -1,0 +1,73 @@
+#usda 1.0
+(
+    defaultPrim = "Root"
+)
+
+def Xform "Root"
+{
+    def Mesh "Cube" (
+        prepend apiSchemas = ["MaterialBindingAPI"]
+    )
+    {
+        int[] faceVertexCounts = [4, 4, 4, 4, 4, 4]
+        int[] faceVertexIndices = [0, 3, 2, 1, 4, 5, 6, 7, 0, 1, 5, 4, 2, 3, 7, 6, 1, 2, 6, 5, 0, 4, 7, 3]
+        point3f[] points = [(-1, -1, -1), (1, -1, -1), (1, 1, -1), (-1, 1, -1), (-1, -1, 1), (1, -1, 1), (1, 1, 1), (-1, 1, 1)]
+        uniform token subsetFamily:materialBind:familyType = "nonOverlapping"
+
+        def GeomSubset "Top" (
+            prepend apiSchemas = ["MaterialBindingAPI"]
+        )
+        {
+            uniform token elementType = "face"
+            uniform token familyName = "materialBind"
+            int[] indices = [3]
+            rel material:binding = </Root/Looks/Blue>
+        }
+
+        def GeomSubset "Rest" (
+            prepend apiSchemas = ["MaterialBindingAPI"]
+        )
+        {
+            uniform token elementType = "face"
+            uniform token familyName = "materialBind"
+            int[] indices = [0, 1, 2, 4, 5]
+            rel material:binding = </Root/Looks/Yellow>
+        }
+    }
+
+    def "Looks"
+    {
+        def Material "Blue"
+        {
+            token outputs:surface.connect = </Root/Looks/Blue/Surface.outputs:surface>
+
+            def Shader "Surface"
+            {
+                uniform token info:id = "UsdPreviewSurface"
+                color3f inputs:diffuseColor = (0, 0, 1)
+                token outputs:surface
+            }
+        }
+
+        def Material "Yellow"
+        {
+            token outputs:surface.connect = </Root/Looks/Yellow/Surface.outputs:surface>
+
+            def Shader "Surface"
+            {
+                uniform token info:id = "UsdPreviewSurface"
+                color3f inputs:diffuseColor = (1, 1, 0)
+                token outputs:surface
+            }
+        }
+    }
+
+    def Xform "Placed" (
+        prepend references = @./part.usdc@
+    )
+    {
+        double3 xformOp:translate = (0, 5, 0)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+    }
+}
+

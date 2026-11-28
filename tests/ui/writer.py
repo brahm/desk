@@ -1333,7 +1333,7 @@ def instant_alpha_of_a_picture(work):
         writer.wait(timeout=10)
 
 
-CHOOSE = "Choose an Image, Movie or Sound"
+CHOOSE = "Choose an Image, Movie, Sound or 3D Object"
 
 
 def choose_file(app, path):

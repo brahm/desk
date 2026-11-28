@@ -87,6 +87,9 @@ const NAMES: &[&str] = &[
     n_("Animate Drawing"),
     // The image gallery of Pages 15.4 (W111).
     n_("Insert Image Gallery"),
+    n_("Insert 3D Object"),
+    n_("Rotate 3D Object"),
+    n_("Reset Rotation"),
     n_("Add Images"),
     n_("Show Image"),
     n_("Move Image"),

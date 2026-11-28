@@ -118,6 +118,14 @@ pub enum Item {
         /// The height.
         height: f32,
     },
+    /// A 3D model, drawn turned as it says, scaled into a rectangle
+    /// (W116).
+    Model {
+        /// The model.
+        model: desk_model::Model3d,
+        /// The left edge, top edge, width and height.
+        rect: (f32, f32, f32, f32),
+    },
     /// A path, filled, outlined or both, as for shapes (OBJ-08).
     Path {
         /// The path.
@@ -1037,6 +1045,26 @@ fn object_body_item(placed: &PlacedObject) -> Item {
                 }),
                 _ => list.items.extend(media_icon(media.is_sound(), x, y, w, h)),
             }
+            if stroke.is_some() {
+                list.items.push(Item::Path {
+                    path: shape_path(&Shape::Rectangle, x, y, w, h),
+                    fill: None,
+                    stroke,
+                });
+            }
+        }
+        ObjectKind::Model(model) => {
+            if fill.is_some() {
+                list.items.push(Item::Path {
+                    path: shape_path(&Shape::Rectangle, x, y, w, h),
+                    fill,
+                    stroke: None,
+                });
+            }
+            list.items.push(Item::Model {
+                model: model.clone(),
+                rect: (x, y, w, h),
+            });
             if stroke.is_some() {
                 list.items.push(Item::Path {
                     path: shape_path(&Shape::Rectangle, x, y, w, h),

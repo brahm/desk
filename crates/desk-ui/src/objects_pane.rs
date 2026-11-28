@@ -76,6 +76,8 @@ pub struct ObjectGroups {
     media: Rc<crate::media_pane::MediaGroup>,
     gallery: Rc<crate::gallery_pane::GalleryGroup>,
     drawing: Rc<crate::drawing_pane::DrawingGroup>,
+    /// The turn and description of a 3D object (W116).
+    model: Rc<crate::model_pane::ModelGroup>,
     units: Cell<Units>,
     updating: Cell<bool>,
 }
@@ -332,6 +334,7 @@ impl ObjectGroups {
             media: crate::media_pane::MediaGroup::new(editor.clone()),
             gallery: crate::gallery_pane::GalleryGroup::new(editor.clone()),
             drawing: crate::drawing_pane::DrawingGroup::new(editor.clone()),
+            model: crate::model_pane::ModelGroup::new(editor.clone()),
             units: Cell::new(units),
             updating: Cell::new(false),
         });
@@ -539,7 +542,7 @@ impl ObjectGroups {
     }
 
     /// The groups, to put at the top of the Inspector.
-    pub fn groups(&self) -> [&compact::Group; 9] {
+    pub fn groups(&self) -> [&compact::Group; 10] {
         [
             &self.metrics,
             self.shape.group(),
@@ -547,6 +550,7 @@ impl ObjectGroups {
             self.media.group(),
             self.gallery.group(),
             self.drawing.group(),
+            self.model.group(),
             self.graphic.group(),
             &self.wrap_group,
             &self.text_group,
@@ -579,6 +583,7 @@ impl ObjectGroups {
         self.media.show(info);
         self.gallery.show(info);
         self.drawing.show(info);
+        self.model.show(info);
         let Some(info) = info else {
             return;
         };

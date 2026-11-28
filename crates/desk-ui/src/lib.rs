@@ -62,6 +62,7 @@ mod mail_merge;
 mod media;
 mod media_browser;
 mod media_pane;
+mod model_pane;
 mod nav_sidebar;
 mod notes_pane;
 mod object_styles_pane;

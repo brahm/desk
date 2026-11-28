@@ -176,6 +176,8 @@ pub struct ObjectMark {
     /// Where the arrows of a selected image gallery are, back then
     /// forward (W111).
     pub arrows: Vec<(f64, f64)>,
+    /// Where the handle that turns a selected 3D object is (W116).
+    pub turn: Option<(f64, f64)>,
 }
 
 /// A shape being drawn with the pen or having its points edited: its
@@ -1425,6 +1427,35 @@ fn draw_objects(cr: &gtk::cairo::Context, state: &State, page: usize, rect: &Pag
             cr.stroke().ok();
             cr.set_line_width(1.0);
         }
+    }
+    // The handle of a selected 3D object: a white disc with an orbit
+    // around a dot, which turns the model as it is dragged (W116).
+    for mark in state.objects.iter().filter(|m| m.page == page) {
+        let Some(point) = mark.turn else { continue };
+        let (x, y) = at(point);
+        let r = crate::editing::MODEL_HANDLE_RADIUS;
+        cr.new_sub_path();
+        cr.arc(x, y, r, 0.0, std::f64::consts::TAU);
+        cr.set_source_rgba(1.0, 1.0, 1.0, 0.9);
+        cr.fill_preserve().ok();
+        cr.set_source_rgba(0.0, 0.0, 0.0, 0.25);
+        cr.set_line_width(1.0);
+        cr.stroke().ok();
+        cr.set_source_rgb(0.21, 0.52, 0.89);
+        cr.set_line_width(1.5);
+        for (sx, sy) in [(0.62, 0.28), (0.28, 0.62)] {
+            cr.save().ok();
+            cr.translate(x, y);
+            cr.scale(r * sx, r * sy);
+            cr.new_sub_path();
+            cr.arc(0.0, 0.0, 1.0, 0.0, std::f64::consts::TAU);
+            cr.restore().ok();
+            cr.stroke().ok();
+        }
+        cr.new_sub_path();
+        cr.arc(x, y, 1.8, 0.0, std::f64::consts::TAU);
+        cr.fill().ok();
+        cr.set_line_width(1.0);
     }
     if let Some(mark) = state.path.as_ref().filter(|m| m.page == page) {
         use desk_model::PathSegment;

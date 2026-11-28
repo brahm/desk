@@ -223,8 +223,25 @@ pub fn media_from_file(file: &gtk::gio::File) -> Option<desk_model::Media> {
     desk_model::Media::from_bytes(bytes)
 }
 
+/// The 3D model of a file, if it is one that Desk reads (W116), as
+/// large as a movie may be.
+pub fn model_from_file(file: &gtk::gio::File) -> Option<desk_model::Model3d> {
+    let bytes = load_bounded(file, MAX_MEDIA)?;
+    desk_model::Model3d::from_bytes(bytes).filter(|m| m.scene().is_ok())
+}
+
+/// The filter of the 3D models that Desk reads (W116).
+pub fn model_filter() -> gtk::FileFilter {
+    let models = gtk::FileFilter::new();
+    models.set_name(Some(&crate::i18n::tr("3D Objects")));
+    let format = desk_model::ModelFormat::Usdz;
+    models.add_mime_type(format.media_type());
+    models.add_suffix(format.extension());
+    models
+}
+
 /// The filters of the dialogs that choose a picture for a document: the
-/// images and PDF, with movies and sounds when `media`.
+/// images and PDF, with movies, sounds and 3D objects when `media`.
 pub fn document_picture_filters(with_media: bool) -> gtk::gio::ListStore {
     let images = gtk::FileFilter::new();
     images.set_name(Some(&crate::i18n::tr("Images")));
@@ -237,11 +254,16 @@ pub fn document_picture_filters(with_media: bool) -> gtk::gio::ListStore {
         media.add_mime_type(kind);
     }
     let all = gtk::FileFilter::new();
-    all.set_name(Some(&crate::i18n::tr("Images, Movies and Sounds")));
+    all.set_name(Some(&crate::i18n::tr(
+        "Images, Movies, Sounds and 3D Objects",
+    )));
     all.add_mime_type("image/*");
     for kind in ["application/pdf", "video/*", "audio/*"] {
         all.add_mime_type(kind);
     }
+    let format = desk_model::ModelFormat::Usdz;
+    all.add_mime_type(format.media_type());
+    all.add_suffix(format.extension());
     let filters = gtk::gio::ListStore::new::<gtk::FileFilter>();
     if with_media {
         filters.append(&all);
@@ -249,6 +271,7 @@ pub fn document_picture_filters(with_media: bool) -> gtk::gio::ListStore {
     filters.append(&images);
     if with_media {
         filters.append(&media);
+        filters.append(&model_filter());
     }
     filters
 }
