@@ -8,6 +8,9 @@ is on the [progress dashboard](https://brahm.github.io/desk/painel/).
 
 ## Changes since 0.7.0 (unreleased)
 
+* Added: Insert > Record Audio records from the microphone, the Movie and
+  Sound group trims with handles and keeps a description, and movies and
+  sounds can be optimized, on insert or from the Format pane (#272).
 * Added: Insert > Drawing draws freehand with a pen, a pencil, a crayon
   and a fill, and the Drawing tab animates the drawing (#271).
 * Added: Reverse Colors turns a gradient fill around, and Saved Fills

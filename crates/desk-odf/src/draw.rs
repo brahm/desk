@@ -669,6 +669,9 @@ pub enum DrawKind {
         repeat: Option<String>,
         /// `desk:duration`: how long it lasts, in seconds, as Desk found.
         duration: Option<String>,
+        /// The `svg:desc` of the frame: what it shows or says, for those
+        /// who cannot see or hear it (W118).
+        description: Option<String>,
     },
     /// `draw:frame` with a `draw:text-box`.
     TextBox {
@@ -1093,6 +1096,10 @@ fn draw_object_at(
                     poster_time: text(DESK, "poster-time"),
                     repeat: text(DESK, "repeat"),
                     duration: text(DESK, "duration"),
+                    description: e
+                        .child(SVG, "desc")
+                        .map(|d| d.text())
+                        .filter(|d| !d.trim().is_empty()),
                 }
             } else if let Some(image) = e.child(DRAW, "image") {
                 DrawKind::Image {
@@ -1520,6 +1527,7 @@ fn write_shape(w: &mut Writer, object: &DrawObject, paragraph: &dyn Fn(&mut Writ
             poster_time,
             repeat,
             duration,
+            description,
         } => {
             w.start("draw:plugin")
                 .attr("xlink:href", href)
@@ -1551,6 +1559,10 @@ fn write_shape(w: &mut Writer, object: &DrawObject, paragraph: &dyn Fn(&mut Writ
                     .attr("xlink:show", "embed")
                     .attr("xlink:actuate", "onLoad")
                     .end();
+            }
+            // After the content of the frame, before its contour.
+            if let Some(description) = description {
+                w.text_element("svg:desc", description);
             }
         }
         DrawKind::Table(table) => {

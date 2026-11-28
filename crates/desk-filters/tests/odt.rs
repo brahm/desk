@@ -2863,6 +2863,8 @@ fn obj_18_obj_19_movies_and_sounds_are_kept_in_odt_with_how_they_play() {
     movie.poster_time = 2_000;
     movie.repeat = Repeat::BackAndForth;
     movie.volume = 50;
+    // Kept as the svg:desc of the frame (W118).
+    movie.description = Some("A dog runs on the beach & barks".into());
     let mut sound = Media::from_bytes(b"ID3\x04\0\0\0\0\0\0sound".to_vec()).unwrap();
     sound.repeat = Repeat::Loop;
     sound.volume = 0;
@@ -2897,7 +2899,7 @@ fn obj_18_movies_of_other_programs_are_read() {
   xmlns:xlink="http://www.w3.org/1999/xlink"
   xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0" office:version="1.3">
 <office:body><office:text>
-<draw:frame text:anchor-type="page" text:anchor-page-number="1" svg:x="1in" svg:y="1in" svg:width="2in" svg:height="1in"><draw:plugin xlink:href="Media/song.mp3" draw:mime-type="application/vnd.sun.star.media"><draw:param draw:name="Loop" draw:value="true"/><draw:param draw:name="VolumeDB" draw:value="-6"/></draw:plugin></draw:frame>
+<draw:frame text:anchor-type="page" text:anchor-page-number="1" svg:x="1in" svg:y="1in" svg:width="2in" svg:height="1in"><draw:plugin xlink:href="Media/song.mp3" draw:mime-type="application/vnd.sun.star.media"><draw:param draw:name="Loop" draw:value="true"/><draw:param draw:name="VolumeDB" draw:value="-6"/></draw:plugin><svg:desc>A song</svg:desc></draw:frame>
 <text:p/>
 </office:text></office:body></office:document-content>"##;
     let mut source = desk_odf::read_streams(content, None, None).unwrap();
@@ -2913,6 +2915,8 @@ fn obj_18_movies_of_other_programs_are_read() {
         (media.repeat, media.volume, media.is_sound()),
         (desk_model::Repeat::Loop, 50, true)
     );
+    // The description of the frame (W118).
+    assert_eq!(media.description.as_deref(), Some("A song"));
 }
 
 #[test]

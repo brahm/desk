@@ -118,8 +118,8 @@ W114	3.8 Objects: images, shapes, media	Edit points and curves	Equal	Equal in bo
 W115	3.8 Objects: images, shapes, media	Lines and connections	Equal	Equal in both	-	In	Done	-	done	Connection line (OBJ-31)
 W116	3.8 Objects: images, shapes, media	3D objects (USDZ)	Only 15	15.4	D-001	In	Missing	-	W4	3D objects (USDZ)
 W117	3.8 Objects: images, shapes, media	Drawings (Apple Pencil)	Only 15	15.4	D-001	In	Done	-	W4	Freehand drawing with the pointer or a stylus, with pen, pencil, crayon, fill and eraser, drawn on again and animated (W4 step 8)
-W118	3.8 Objects: images, shapes, media	Sound and video 🌐 (in 15)	Different	15.4	D-001	In	Partial	-	W4	Audio and video (OBJ-18, OBJ-19); recording audio, trimming, poster frame and description are missing; web video stays out
-W119	3.8 Objects: images, shapes, media	Media formats	Different	15.4	D-001	In	Partial	-	W4	Reduces media (OBJ-20); optimizing on insert is missing
+W118	3.8 Objects: images, shapes, media	Sound and video 🌐 (in 15)	Different	15.4	D-001	In	Done	-	W4	Audio and video (OBJ-18, OBJ-19); recording audio, trimming with handles, the poster frame and the description (W4 step 9); web video stays out
+W119	3.8 Objects: images, shapes, media	Media formats	Different	15.4	D-001	In	Done	-	W4	Reduces media (OBJ-20), and optimizes it on insert or from the Movie tab (W4 step 9)
 W120	3.8 Objects: images, shapes, media	Borders, picture frames, shadow, reflection, opacity	Equal	Equal in both	-	In	Done	-	done	Borders, picture frames, shadow, reflection and opacity (OBJ-35 to OBJ-39); the five artistic lines of Pages 15.4, chalk, thick brush, chisel pen, dry brush and uneven ink, drawn in Desk's own way (B-044)
 W121	3.8 Objects: images, shapes, media	Fill	Different	15.4	D-001	In	Done	-	W4	Color, gradient and image (OBJ-40 to OBJ-42); the advanced gradient with Reverse, and Saved Fills (W4 step 7)
 W122	3.8 Objects: images, shapes, media	Object caption and title	Only 15	15.4	D-001	In	Done	-	W4	Title above or below and caption of any object, in the Style tab, edited in place in the Caption style; in ODF as a frame around the object, desk:captions (#262); on master pages and page templates B-081

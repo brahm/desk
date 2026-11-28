@@ -218,6 +218,9 @@ pub struct Preferences {
     /// Whether a saved document holds a picture of its first page, which
     /// file managers show (DOC-09).
     pub include_preview: bool,
+    /// Whether movies and sounds are made smaller when they are inserted,
+    /// as Pages 15.4 optimizes them for iPhone and iPad (W119).
+    pub optimize_media: bool,
     /// Whether new documents of the Blank templates take the font and
     /// size below, as "Set font and size for new Basic documents" of
     /// Pages 15.4 (PXV-03).
@@ -295,6 +298,7 @@ impl Default for Preferences {
             screen_view: false,
             font_favorites: Vec::new(),
             include_preview: true,
+            optimize_media: false,
             // What the sheet of Pages 15.4 offers first.
             set_default_font: false,
             default_font: "Helvetica Neue".into(),
@@ -430,6 +434,9 @@ impl Preferences {
         out.include_preview = file
             .boolean(SAVING, "include-preview")
             .unwrap_or(out.include_preview);
+        out.optimize_media = file
+            .boolean(SAVING, "optimize-media")
+            .unwrap_or(out.optimize_media);
         if let Some(color) = file
             .string(EDITING, "guide-color")
             .ok()
@@ -515,6 +522,7 @@ impl Preferences {
             .collect();
         file.set_string(FONTS, "favorites", &favorites);
         file.set_boolean(SAVING, "include-preview", self.include_preview);
+        file.set_boolean(SAVING, "optimize-media", self.optimize_media);
         file.set_boolean(EDITING, "set-default-font", self.set_default_font);
         file.set_string(EDITING, "default-font", &self.default_font);
         file.set_double(EDITING, "default-font-size", self.default_font_size.to_pt());
@@ -879,6 +887,12 @@ pub fn show_for(parent: &impl IsA<gtk::Widget>, tables: bool) {
         current.show_size_and_position,
         |p, on| p.show_size_and_position = on,
     ));
+    objects.add(&switch(
+        &tr("Optimize Movies and Sounds"),
+        &tr("Makes them smaller as they are inserted, as phones and tablets play them"),
+        current.optimize_media,
+        |p, on| p.optimize_media = on,
+    ));
     if !tables {
         objects.add(&switch(
             &tr("Move Objects Aside as Tables Grow"),
@@ -1192,6 +1206,7 @@ mod tests {
             screen_view: true,
             font_favorites: vec!["Liberation Serif".into(), "DejaVu Sans".into()],
             include_preview: false,
+            optimize_media: true,
             set_default_font: true,
             default_font: "Georgia".into(),
             default_font_size: desk_model::Length::from_pt(13.5),
@@ -1216,6 +1231,7 @@ mod tests {
         assert!(!Preferences::read(&empty).screen_view);
         assert!(Preferences::read(&empty).detect_links);
         assert!(Preferences::read(&empty).include_preview);
+        assert!(!Preferences::read(&empty).optimize_media);
         assert!(Preferences::read(&empty).author.is_empty());
         assert!(Preferences::read(&empty).former_authors.is_empty());
         // B-066: a name changed is kept, and taken back it is the

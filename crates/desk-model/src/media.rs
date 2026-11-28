@@ -141,6 +141,10 @@ pub struct Media {
     pub repeat: Repeat,
     /// How loud it plays, in percent.
     pub volume: u8,
+    /// What it shows or says, for those who cannot see or hear it, as
+    /// the Description of the Movie tab of Pages 15.4 (W118); none when
+    /// it has none.
+    pub description: Option<Arc<str>>,
 }
 
 impl Media {
@@ -159,7 +163,26 @@ impl Media {
             poster_time: 0,
             repeat: Repeat::None,
             volume: 100,
+            description: None,
         })
+    }
+
+    /// The movie or sound of another file, as an optimized one, that
+    /// plays as this one does: the same start, stop, poster frame, repeat,
+    /// volume and description (W119). None when Desk does not know the
+    /// format of the file.
+    pub fn with_data(&self, data: impl Into<Arc<[u8]>>) -> Option<Self> {
+        let other = Self::from_bytes(data)?;
+        Some(Self {
+            data: other.data,
+            format: other.format,
+            ..self.clone()
+        })
+    }
+
+    /// Whether it is the same file as `other`, not a copy.
+    pub fn same_file(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.data, &other.data)
     }
 
     /// The bytes of the file.
@@ -200,6 +223,7 @@ impl std::fmt::Debug for Media {
             .field("poster_time", &self.poster_time)
             .field("repeat", &self.repeat)
             .field("volume", &self.volume)
+            .field("description", &self.description)
             .finish()
     }
 }
@@ -215,6 +239,7 @@ impl PartialEq for Media {
             && self.poster_time == other.poster_time
             && self.repeat == other.repeat
             && self.volume == other.volume
+            && self.description == other.description
     }
 }
 
@@ -265,5 +290,25 @@ mod tests {
         assert!(sound.is_sound());
         assert_eq!((sound.start, sound.end(), sound.volume), (0, None, 100));
         assert!(!Media::from_bytes(mov).unwrap().is_sound());
+    }
+
+    #[test]
+    fn w119_an_optimized_file_plays_as_the_one_it_replaces() {
+        let mut sound = Media::from_bytes(b"RIFF\0\0\0\0WAVE".to_vec()).unwrap();
+        sound.start = 1_000;
+        sound.stop = Some(2_000);
+        sound.volume = 40;
+        sound.repeat = Repeat::Loop;
+        sound.description = Some("A bell".into());
+        let mp3 = sound.with_data(b"ID3\x04\0\0\0\0\0\0".to_vec()).unwrap();
+        assert_eq!(mp3.format(), MediaFormat::Mp3);
+        assert_eq!(
+            (mp3.start, mp3.stop, mp3.volume, mp3.repeat),
+            (1_000, Some(2_000), 40, Repeat::Loop)
+        );
+        assert_eq!(mp3.description.as_deref(), Some("A bell"));
+        assert!(!mp3.same_file(&sound));
+        assert!(sound.same_file(&sound.clone()));
+        assert!(sound.with_data(b"%PDF".to_vec()).is_none());
     }
 }

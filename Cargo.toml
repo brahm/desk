@@ -71,6 +71,9 @@ poppler-rs = { version = "0.26.0", features = ["v0_82"] }
 # come with GNOME (W108).
 librsvg-rebind = "0.3.0"
 libheif-rs = { version = "3.0.0", default-features = false, features = ["v1_17"] }
+# Recording sound, and making movies and sounds smaller, by GStreamer,
+# which comes with GNOME and plays them already through GTK (W118, W119).
+gstreamer = { version = "0.25.4", features = ["v1_24"] }
 zune-jpeg = "0.5.15"
 
 desk-chart = { path = "crates/desk-chart" }

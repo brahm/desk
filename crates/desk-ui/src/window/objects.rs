@@ -17,8 +17,9 @@ use crate::i18n::{tr, trc};
 use crate::shape_library;
 
 /// The actions of these menus, which need a document.
-pub(super) const OBJECT_ACTIONS: [&str; 43] = [
+pub(super) const OBJECT_ACTIONS: [&str; 44] = [
     "insert-equation",
+    "record-audio",
     "insert-drawing",
     "edit-drawing",
     "finish-drawing",
@@ -160,6 +161,19 @@ impl DocumentWindow {
             if let Some(this) = weak.upgrade() {
                 this.choose_picture();
             }
+        });
+        self.actions.add_action(&action);
+        // Insert > Record Audio of Pages 15.4 (W118).
+        let weak = Rc::downgrade(self);
+        let action = gio::SimpleAction::new("record-audio", None);
+        action.connect_activate(move |_, _| {
+            let Some(this) = weak.upgrade() else { return };
+            let editor = Rc::downgrade(&this);
+            crate::record_dialog::open(&this.window(), crate::recorder::MICROPHONE, move |media| {
+                if let Some(editor) = editor.upgrade().and_then(|this| this.editor()) {
+                    editor.insert_media(media, None);
+                }
+            });
         });
         self.actions.add_action(&action);
         self.add_media_browser_action();

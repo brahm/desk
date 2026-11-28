@@ -12,6 +12,7 @@
         "--socket=fallback-x11",
         "--socket=wayland",
         "--device=dri",
+        "--socket=pulseaudio",
         "--talk-name=org.gnome.evolution.dataserver.*"
     ],
     "build-options": {
