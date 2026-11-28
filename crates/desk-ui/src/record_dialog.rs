@@ -267,9 +267,11 @@ pub fn open(parent: &impl IsA<gtk::Widget>, source: &str, on_insert: impl Fn(Med
         });
     }
     {
-        // What is recorded and not inserted goes with the dialog.
-        let this = this.clone();
+        // What is recorded and not inserted goes with the dialog, which
+        // keeps the rest until it closes.
+        let keep = RefCell::new(Some(this.clone()));
         this.dialog.clone().connect_closed(move |_| {
+            let Some(this) = keep.take() else { return };
             this.closed.set(true);
             this.stop_preview();
             if let Some(recorder) = this.recorder.take() {

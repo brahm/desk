@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Desk\n"
 "Report-Msgid-Bugs-To: https://github.com/brahm/desk/issues\n"
-"POT-Creation-Date: 2026-11-28 00:17+0000\n"
+"POT-Creation-Date: 2026-11-28 00:27+0000\n"
 "PO-Revision-Date: 2026-11-02 00:54+0000\n"
 "Last-Translator: Desk contributors\n"
 "Language-Team: Brazilian Portuguese\n"
@@ -474,7 +474,7 @@ msgstr "Texturas"
 #: crates/desk-ui/src/graphic_pane.rs:117
 #: crates/desk-ui/src/graphic_pane.rs:119 crates/desk-ui/src/links_pane.rs:374
 #: crates/desk-ui/src/lists_pane.rs:59 crates/desk-ui/src/mail_merge.rs:124
-#: crates/desk-ui/src/media_pane.rs:95
+#: crates/desk-ui/src/media_pane.rs:97
 #: crates/desk-ui/src/page_templates_pane.rs:28
 #: crates/desk-ui/src/page_templates_pane.rs:133
 #: crates/desk-ui/src/styles_drawer.rs:871
@@ -565,7 +565,7 @@ msgstr "Espaço entre barras"
 #: crates/desk-ui/src/graphic_pane.rs:147
 #: crates/desk-ui/src/graphic_pane.rs:153
 #: crates/desk-ui/src/graphic_pane.rs:155 crates/desk-ui/src/lists_pane.rs:260
-#: crates/desk-ui/src/media_pane.rs:103
+#: crates/desk-ui/src/media_pane.rs:105
 msgid "Percent"
 msgstr "Porcentagem"
 
@@ -988,7 +988,7 @@ msgid "Degrees"
 msgstr "Graus"
 
 #: crates/desk-ui/src/compact.rs:48 crates/desk-ui/src/drawing_pane.rs:61
-#: crates/desk-ui/src/media_pane.rs:88
+#: crates/desk-ui/src/media_pane.rs:90
 msgid "Seconds"
 msgstr "Segundos"
 
@@ -1544,7 +1544,7 @@ msgstr "Suas linhas são desenhadas de novo, na ordem em que foram desenhadas"
 msgid "Duration"
 msgstr "Duração"
 
-#: crates/desk-ui/src/drawing_pane.rs:65 crates/desk-ui/src/media_pane.rs:95
+#: crates/desk-ui/src/drawing_pane.rs:65 crates/desk-ui/src/media_pane.rs:97
 msgid "Loop"
 msgstr "Repetir"
 
@@ -3891,81 +3891,85 @@ msgstr "Navegador de mídia"
 msgid "Add a Folder"
 msgstr "Adicionar uma pasta"
 
-#: crates/desk-ui/src/media_pane.rs:92
+#: crates/desk-ui/src/media_pane.rs:94
 msgid "Start"
 msgstr "Início"
 
-#: crates/desk-ui/src/media_pane.rs:93 crates/desk-ui/src/record_dialog.rs:136
+#: crates/desk-ui/src/media_pane.rs:95 crates/desk-ui/src/record_dialog.rs:136
 msgid "Stop"
 msgstr "Fim"
 
-#: crates/desk-ui/src/media_pane.rs:94
+#: crates/desk-ui/src/media_pane.rs:96
 msgid "Poster Frame"
 msgstr "Quadro de pôster"
 
-#: crates/desk-ui/src/media_pane.rs:95
+#: crates/desk-ui/src/media_pane.rs:97
 msgid "Loop Back and Forth"
 msgstr "Ir e voltar"
 
-#: crates/desk-ui/src/media_pane.rs:98
+#: crates/desk-ui/src/media_pane.rs:100
 msgid "Repeat"
 msgstr "Repetição"
 
-#: crates/desk-ui/src/media_pane.rs:102
+#: crates/desk-ui/src/media_pane.rs:104
 msgid "Volume"
 msgstr "Volume"
 
-#: crates/desk-ui/src/media_pane.rs:106 crates/desk-ui/src/media_pane.rs:110
+#: crates/desk-ui/src/media_pane.rs:108 crates/desk-ui/src/media_pane.rs:112
 #: crates/desk-ui/src/window/slides.rs:238
 #: crates/desk-ui/src/window/slides.rs:241
 msgid "Play"
 msgstr "Reproduzir"
 
-#: crates/desk-ui/src/media_pane.rs:112
+#: crates/desk-ui/src/media_pane.rs:114
 msgid "Movie and Sound"
 msgstr "Filme e som"
 
-#: crates/desk-ui/src/media_pane.rs:130 crates/desk-ui/src/undo_names.rs:31
+#: crates/desk-ui/src/media_pane.rs:132 crates/desk-ui/src/undo_names.rs:31
 msgid "Description"
 msgstr "Descrição"
 
-#: crates/desk-ui/src/media_pane.rs:133
+#: crates/desk-ui/src/media_pane.rs:135
 msgid "Says what it shows or plays, for those who cannot see or hear it"
 msgstr "Diz o que mostra ou toca, para quem não pode ver ou ouvir"
 
-#: crates/desk-ui/src/media_pane.rs:137
+#: crates/desk-ui/src/media_pane.rs:139
 msgid "Reduce"
 msgstr "Reduzir"
 
-#: crates/desk-ui/src/media_pane.rs:141
+#: crates/desk-ui/src/media_pane.rs:143
 msgid "Reduce Media"
 msgstr "Reduzir mídia"
 
-#: crates/desk-ui/src/media_pane.rs:142 crates/desk-ui/src/media_pane.rs:364
+#: crates/desk-ui/src/media_pane.rs:144 crates/desk-ui/src/media_pane.rs:372
 msgid "Removes the parts outside the start and stop"
 msgstr "Remove as partes fora do início e do fim"
 
-#: crates/desk-ui/src/media_pane.rs:148
+#: crates/desk-ui/src/media_pane.rs:150
 msgid "Optimize"
 msgstr "Otimizar"
 
-#: crates/desk-ui/src/media_pane.rs:152
+#: crates/desk-ui/src/media_pane.rs:154
 msgid "Optimize for Phones and Tablets"
 msgstr "Otimizar para Celulares e Tablets"
 
-#: crates/desk-ui/src/media_pane.rs:153 crates/desk-ui/src/media_pane.rs:368
+#: crates/desk-ui/src/media_pane.rs:155 crates/desk-ui/src/media_pane.rs:377
 msgid "Makes the file smaller, in a format they play"
 msgstr "Deixa o arquivo menor, num formato que eles tocam"
 
-#: crates/desk-ui/src/media_pane.rs:278
+#: crates/desk-ui/src/media_pane.rs:281
 msgid "This file cannot be reduced"
 msgstr "Este arquivo não pode ser reduzido"
 
-#: crates/desk-ui/src/media_pane.rs:290
+#: crates/desk-ui/src/media_pane.rs:294
 msgid "Optimizing…"
 msgstr "Otimizando…"
 
-#: crates/desk-ui/src/media_pane.rs:296
+#: crates/desk-ui/src/media_pane.rs:302
+msgid "Optimized"
+msgstr "Otimizado"
+
+#: crates/desk-ui/src/media_pane.rs:304
 msgid "It cannot be made smaller"
 msgstr "Não é possível deixá-lo menor"
 

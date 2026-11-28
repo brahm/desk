@@ -187,10 +187,34 @@ impl Recorder {
         let _ = std::fs::remove_file(&self.path);
         let result = match (error, read) {
             (Some(error), _) => Err(error),
-            (None, Ok(bytes)) => Ok(bytes),
+            (None, Ok(mut bytes)) => {
+                sized(&mut bytes);
+                Ok(bytes)
+            }
             (None, Err(error)) => Err(error.to_string()),
         };
         self.tell(Event::Done(result));
+    }
+}
+
+/// Writes the sizes of a WAVE file of the recorder into its header from
+/// its length, as a recording stopped without the end of its stream
+/// leaves them as they were at the start.
+fn sized(bytes: &mut [u8]) {
+    let length = bytes.len();
+    if length < 12 || bytes.get(..4) != Some(b"RIFF") || bytes.get(8..12) != Some(b"WAVE") {
+        return;
+    }
+    let Some(at) = bytes.windows(4).position(|w| w == b"data") else {
+        return;
+    };
+    let riff = u32::try_from(length - 8).unwrap_or(u32::MAX);
+    let data = u32::try_from(length.saturating_sub(at + 8)).unwrap_or(u32::MAX);
+    if let Some(field) = bytes.get_mut(4..8) {
+        field.copy_from_slice(&riff.to_le_bytes());
+    }
+    if let Some(field) = bytes.get_mut(at + 4..at + 8) {
+        field.copy_from_slice(&data.to_le_bytes());
     }
 }
 
@@ -217,6 +241,22 @@ pub fn wave_length(bytes: &[u8]) -> Option<u32> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn w118_a_recording_stopped_short_is_given_its_sizes() {
+        // The header as wavenc writes it before any sound, then 0.1 s.
+        let mut bytes = b"RIFF\0\0\0\0WAVEfmt ".to_vec();
+        bytes.extend([0; 20]);
+        bytes.extend(b"data\0\0\0\0");
+        bytes.extend(vec![0; 8_820]);
+        sized(&mut bytes);
+        assert_eq!(wave_length(&bytes), Some(100));
+        assert_eq!(&bytes[4..8], &(bytes.len() as u32 - 8).to_le_bytes());
+        // Other bytes are left as they are.
+        let mut other = b"ID3\x04".to_vec();
+        sized(&mut other);
+        assert_eq!(other, b"ID3\x04");
+    }
 
     #[test]
     fn w118_a_recording_is_a_wave_file_of_its_length() {

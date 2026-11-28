@@ -91,6 +91,7 @@ impl Media {
         media.poster_time = self.poster_time.saturating_sub(kept.from).min(length);
         media.repeat = self.repeat;
         media.volume = self.volume;
+        media.description = self.description.clone();
         Some(media)
     }
 }
@@ -931,6 +932,7 @@ mod tests {
         media.stop = Some(5_000);
         media.poster_time = 3_000;
         media.volume = 40;
+        media.description = Some("A bell".into());
         let reduced = media.reduced().unwrap();
         assert_eq!(
             (
@@ -942,6 +944,8 @@ mod tests {
             (0, None, Some(3_000), 1_000)
         );
         assert_eq!(reduced.volume, 40);
+        // The description stays (W118).
+        assert_eq!(reduced.description.as_deref(), Some("A bell"));
         let data = reduced.data();
         assert_eq!(le32(data, 4).unwrap() as usize, data.len() - 8);
         assert_eq!(le32(data, 40).unwrap(), 6_000);

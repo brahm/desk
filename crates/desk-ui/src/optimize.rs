@@ -4,7 +4,8 @@
 //! Optimizing movies and sounds, as Pages 15.4 does for iPhone and iPad
 //! (W119): a movie coded again at most 1280 × 720 into MPEG-4, and a sound
 //! of samples (WAVE, AIFF) into MP3, by the encoders of GStreamer that
-//! the computer has. The file is kept only when it comes out smaller.
+//! the computer has. The file is kept only when it comes out a quarter
+//! smaller at least.
 
 use std::cell::RefCell;
 use std::path::{Path, PathBuf};
@@ -94,6 +95,13 @@ pub fn optimizable(media: &Media) -> bool {
     plan(media).is_some()
 }
 
+/// Whether an optimized file of `new` bytes saves enough over the `old`
+/// to replace it: a quarter at least, so that a file optimized already is
+/// not coded again, losing more each time.
+fn worth_it(new: usize, old: usize) -> bool {
+    new.saturating_mul(4) <= old.saturating_mul(3)
+}
+
 /// The size a movie of `width` by `height` is made, in even pixels.
 fn optimized_size(width: i32, height: i32) -> (i32, i32) {
     let (w, h) = (f64::from(width.max(2)), f64::from(height.max(2)));
@@ -178,14 +186,28 @@ fn pipeline(plan: Plan, from: &Path, to: &Path) -> Result<gst::Pipeline, glib::B
         let name = structure.name().to_string();
         let Ok(mut taken) = taken.lock() else { return };
         let made = match plan {
-            Plan::Movie { video, audio } if name.starts_with("video/") && !taken.0 => {
+            Plan::Movie { video, .. } if name.starts_with("video/") && !taken.0 => {
                 taken.0 = true;
-                let width = structure.get::<i32>("width").unwrap_or(LARGEST.0 as i32);
-                let height = structure.get::<i32>("height").unwrap_or(LARGEST.1 as i32);
-                let (w, h) = optimized_size(width, height);
-                let _ = audio;
                 (|| {
+                    // As it shows: its pixels may not be square.
+                    let (Ok(width), Ok(height)) = (
+                        structure.get::<i32>("width"),
+                        structure.get::<i32>("height"),
+                    ) else {
+                        return Err(glib::bool_error!("a movie of no size"));
+                    };
+                    let shown = structure
+                        .get::<gst::Fraction>("pixel-aspect-ratio")
+                        .ok()
+                        .filter(|par| par.numer() > 0 && par.denom() > 0)
+                        .map_or(width, |par| {
+                            (i64::from(width) * i64::from(par.numer()) / i64::from(par.denom()))
+                                .clamp(2, i64::from(i32::MAX)) as i32
+                        });
+                    let (w, h) = optimized_size(shown, height);
+                    // 4:2:0, which phones and tablets decode.
                     let caps = gst::Caps::builder("video/x-raw")
+                        .field("format", "I420")
                         .field("width", w)
                         .field("height", h)
                         .field("pixel-aspect-ratio", gst::Fraction::new(1, 1))
@@ -242,6 +264,11 @@ fn pipeline(plan: Plan, from: &Path, to: &Path) -> Result<gst::Pipeline, glib::B
                     )
                 })()
             }
+            // A second picture or sound, or a sound with no encoder, would
+            // be lost: the movie is left as it is.
+            _ if name.starts_with("video/") || name.starts_with("audio/") => {
+                Err(glib::bool_error!("a stream that cannot be kept"))
+            }
             _ => Ok(()),
         };
         if let Err(error) = made {
@@ -286,7 +313,7 @@ pub fn optimize(media: &Media, done: impl FnOnce(Option<Media>) + 'static) {
             let optimized = ok
                 .then(|| std::fs::read(&output.0).ok())
                 .flatten()
-                .filter(|bytes| !bytes.is_empty() && bytes.len() < media.data().len())
+                .filter(|bytes| !bytes.is_empty() && worth_it(bytes.len(), media.data().len()))
                 .and_then(|bytes| media.with_data(bytes));
             done(optimized);
         }
@@ -400,6 +427,7 @@ mod tests {
         assert_eq!(optimized_size(640, 480), (640, 480));
         assert_eq!(optimized_size(4000, 1000), (1280, 320));
         assert_eq!(optimized_size(333, 201), (334, 202));
+        assert!(worth_it(75, 100) && !worth_it(76, 100));
     }
 
     #[test]

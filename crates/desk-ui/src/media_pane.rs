@@ -38,6 +38,8 @@ pub struct MediaGroup {
     description: compact::EntryRow,
     reduce: compact::ActionRow,
     optimize: compact::ActionRow,
+    /// Whether the selected movie or sound is being optimized.
+    optimizing: Cell<bool>,
     updating: Cell<bool>,
 }
 
@@ -167,6 +169,7 @@ impl MediaGroup {
             description,
             reduce,
             optimize,
+            optimizing: Cell::new(false),
             updating: Cell::new(false),
         });
         this.show(None);
@@ -286,15 +289,20 @@ impl MediaGroup {
                 let (Some(this), Some(editor)) = (weak.upgrade(), editor()) else {
                     return;
                 };
+                this.optimizing.set(true);
                 this.optimize.set_sensitive(false);
                 this.optimize.set_subtitle(&tr("Optimizing…"));
                 let weak = Rc::downgrade(&this);
                 editor.optimize_selected_media(move |optimized| {
                     let Some(this) = weak.upgrade() else { return };
-                    if !optimized {
-                        this.optimize.set_sensitive(true);
-                        this.optimize.set_subtitle(&tr("It cannot be made smaller"));
-                    }
+                    this.optimizing.set(false);
+                    // Optimized, it is not optimized again.
+                    this.optimize.set_sensitive(!optimized);
+                    this.optimize.set_subtitle(&if optimized {
+                        tr("Optimized")
+                    } else {
+                        tr("It cannot be made smaller")
+                    });
                 });
             });
         }
@@ -362,10 +370,12 @@ impl MediaGroup {
         self.reduce.set_sensitive(media.reducible());
         self.reduce
             .set_subtitle(&tr("Removes the parts outside the start and stop"));
-        self.optimize
-            .set_sensitive(crate::optimize::optimizable(media));
-        self.optimize
-            .set_subtitle(&tr("Makes the file smaller, in a format they play"));
+        if !self.optimizing.get() {
+            self.optimize
+                .set_sensitive(crate::optimize::optimizable(media));
+            self.optimize
+                .set_subtitle(&tr("Makes the file smaller, in a format they play"));
+        }
         self.updating.set(false);
     }
 }
