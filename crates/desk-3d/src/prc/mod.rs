@@ -94,19 +94,19 @@ impl Words<'_> {
     }
 }
 
-/// A section, unpacked.
-fn inflate(bytes: &[u8], from: u32) -> Result<Vec<u8>> {
+/// A section, unpacked, within what is left of the bytes that the
+/// sections of a file may unpack to: many file structures can name the
+/// same section.
+fn inflate(bytes: &[u8], from: u32, left: &mut u64) -> Result<Vec<u8>> {
     let packed = bytes
         .get(from as usize..)
         .ok_or_else(|| malformed("a PRC section past the end of its file"))?;
     let mut out = Vec::new();
     flate2::read::ZlibDecoder::new(packed)
-        .take(limits::FILE_BYTES + 1)
+        .take(*left + 1)
         .read_to_end(&mut out)
         .map_err(|_| malformed("a PRC section that does not unpack"))?;
-    if out.len() as u64 > limits::FILE_BYTES {
-        return Err(Error::TooLarge);
-    }
+    *left = left.checked_sub(out.len() as u64).ok_or(Error::TooLarge)?;
     Ok(out)
 }
 
@@ -326,9 +326,10 @@ impl<'a> Reader<'a> {
             x = self.vector()?;
             y = self.vector()?;
             z = cross(x, y);
-            if behaviour & 0x04 != 0 {
-                z = z.map(|v| -v);
-            }
+        }
+        // A mirror turns Z around, unless the three axes are given.
+        if behaviour & 0x04 != 0 && behaviour & 0x20 == 0 {
+            z = z.map(|v| -v);
         }
         let mut s = [1.0; 3];
         if behaviour & 0x10 != 0 {
@@ -728,7 +729,8 @@ impl<'a> Reader<'a> {
         let triple = |values: &[f64], at: u32| -> Option<[f32; 3]> {
             let at = at as usize;
             let v = values.get(at..at.checked_add(3)?)?;
-            Some([v.first()?, v.get(1)?, v.get(2)?].map(|v| *v as f32))
+            let v = [v.first()?, v.get(1)?, v.get(2)?].map(|v| *v as f32);
+            v.iter().all(|c| c.is_finite()).then_some(v)
         };
         let mut corners = 0usize;
         for _ in 0..n {
@@ -871,9 +873,19 @@ impl<'a> Reader<'a> {
                     }
                 }
             }
-            // The colors of its corners, as many as it has.
+            // What is decoded counts, kept or not.
+            corners += face_corners.len();
+            if corners > limits::CORNERS {
+                return Err(Error::TooLarge);
+            }
+            // The colors of its corners, as many as it has: those of a
+            // face that is not decoded cannot be counted, and end the
+            // tessellation.
             let mut colors = Vec::new();
             if self.bits.bit()? {
+                if !usable {
+                    return Err(malformed("colors of a PRC face that is not read"));
+                }
                 let rgba = self.bits.bit()?;
                 if self.bits.bit()? {
                     return Err(malformed("optimised colors of a PRC face"));
@@ -894,12 +906,9 @@ impl<'a> Reader<'a> {
             if !lines.is_empty() {
                 self.bits.uint()?;
             }
-            if !usable {
+            // A face with no triangle draws nothing.
+            if !usable || triangles.is_empty() {
                 continue;
-            }
-            corners += face_corners.len();
-            if corners > limits::CORNERS {
-                return Err(Error::TooLarge);
             }
             let base = tess.points.len();
             let mut kept = Vec::with_capacity(face_corners.len());
@@ -1041,23 +1050,12 @@ impl Builder {
         let m = mul(m, &STAGE);
         let inverse = invert(&m);
         let mut meshes: HashMap<([u32; 4], bool), usize> = HashMap::new();
-        for face in &tess.faces {
-            let material = globals.material(face.style.or(style));
-            let colored = !face.colors.is_empty();
-            let key = (material.color.map(f32::to_bits), colored);
-            let at = *meshes.entry(key).or_insert_with(|| {
-                self.scene.meshes.push(Mesh {
-                    material,
-                    ..Mesh::default()
-                });
-                self.scene.meshes.len() - 1
-            });
-            let Some(mesh) = self.scene.meshes.get_mut(at) else {
-                continue;
-            };
-            // The corners of the face, each once, by their index in the
-            // tessellation.
+        'faces: for face in &tess.faces {
+            // The corners of the face, each once, placed; a face with a
+            // corner that is not finite there is left out.
             let mut taken: HashMap<u32, u32> = HashMap::new();
+            let (mut positions, mut normals, mut colors) = (Vec::new(), Vec::new(), Vec::new());
+            let mut triangles = Vec::with_capacity(face.triangles.len());
             for t in &face.triangles {
                 let mut out = [0u32; 3];
                 for (o, &c) in out.iter_mut().zip(t) {
@@ -1072,29 +1070,60 @@ impl Builder {
                     if self.corners > limits::CORNERS {
                         return Err(Error::TooLarge);
                     }
-                    let i = u32::try_from(mesh.positions.len()).map_err(|_| Error::TooLarge)?;
-                    mesh.positions.push(point(&m, p));
+                    let p = point(&m, p);
+                    if !p.iter().all(|v| v.is_finite()) {
+                        continue 'faces;
+                    }
+                    let i = u32::try_from(positions.len()).map_err(|_| Error::TooLarge)?;
+                    positions.push(p);
                     if let (Some(n), Some(inverse)) =
                         (tess.normals.get(c as usize), inverse.as_ref())
                     {
-                        mesh.normals.push(unit(normal(inverse, *n)));
+                        let n = unit(normal(inverse, *n));
+                        if n.iter().all(|v| v.is_finite()) {
+                            normals.push(n);
+                        }
                     }
-                    if colored
-                        && let Some(color) = face.colors.get((c as usize).wrapping_sub(face.first))
-                    {
-                        mesh.colors.push(*color);
+                    if let Some(color) = face.colors.get((c as usize).wrapping_sub(face.first)) {
+                        colors.push(*color);
                     }
                     taken.insert(c, i);
                     *o = i;
                 }
-                mesh.triangles.push(out);
+                triangles.push(out);
             }
-            if mesh.normals.len() != mesh.positions.len() {
+            let material = globals.material(face.style.or(style));
+            let colored = !face.colors.is_empty();
+            let key = (material.color.map(f32::to_bits), colored);
+            let at = *meshes.entry(key).or_insert_with(|| {
+                self.scene.meshes.push(Mesh {
+                    material,
+                    ..Mesh::default()
+                });
+                self.scene.meshes.len() - 1
+            });
+            let Some(mesh) = self.scene.meshes.get_mut(at) else {
+                continue;
+            };
+            let base = u32::try_from(mesh.positions.len())
+                .ok()
+                .filter(|b| b.checked_add(positions.len() as u32).is_some())
+                .ok_or(Error::TooLarge)?;
+            // The normals and the colors of a mesh are those of all its
+            // corners, or none.
+            if mesh.normals.len() == mesh.positions.len() && normals.len() == positions.len() {
+                mesh.normals.extend(normals);
+            } else {
                 mesh.normals.clear();
             }
-            if mesh.colors.len() != mesh.positions.len() {
+            if mesh.colors.len() == mesh.positions.len() && colors.len() == positions.len() {
+                mesh.colors.extend(colors);
+            } else {
                 mesh.colors.clear();
             }
+            mesh.positions.extend(positions);
+            mesh.triangles
+                .extend(triangles.into_iter().map(|t| t.map(|c| base + c)));
         }
         Ok(())
     }
@@ -1221,28 +1250,35 @@ pub(crate) fn read(bytes: &[u8]) -> Result<Scene> {
     }
     let mut builder = Builder::default();
     let mut read_any = false;
+    let mut left = limits::FILE_BYTES;
+    // A section of a file structure: none when it has none or it does
+    // not read, and an error when it is too large.
+    fn section<T>(
+        bytes: &[u8],
+        offsets: &[u32],
+        i: usize,
+        left: &mut u64,
+        parse: impl FnOnce(&mut Reader<'_>) -> Result<T>,
+    ) -> Result<Option<T>> {
+        let Some(&from) = offsets.get(i) else {
+            return Ok(None);
+        };
+        match inflate(bytes, from, left).and_then(|d| parse(&mut Reader::new(&d))) {
+            Ok(t) => Ok(Some(t)),
+            Err(Error::TooLarge) => Err(Error::TooLarge),
+            Err(_) => Ok(None),
+        }
+    }
     for offsets in offsets {
         // The sections after the header: the globals, the tree and the
         // tessellations.
-        let section = |i: usize| offsets.get(i).map(|&from| inflate(bytes, from)).transpose();
-        let tessellations =
-            match section(3).and_then(|d| d.map(|d| Reader::new(&d).tessellations()).transpose()) {
-                Ok(Some(t)) => t,
-                Ok(None) => continue,
-                Err(Error::TooLarge) => return Err(Error::TooLarge),
-                Err(_) => continue,
-            };
+        let Some(tessellations) = section(bytes, &offsets, 3, &mut left, |r| r.tessellations())?
+        else {
+            continue;
+        };
         read_any = true;
-        let globals = match section(1) {
-            Ok(Some(d)) => Reader::new(&d).globals().unwrap_or_default(),
-            Err(Error::TooLarge) => return Err(Error::TooLarge),
-            _ => Globals::default(),
-        };
-        let tree = match section(2) {
-            Ok(Some(d)) => Reader::new(&d).tree().ok(),
-            Err(Error::TooLarge) => return Err(Error::TooLarge),
-            _ => None,
-        };
+        let globals = section(bytes, &offsets, 1, &mut left, |r| r.globals())?.unwrap_or_default();
+        let tree = section(bytes, &offsets, 2, &mut left, |r| r.tree())?;
         builder.structure(&Structure {
             globals,
             tree,
@@ -1409,5 +1445,106 @@ mod tests {
         let tess = Reader::new(&bytes).tess().unwrap().unwrap();
         assert!(tess.faces.is_empty());
         assert!(tess.points.is_empty());
+    }
+
+    #[test]
+    fn w116_a_mirror_with_no_rotation_turns_z_around() {
+        let mut w = Writer::default();
+        w.char(0x05).double(1.0).double(0.0).double(0.0);
+        let bytes = w.bytes();
+        let m = Reader::new(&bytes).cartesian().unwrap();
+        assert_eq!(crate::matrix::at(&m, 2, 2), -1.0);
+        assert_eq!(crate::matrix::at(&m, 3, 0), 1.0);
+    }
+
+    /// A tessellation of the three corners of a triangle and one face.
+    fn face(w: &mut Writer, flags: u32, sizes: &[u32], colors: bool) {
+        w.bit(false).uint(9);
+        for v in [0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0] {
+            w.double(v);
+        }
+        w.bit(false).bit(false).bit(false).uint(0).uint(0);
+        w.uints(&[0, 3, 6]);
+        w.uint(1).uint(TESS_FACE);
+        w.uint(0).uint(0).uints(&[]);
+        w.uint(flags).uint(0).uints(sizes);
+        w.uint(0).bit(colors);
+        if colors {
+            w.bit(false).bit(false).char(255).char(0).char(0);
+            w.bit(true).bit(true);
+        }
+        w.uint(0);
+    }
+
+    #[test]
+    fn w116_a_face_with_no_triangle_is_left_out_and_its_colors_counted() {
+        let mut w = Writer::default();
+        face(&mut w, 0, &[], false);
+        let bytes = w.bytes();
+        assert!(
+            Reader::new(&bytes)
+                .tess()
+                .unwrap()
+                .unwrap()
+                .faces
+                .is_empty()
+        );
+        // The colors of a triangle, one for each corner.
+        let mut w = Writer::default();
+        face(&mut w, TRIANGLE, &[1], true);
+        let bytes = w.bytes();
+        let tess = Reader::new(&bytes).tess().unwrap().unwrap();
+        assert_eq!(tess.faces[0].colors, [[1.0, 0.0, 0.0]; 3]);
+        // A polyface is not read, so its colors cannot be counted.
+        let mut w = Writer::default();
+        face(&mut w, 0x1, &[1], true);
+        let bytes = w.bytes();
+        assert!(Reader::new(&bytes).tess().is_err());
+    }
+
+    #[test]
+    fn w116_a_face_with_a_corner_not_finite_is_not_drawn() {
+        let tess = Tess {
+            points: vec![
+                [0.0; 3],
+                [f32::INFINITY, 0.0, 0.0],
+                [0.0, 1.0, 0.0],
+                [1.0, 0.0, 0.0],
+            ],
+            normals: Vec::new(),
+            faces: vec![
+                Face {
+                    style: None,
+                    first: 0,
+                    triangles: vec![[0, 1, 2]],
+                    colors: Vec::new(),
+                },
+                Face {
+                    style: None,
+                    first: 0,
+                    triangles: vec![[0, 3, 2]],
+                    colors: Vec::new(),
+                },
+            ],
+        };
+        let mut builder = Builder::default();
+        builder
+            .draw(&Globals::default(), &tess, &IDENTITY, None)
+            .unwrap();
+        assert_eq!(builder.scene.triangle_count(), 1);
+        assert_eq!(builder.scene.meshes[0].positions.len(), 3);
+    }
+
+    #[test]
+    fn w116_the_sections_of_a_file_share_what_they_may_unpack() {
+        use std::io::Write as _;
+        let mut packed =
+            flate2::write::ZlibEncoder::new(Vec::new(), flate2::Compression::default());
+        packed.write_all(&[0; 1000]).unwrap();
+        let packed = packed.finish().unwrap();
+        let mut left = 1500;
+        assert_eq!(inflate(&packed, 0, &mut left).unwrap().len(), 1000);
+        assert_eq!(left, 500);
+        assert_eq!(inflate(&packed, 0, &mut left), Err(Error::TooLarge));
     }
 }
