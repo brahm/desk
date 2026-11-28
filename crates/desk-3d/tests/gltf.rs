@@ -158,3 +158,49 @@ fn w116_blended_materials_let_what_is_behind_show() {
         .collect();
     assert_eq!(translucent, [false, false, true]);
 }
+
+#[test]
+fn w116_packing_takes_only_the_files_that_are_used() {
+    // The quad of the folder beside, with a buffer and pictures that
+    // nothing uses, which are not asked for.
+    let mut json: serde_json::Value = serde_json::from_slice(&data("external/quad.gltf")).unwrap();
+    json["buffers"]
+        .as_array_mut()
+        .unwrap()
+        .push(serde_json::json!({"byteLength": 4, "uri": "other.bin"}));
+    json["images"].as_array_mut().unwrap().extend([
+        serde_json::json!({"uri": "secret.txt"}),
+        serde_json::json!({"uri": "notes/x.pdf"}),
+    ]);
+    let gltf = serde_json::to_vec(&json).unwrap();
+    let mut asked = Vec::new();
+    let glb = pack_gltf(&gltf, &mut |path| {
+        asked.push(path.to_owned());
+        std::fs::read(format!(
+            "{}/tests/data/external/{path}",
+            env!("CARGO_MANIFEST_DIR")
+        ))
+        .ok()
+    })
+    .unwrap();
+    assert_eq!(asked, ["quad data.bin", "pictures/quad.png"]);
+    assert_eq!(read(&glb).unwrap(), read(&data("textured.gltf")).unwrap());
+    // A picture that a texture uses must be one.
+    json["images"][0] = serde_json::json!({"uri": "quad data.bin"});
+    let gltf = serde_json::to_vec(&json).unwrap();
+    let packed = pack_gltf(&gltf, &mut |path| {
+        std::fs::read(format!(
+            "{}/tests/data/external/{path}",
+            env!("CARGO_MANIFEST_DIR")
+        ))
+        .ok()
+    });
+    assert!(matches!(packed, Err(Error::Malformed(_))), "{packed:?}");
+    // A GLB reads no file beside it.
+    let mut asked = 0;
+    let _ = pack_gltf(&glb, &mut |_| {
+        asked += 1;
+        None
+    });
+    assert_eq!(asked, 0);
+}

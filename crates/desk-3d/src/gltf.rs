@@ -150,7 +150,7 @@ pub(crate) fn relative_path(uri: &str) -> Option<String> {
         || path.starts_with('/')
         || path.contains('\\')
         || path.contains('\0')
-        || path.split('/').any(|s| s == ".." || s == ".")
+        || path.split('/').any(|s| s.is_empty() || s.starts_with('.'))
     {
         return None;
     }
@@ -818,16 +818,29 @@ fn picture_type(bytes: &[u8]) -> &'static str {
 /// Gathers a glTF or a GLB with the files it names into one GLB: its
 /// buffers into one, and its pictures into views of it. `files` gives the
 /// bytes of a file beside the glTF by its relative path, which never
-/// leaves the folder of the glTF: a URI with `..`, a whole path or a
-/// scheme is refused.
+/// leaves the folder of the glTF: a URI with `..`, a whole path, a
+/// scheme or a hidden file is refused. Only the buffers that views use
+/// and the pictures that textures use are asked for, and none for a GLB.
 pub fn pack(bytes: &[u8], files: &mut dyn FnMut(&str) -> Option<Vec<u8>>) -> Result<Vec<u8>> {
     let (mut json, bin) = parse(bytes)?;
-    let mut fetch = |uri: &str| -> Option<Vec<u8>> {
-        if let Some((data, _)) = data_uri(uri) {
-            return Some(data);
+    // A GLB stands alone: no file beside it is read for it.
+    let alone = is_glb(bytes);
+    let mut outside = |uri: &str| -> Option<Vec<u8>> {
+        if alone {
+            return None;
         }
         files(&relative_path(uri)?)
     };
+    // Only the buffers that views use, and the pictures that textures
+    // use, are read: a file names no other file beside it to be taken.
+    let used_buffers: std::collections::HashSet<usize> = list(&json, "bufferViews")
+        .iter()
+        .filter_map(|v| index(v, "buffer"))
+        .collect();
+    let used_images: std::collections::HashSet<usize> = list(&json, "textures")
+        .iter()
+        .filter_map(|t| index(t, "source"))
+        .collect();
     let mut out: Vec<u8> = Vec::new();
     let grow = |out: &mut Vec<u8>, data: &[u8]| -> Result<usize> {
         let at = out.len().next_multiple_of(4);
@@ -842,8 +855,12 @@ pub fn pack(bytes: &[u8], files: &mut dyn FnMut(&str) -> Option<Vec<u8>>) -> Res
     let mut sizes = Vec::new();
     for (i, b) in list(&json, "buffers").iter().enumerate() {
         let data = match b.get("uri").and_then(Json::as_str) {
+            _ if !used_buffers.contains(&i) => Some(Vec::new()),
             None if i == 0 => bin.map(<[u8]>::to_vec),
-            Some(uri) => fetch(uri),
+            Some(uri) => match data_uri(uri) {
+                Some((data, _)) => Some(data),
+                None => outside(uri),
+            },
             None => None,
         };
         let data = data.ok_or_else(|| malformed(format!("buffer {i} of the glTF is missing")))?;
@@ -911,7 +928,7 @@ pub fn pack(bytes: &[u8], files: &mut dyn FnMut(&str) -> Option<Vec<u8>>) -> Res
     }
     let mut added = Vec::new();
     if let Some(Json::Array(images)) = object.get_mut("images") {
-        for image in images.iter_mut() {
+        for (n, image) in images.iter_mut().enumerate() {
             let Some(image) = image.as_object_mut() else {
                 continue;
             };
@@ -932,8 +949,25 @@ pub fn pack(bytes: &[u8], files: &mut dyn FnMut(&str) -> Option<Vec<u8>>) -> Res
                 }
                 None => {}
             }
-            let Some(data) = uri.as_str().and_then(&mut fetch) else {
+            let Some(uri) = uri.as_str() else {
                 continue;
+            };
+            let data = match data_uri(uri) {
+                Some((data, _)) => data,
+                // A picture beside the file that no texture uses is not
+                // read; one that a texture uses must be there, and be a
+                // picture.
+                None if !used_images.contains(&n) => continue,
+                None => {
+                    let data = outside(uri)
+                        .ok_or_else(|| malformed(format!("picture {n} of the glTF is missing")))?;
+                    if picture_type(&data) == "application/octet-stream" {
+                        return Err(malformed(format!(
+                            "picture {n} of the glTF is not a picture"
+                        )));
+                    }
+                    data
+                }
             };
             let at = grow(&mut out, &data)?;
             image.insert("mimeType".into(), picture_type(&data).into());
@@ -1008,6 +1042,9 @@ mod tests {
             "a\\x.bin",
             "%2e%2e/x.bin",
             "./x.bin",
+            ".ssh/id_ed25519",
+            "a/.hidden.bin",
+            "a//b.bin",
             "",
         ] {
             assert_eq!(relative_path(uri), None, "{uri}");

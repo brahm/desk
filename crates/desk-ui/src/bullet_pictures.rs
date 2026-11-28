@@ -228,8 +228,10 @@ pub fn media_from_file(file: &gtk::gio::File) -> Option<desk_model::Media> {
 ///
 /// A glTF comes with the files it names beside it, gathered into one GLB
 /// that the document keeps: only files in its folder, or folders under
-/// it, are read. `desk_model::pack_gltf` refuses the paths that leave
-/// it, and a link that leads out of it is not followed.
+/// it, are read, and only those that its views and textures use; none
+/// for a GLB. `desk_model::pack_gltf` refuses the paths that leave the
+/// folder or name hidden files, and a link that leads out of it is not
+/// followed.
 pub fn model_from_file(file: &gtk::gio::File) -> Option<desk_model::Model3d> {
     let mut bytes = load_bounded(file, MAX_MEDIA)?;
     if matches!(

@@ -3415,8 +3415,12 @@ paragraph, and objects on a second page.
 - A `.gltf` that names files beside it, its buffers and pictures, is
   gathered into one GLB when it is inserted, and the document keeps that
   GLB (`model/gltf-binary` in ODT). Only files in the folder of the
-  glTF, or under it, are read: a URI with `..`, a whole path or a scheme
-  is refused.
+  glTF, or under it, are read, and only the buffers its views use and
+  the pictures its textures use: a URI with `..`, a whole path, a scheme
+  or a hidden file is refused, a link out of the folder is not followed,
+  and a GLB reads no file beside it. The security review asked for that
+  last part, so that a model cannot carry other files of its folder
+  into a document that is then shared.
 - The fuzz target of models reads glTF and GLB too, and checks that a
   file packed into a GLB reads as it did; it found two cases where the
   packed file read more than the first, which are fixed.
