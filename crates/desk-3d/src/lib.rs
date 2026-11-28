@@ -30,7 +30,7 @@ mod texture;
 mod usd;
 mod usdz;
 
-pub use raster::{View, render};
+pub use raster::{MAX_SIDE, View, render};
 
 /// The limits of what is read, against hostile or huge files.
 pub mod limits {
