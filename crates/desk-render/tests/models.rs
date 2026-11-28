@@ -87,3 +87,29 @@ fn w116_a_model_that_cannot_be_read_shows_as_a_crossed_frame() {
     let (r, ..) = at(&mut surface, 50, 20);
     assert!(r < 0xff && r > 0xd0);
 }
+
+#[test]
+fn w116_a_model_that_moves_draws_at_the_moment_it_plays() {
+    let model = model("animated.glb");
+    let rest = painted(&model, 1.0);
+    let mut start = painted(&model.at(Some(0)), 1.0);
+    let mut end = painted(&model.at(Some(2000)), 1.0);
+    // At the start of its animation it is as it rests; at the end the red
+    // box has gone up.
+    let mut rest = rest;
+    let red = |s: &mut cairo::ImageSurface| {
+        (0..SIDE)
+            .filter(|&y| {
+                let (r, g, b) = at(s, 87, y);
+                r > 100 && g < 60 && b < 60
+            })
+            .max()
+    };
+    assert_eq!(red(&mut rest), red(&mut start));
+    assert!(
+        red(&mut end) < red(&mut start),
+        "{:?} {:?}",
+        red(&mut end),
+        red(&mut start)
+    );
+}

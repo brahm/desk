@@ -5,10 +5,13 @@
 //! turned by dragging the handle in the middle of a selected one, as in
 //! Pages 15.4, or with the rows of the Object tab. While the handle is
 //! dragged the model turns on the page; the turn is one change, made
-//! when the drag ends.
+//! when the drag ends. A model that moves, as a glTF may, plays its
+//! animation on the page, over and over until it is paused; playing it
+//! changes nothing in the document.
 
 use desk_layout::PlacedObject;
 use desk_model::{Anchor, Model3d, NodeId, Object, ObjectKind};
+use gtk::prelude::*;
 
 use super::TextEditor;
 use super::objects::find;
@@ -34,6 +37,33 @@ pub(super) struct ModelTurn {
     model: Model3d,
     /// The model as the drag turns it.
     turned: Model3d,
+}
+
+/// The animation of a 3D object as it plays on the page, or as it was
+/// paused.
+pub(super) struct ModelPlaying {
+    /// The object.
+    id: NodeId,
+    /// The page it is on, by index.
+    page: usize,
+    /// How long the animation lasts, in milliseconds.
+    duration: u32,
+    /// Where it starts or goes on from, in milliseconds.
+    from: u32,
+    /// When it started or went on, in microseconds of the clock of the
+    /// frames.
+    started: Option<i64>,
+    /// Where it shows now, in milliseconds.
+    moment: u32,
+    /// The callback that draws each frame; none while it is paused.
+    tick: Option<gtk::TickCallbackId>,
+}
+
+impl ModelPlaying {
+    /// The object.
+    pub(super) fn id(&self) -> NodeId {
+        self.id
+    }
 }
 
 /// Where the handle that turns a 3D object is, in points on its page; none
@@ -101,6 +131,129 @@ impl TextEditor {
     /// Shows the selected 3D model from the front again.
     pub fn reset_model_rotation(&self) {
         self.turn_selected_model("Reset Rotation", 0, 0);
+    }
+
+    /// How long the animation of the selected 3D model lasts, in
+    /// milliseconds; none when it does not move.
+    pub fn selected_model_animation(&self) -> Option<u32> {
+        let (_, model) = self.selected_model()?;
+        let seconds = model.scene().ok()?.animation?.duration();
+        Some((seconds * 1000.0).round().clamp(1.0, u32::MAX as f32) as u32)
+    }
+
+    /// Whether the animation of a 3D model plays, not paused.
+    pub fn model_playing(&self) -> bool {
+        self.state
+            .borrow()
+            .model_playing
+            .as_ref()
+            .is_some_and(|p| p.tick.is_some())
+    }
+
+    /// Plays the animation of the selected 3D model, from where it was
+    /// paused, or pauses the one that plays, which holds where it is.
+    pub fn play_model_animation(&self) {
+        let selected = self.selected_model().map(|(id, _)| id);
+        let paused = {
+            let mut state = self.state.borrow_mut();
+            match state.model_playing.as_mut() {
+                Some(p) if p.tick.is_some() => {
+                    if let Some(tick) = p.tick.take() {
+                        tick.remove();
+                    }
+                    p.from = p.moment;
+                    true
+                }
+                _ => false,
+            }
+        };
+        if paused {
+            self.changed();
+            return;
+        }
+        let (Some(id), Some(duration)) = (selected, self.selected_model_animation()) else {
+            return;
+        };
+        let from = match &self.state.borrow().model_playing {
+            Some(p) if p.id == id => p.from,
+            _ => 0,
+        };
+        let Some(page) = find(&self.state.borrow().layout, id).map(|(p, _)| p) else {
+            return;
+        };
+        let weak = self.downgrade();
+        let tick = self.view.area().add_tick_callback(move |_, clock| {
+            let Some(this) = weak.upgrade() else {
+                return gtk::glib::ControlFlow::Break;
+            };
+            if this.model_frame(clock.frame_time()) {
+                gtk::glib::ControlFlow::Continue
+            } else {
+                // The callback ends here: it is not removed again.
+                if let Some(playing) = this.state.borrow_mut().model_playing.as_mut() {
+                    playing.tick = None;
+                }
+                this.stop_model_animation();
+                gtk::glib::ControlFlow::Break
+            }
+        });
+        self.state.borrow_mut().model_playing = Some(ModelPlaying {
+            id,
+            page,
+            duration,
+            from,
+            started: None,
+            moment: from,
+            tick: Some(tick),
+        });
+        self.changed();
+    }
+
+    /// Stops the animation of a 3D model, which shows at rest again.
+    pub fn stop_model_animation(&self) {
+        let Some(mut playing) = self.state.borrow_mut().model_playing.take() else {
+            return;
+        };
+        if let Some(tick) = playing.tick.take() {
+            tick.remove();
+        }
+        self.show_pages();
+        self.changed();
+    }
+
+    /// Draws the page of the 3D model being played as it is at a time of
+    /// the clock. Returns whether the animation goes on: not once the
+    /// model is gone.
+    fn model_frame(&self, now: i64) -> bool {
+        let (id, page, moment) = {
+            let mut state = self.state.borrow_mut();
+            let Some(playing) = state.model_playing.as_mut() else {
+                return false;
+            };
+            let started = *playing.started.get_or_insert(now);
+            let elapsed = ((now - started).max(0) / 1000) as u64 + u64::from(playing.from);
+            let moment = (elapsed % u64::from(playing.duration.max(1))) as u32;
+            playing.moment = moment;
+            (playing.id, playing.page, moment)
+        };
+        let list = {
+            let state = self.state.borrow();
+            let layout = Self::main_layout(&state);
+            let Some(shown) = layout.pages.get(page) else {
+                return false;
+            };
+            let mut shown = shown.clone();
+            let Some(placed) = shown.objects.iter_mut().find(|o| o.object.id == id) else {
+                return false;
+            };
+            let Some(model) = placed.object.model() else {
+                return false;
+            };
+            placed.object.kind = ObjectKind::Model(model.at(Some(moment)));
+            desk_render::DisplayList::from_page(layout, &shown)
+        };
+        self.view.set_page(page, list);
+        true
     }
 
     /// Starts turning the selected 3D model when a press at a point of a
@@ -247,6 +400,61 @@ mod tests {
             assert_eq!(editor.selected_model().map(|(_, m)| m.yaw), Some(0));
             editor.redo();
             assert_eq!(editor.selected_model().map(|(_, m)| m.yaw), Some(-4500));
+        });
+    }
+
+    #[test]
+    fn w116_a_model_that_moves_plays_and_pauses_without_a_change() {
+        crate::with_gtk(|| {
+            let editor = TextEditor::new(
+                &crate::view::DocumentView::new(),
+                desk_model::Document::new_word_processing(),
+            );
+            editor.insert_model(cube(), None);
+            // A cube of USD that rests has no animation to play.
+            assert_eq!(editor.selected_model_animation(), None);
+            editor.play_model_animation();
+            assert!(!editor.model_playing());
+            let path = format!(
+                "{}/../desk-3d/tests/data/animated.glb",
+                env!("CARGO_MANIFEST_DIR")
+            );
+            let moving = Model3d::from_bytes(std::fs::read(path).unwrap()).unwrap();
+            editor.insert_model(moving, None);
+            assert_eq!(editor.selected_model_animation(), Some(2000));
+            let before = editor.state.borrow().editor.document().clone();
+            editor.play_model_animation();
+            assert!(editor.model_playing());
+            assert!(editor.model_frame(0) && editor.model_frame(1_500_000));
+            let (id, _) = editor.selected_model().unwrap();
+            assert_eq!(
+                editor.state.borrow().editor.document().clone(),
+                before,
+                "playing changes nothing"
+            );
+            assert!(find(&editor.state.borrow().layout, id).is_some());
+            // Paused, it holds where it was, and goes on from there.
+            editor.play_model_animation();
+            assert!(!editor.model_playing());
+            assert_eq!(
+                editor.state.borrow().model_playing.as_ref().map(|p| p.from),
+                Some(1500)
+            );
+            editor.play_model_animation();
+            assert!(editor.model_playing());
+            assert!(editor.model_frame(3_000_000));
+            assert_eq!(
+                editor
+                    .state
+                    .borrow()
+                    .model_playing
+                    .as_ref()
+                    .map(|p| p.moment),
+                Some(1500)
+            );
+            // Another object selected, it stops.
+            editor.insert_model(cube(), None);
+            assert!(editor.state.borrow().model_playing.is_none());
         });
     }
 }

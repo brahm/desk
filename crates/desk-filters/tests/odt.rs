@@ -2948,6 +2948,51 @@ fn w116_3d_objects_keep_their_file_turn_and_description_with_a_picture_for_other
 }
 
 #[test]
+fn w116_a_glb_keeps_its_file_and_its_media_type() {
+    use desk_model::{Anchor, Frame, Object, ObjectKind};
+    let path = format!(
+        "{}/../desk-3d/tests/data/animated.glb",
+        env!("CARGO_MANIFEST_DIR")
+    );
+    let model = desk_model::Model3d::from_bytes(std::fs::read(path).unwrap())
+        .unwrap()
+        .turned(-2000, 1500);
+    assert_eq!(model.format(), desk_model::ModelFormat::Glb);
+    let mut editor = desk_model::Editor::new(Document::new_word_processing());
+    editor
+        .edit("3D Object", |edit| {
+            let mut object = Object::new(
+                edit.new_id(),
+                ObjectKind::Model(model.clone()),
+                Frame::from_pt(72.0, 72.0, 200.0, 150.0),
+            );
+            object.anchor = Anchor::Page(0);
+            edit.add_object(object)
+        })
+        .unwrap();
+    let bytes = write_odt(editor.document()).unwrap();
+    keep("obj-model-glb.odt", &bytes);
+    let read = read_odt(&bytes).unwrap();
+    let kinds: Vec<ObjectKind> = read.objects().iter().map(|o| o.kind.clone()).collect();
+    assert_eq!(kinds, [ObjectKind::Model(model)]);
+    let mut archive = zip::ZipArchive::new(std::io::Cursor::new(&bytes)).unwrap();
+    let mut manifest = String::new();
+    std::io::Read::read_to_string(
+        &mut archive.by_name("META-INF/manifest.xml").unwrap(),
+        &mut manifest,
+    )
+    .unwrap();
+    let entry = manifest
+        .split("<manifest:file-entry")
+        .find(|e| e.contains(".glb\""))
+        .unwrap_or_else(|| panic!("{manifest}"));
+    assert!(
+        entry.contains(r#"manifest:media-type="model/gltf-binary""#),
+        "{entry}"
+    );
+}
+
+#[test]
 fn obj_18_movies_of_other_programs_are_read() {
     let content = r##"<?xml version="1.0" encoding="UTF-8"?>
 <office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"

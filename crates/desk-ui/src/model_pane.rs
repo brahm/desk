@@ -3,10 +3,10 @@
 
 //! The Object tab of Pages 15.4, for a selected 3D object (W116,
 //! PXV-25): how far it is turned and tipped, which dragging the handle in
-//! its middle also sets, Reset Rotation, and the Description that says
-//! what it shows.
+//! its middle also sets, Reset Rotation, Play and Pause for a model that
+//! moves, and the Description that says what it shows.
 
-use std::cell::Cell;
+use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 use std::sync::Arc;
 
@@ -23,6 +23,11 @@ pub struct ModelGroup {
     group: compact::Group,
     yaw: compact::SpinRow,
     pitch: compact::SpinRow,
+    animation: compact::ActionRow,
+    play: gtk::Button,
+    /// The file last shown, and whether its model moves, so that it is
+    /// read once.
+    moves: RefCell<Option<(Arc<[u8]>, bool)>>,
     description: compact::EntryRow,
     editor: EditorOf,
     updating: Cell<bool>,
@@ -55,6 +60,19 @@ impl ModelGroup {
             .build();
         rotation.add_suffix(&reset);
         group.add(&rotation);
+        let play = gtk::Button::builder()
+            .label(tr("_Play"))
+            .use_underline(true)
+            .action_name("win.play-model-animation")
+            .valign(gtk::Align::Center)
+            .build();
+        let animation = compact::ActionRow::builder()
+            .title(tr("Animation"))
+            .subtitle(tr("Plays how the object moves, over and over"))
+            .activatable_widget(&play)
+            .build();
+        animation.add_suffix(&play);
+        group.add(&animation);
         let description = compact::EntryRow::builder()
             .title(tr("Description"))
             .build();
@@ -64,6 +82,9 @@ impl ModelGroup {
             group,
             yaw,
             pitch,
+            animation,
+            play,
+            moves: RefCell::new(None),
             description,
             editor,
             updating: Cell::new(false),
@@ -134,6 +155,21 @@ impl ModelGroup {
         self.updating.set(true);
         self.yaw.set_value(f64::from(model.yaw) / 100.0);
         self.pitch.set_value(f64::from(model.pitch) / 100.0);
+        let moves = {
+            let mut known = self.moves.borrow_mut();
+            match &*known {
+                Some((data, moves)) if Arc::ptr_eq(data, &model.shared_data()) => *moves,
+                _ => {
+                    let moves = model.scene().is_ok_and(|s| s.animation.is_some());
+                    *known = Some((model.shared_data(), moves));
+                    moves
+                }
+            }
+        };
+        self.animation.set_visible(moves);
+        let playing = (self.editor)().is_some_and(|e| e.model_playing());
+        self.play
+            .set_label(&if playing { tr("_Pause") } else { tr("_Play") });
         let description = model.description.as_deref().unwrap_or_default();
         if self.description.text() != description {
             self.description.set_text(description);

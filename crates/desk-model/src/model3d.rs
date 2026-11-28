@@ -14,6 +14,8 @@ use std::sync::Arc;
 use crate::{Object, ObjectKind};
 
 pub use desk_3d::Format as ModelFormat;
+/// Gathers a glTF and the files beside it that it names into one GLB.
+pub use desk_3d::pack_gltf;
 
 /// The most a model may be tipped toward or away, in hundredths of a
 /// degree: a quarter turn, to see it from straight above or below.
@@ -35,6 +37,11 @@ pub struct Model3d {
     /// What it shows, for those who cannot see it, as the Description of
     /// the Object tab of Pages 15.4; none when it has none.
     pub description: Option<Arc<str>>,
+    /// Where its animation is shown while it plays, in milliseconds from
+    /// its start; none at rest. The view sets it as it plays the model:
+    /// it is never saved, and two models that differ only in it are the
+    /// same.
+    pub moment: Option<u32>,
 }
 
 impl Model3d {
@@ -49,6 +56,7 @@ impl Model3d {
             yaw: 0,
             pitch: 0,
             description: None,
+            moment: None,
         })
     }
 
@@ -87,6 +95,15 @@ impl Model3d {
         desk_3d::read(&self.data)
     }
 
+    /// The model at a moment of its animation, in milliseconds, or at
+    /// rest.
+    pub fn at(&self, moment: Option<u32>) -> Self {
+        Self {
+            moment,
+            ..self.clone()
+        }
+    }
+
     /// How `desk-3d` draws it.
     pub fn view(&self) -> desk_3d::View {
         desk_3d::View {
@@ -114,6 +131,7 @@ impl std::fmt::Debug for Model3d {
             .field("yaw", &self.yaw)
             .field("pitch", &self.pitch)
             .field("description", &self.description)
+            .field("moment", &self.moment)
             .finish()
     }
 }

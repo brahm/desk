@@ -57,7 +57,7 @@ pub use drawing::{
     MAX_DRAWING_STROKES, MAX_STROKE_POINTS, NewStroke, drawing_frame,
 };
 pub use gallery::{Gallery, GalleryImage};
-pub use model3d::{MAX_PITCH, Model3d, ModelFormat};
+pub use model3d::{MAX_PITCH, Model3d, ModelFormat, pack_gltf};
 mod case_change;
 mod change;
 mod chart_style;
