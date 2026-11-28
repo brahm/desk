@@ -10,6 +10,12 @@ use crate::{Texture, limits};
 /// Decodes a picture; none when it is not PNG or JPEG, is broken, or has
 /// more pixels than [`limits::TEXTURE_PIXELS`].
 pub(crate) fn decode(bytes: &[u8]) -> Option<Texture> {
+    decode_shrunk(bytes).map(|(t, _)| t)
+}
+
+/// Decodes a picture as [`decode`] does, and tells whether it was made
+/// smaller.
+pub(crate) fn decode_shrunk(bytes: &[u8]) -> Option<(Texture, bool)> {
     let texture = if bytes.starts_with(b"\x89PNG") {
         png(bytes)?
     } else if bytes.starts_with(&[0xFF, 0xD8]) {
@@ -17,7 +23,20 @@ pub(crate) fn decode(bytes: &[u8]) -> Option<Texture> {
     } else {
         return None;
     };
-    Some(shrink(texture))
+    let side = texture.width.max(texture.height);
+    Some((shrink(texture), side > limits::TEXTURE_SIDE))
+}
+
+/// A PNG of a texture.
+pub(crate) fn encode(texture: &Texture) -> Option<Vec<u8>> {
+    let mut out = Vec::new();
+    let mut encoder = png::Encoder::new(&mut out, texture.width, texture.height);
+    encoder.set_color(png::ColorType::Rgba);
+    encoder.set_depth(png::BitDepth::Eight);
+    let mut writer = encoder.write_header().ok()?;
+    writer.write_image_data(&texture.rgba).ok()?;
+    writer.finish().ok()?;
+    Some(out)
 }
 
 /// Whether a size is within the limit, before the pixels are allocated.
@@ -150,5 +169,7 @@ mod tests {
         assert_eq!(small.rgba.len(), small.width as usize * 4);
         assert!(small.rgba.iter().all(|v| *v == 200));
         assert!(decode(b"not a picture").is_none());
+        let picture = encode(&small).unwrap();
+        assert_eq!(decode_shrunk(&picture), Some((small, false)));
     }
 }

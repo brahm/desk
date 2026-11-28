@@ -14,6 +14,12 @@ use std::sync::Arc;
 use crate::{Object, ObjectKind};
 
 pub use desk_3d::Format as ModelFormat;
+/// The formats that are turned into GLB when a model is brought in, as
+/// OBJ.
+pub use desk_3d::Import as ModelImport;
+/// The bytes that a document keeps of a model from a file, with the files
+/// beside it that it names.
+pub use desk_3d::import as import_model;
 /// Gathers a glTF and the files beside it that it names into one GLB.
 pub use desk_3d::pack_gltf;
 
